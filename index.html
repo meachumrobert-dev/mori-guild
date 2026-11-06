@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0e0b16">
+<title>Mori Guild 3D — The Retired Bard</title>
+<style>
+:root{--bg:rgba(14,11,22,.82);--ln:rgba(163,255,18,.25);--acc:#a3ff12;--pink:#ff8af0;--tx:#efe9ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0e0b16;color:var(--tx);font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+button{font:inherit;color:inherit;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:6px 10px;cursor:pointer}
+button:hover{background:rgba(255,255,255,.14)} button:disabled{opacity:.35;cursor:default}
+button.on{background:var(--acc);color:#111;border-color:var(--acc)}
+.pri{background:var(--acc);color:#111;border-color:var(--acc);font-weight:700}
+#top{position:fixed;top:0;left:0;right:0;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:6px 8px;padding-top:max(6px,env(safe-area-inset-top));background:linear-gradient(#0e0b16f0,#0e0b1600);pointer-events:none;z-index:5}
+#top .st{background:var(--bg);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:3px 9px;white-space:nowrap;pointer-events:auto}
+#top .st b{color:var(--acc)} #brand{font-weight:800;letter-spacing:.08em;color:var(--pink)}
+#hpbar{display:inline-block;width:60px;height:7px;background:#311;border-radius:4px;vertical-align:middle;overflow:hidden}#hpbar i{display:block;height:100%;background:#ff4d6d}
+#bottom{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;padding:6px;padding-bottom:max(6px,env(safe-area-inset-bottom));background:linear-gradient(#0e0b1600,#0e0b16f0);z-index:5}
+#bottom button{background:var(--bg)}
+#log{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;max-width:min(560px,92vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 12px;text-align:center;z-index:4;pointer-events:none;transition:opacity .4s}
+#moriLine{position:fixed;left:8px;top:64px;max-width:min(330px,60vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 10px;z-index:4;font-size:12px}
+#moriLine .bar{height:5px;background:#222;border-radius:3px;margin-top:4px;overflow:hidden}#moriLine .bar i{display:block;height:100%;background:var(--acc);width:0}
+#sugg{margin-top:6px;display:none}#sugg button{padding:3px 8px;margin-right:4px}
+.panel{position:fixed;right:8px;top:64px;bottom:64px;width:min(340px,94vw);background:rgba(14,11,22,.94);border:1px solid var(--ln);border-radius:14px;z-index:6;display:none;flex-direction:column;overflow:hidden}
+.panel.open{display:flex}.panel h3{margin:0;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.panel .body{flex:1;overflow:auto;padding:10px 12px;touch-action:pan-y}
+.row{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}.row button{padding:5px 8px;font-size:12px}
+.small{font-size:11px;opacity:.7}.sec{margin:10px 0 4px;font-weight:700;color:var(--pink);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.q{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.05);border-radius:8px;padding:4px 8px;margin:3px 0}
+#chatLog{height:220px;overflow:auto;background:rgba(0,0,0,.3);border-radius:8px;padding:6px;font-size:12px;touch-action:pan-y}#chatLog .me{color:#9cf}#chatLog .mo{color:var(--acc)}#chatLog .npc{color:#ffd38a}#chatLog .sys{color:#9a8fb0;font-style:italic;font-size:11px}#chatMic.hot{background:#ff4d6d;color:#fff}#chatMic:disabled{opacity:.45}.qrow{border:1px solid var(--ln);border-radius:8px;padding:6px 8px;margin:4px 0;background:rgba(255,255,255,.03)}.qrow.done{opacity:.6}.qrow.active{border-color:#facc15}
+input[type=text]{background:#000a;border:1px solid #fff3;color:#fff;border-radius:8px;padding:6px 8px;font:inherit}
+.modal{position:fixed;inset:0;background:rgba(5,3,10,.7);display:none;align-items:center;justify-content:center;z-index:9;padding:10px}
+.modal.open{display:flex}.modal .card{background:#15101f;border:1px solid rgba(255,138,240,.35);border-radius:18px;max-width:460px;width:100%;max-height:88vh;overflow:auto;padding:14px;touch-action:pan-y}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:7px 9px;margin:5px 0}
+#roll{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%) scale(.8);background:#120d1c;border:2px solid var(--pink);border-radius:16px;padding:10px 16px;z-index:8;text-align:center;opacity:0;pointer-events:none;transition:all .2s;min-width:220px}
+#roll.show{opacity:1;transform:translate(-50%,-50%) scale(1)}#roll .die{display:inline-block;width:46px;height:46px;line-height:46px;font-weight:900;font-size:20px;color:#111;background:var(--acc);clip-path:polygon(50% 0,100% 28%,100% 72%,50% 100%,0 72%,0 28%);margin-right:8px;vertical-align:middle}
+#roll.miss .die{background:#888}#roll.crit .die{background:#facc15}#roll.foe .die{background:#ff4d6d}
+#ctx{position:fixed;right:10px;bottom:70px;display:flex;flex-direction:column;gap:8px;z-index:5;align-items:flex-end}
+#ctx button{border-radius:999px;padding:10px 14px;background:var(--bg);font-weight:700}
+#ctx #bInteract{border-color:var(--acc);color:var(--acc);display:none}
+#joy{position:fixed;left:18px;bottom:78px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);z-index:5;display:none;touch-action:none}
+#joy i{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(163,255,18,.45)}
+.touch #joy{display:block}
+.label3d{position:fixed;transform:translate(-50%,-100%);background:#0e0b16e0;border:1px solid var(--ln);border-radius:10px;padding:4px 8px;font-size:12px;max-width:240px;text-align:center;z-index:3;pointer-events:none;display:none}
+/* creator */
+#creator{position:fixed;inset:0;z-index:7;display:none;pointer-events:none}
+#creator.open{display:block}
+#crLeft,#crRight{position:fixed;top:70px;bottom:120px;width:240px;background:rgba(14,11,22,.92);border:1px solid var(--ln);border-radius:14px;overflow:auto;padding:10px;pointer-events:auto;touch-action:pan-y}
+#crLeft{left:8px}#crRight{right:8px;width:270px}
+#crViews{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;display:flex;gap:5px;pointer-events:auto;flex-wrap:wrap;justify-content:center}
+#crTitle{position:fixed;left:50%;transform:translateX(-50%);top:150px;text-align:center;pointer-events:none;text-shadow:0 2px 6px #000}
+.charItem{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:8px;margin:3px 0;background:rgba(255,255,255,.05);cursor:pointer}
+.charItem.sel{outline:2px solid var(--acc)}
+.sl{display:grid;grid-template-columns:92px 1fr 34px;align-items:center;gap:6px;margin:3px 0;font-size:12px}
+.sl input{width:100%}.lockNote{background:#2a1a0a;border:1px solid #facc15;border-radius:8px;padding:6px;margin:6px 0;color:#facc15;font-size:12px}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff4;display:inline-block;vertical-align:middle;cursor:pointer;margin:2px}
+@media (max-width:760px){
+  #crLeft{top:auto;bottom:118px;left:6px;right:6px;width:auto;height:92px;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding:6px;touch-action:pan-x}
+  #crLeft .charItem{min-width:120px;flex-direction:column;align-items:flex-start}
+  #crLeft .hdr{display:none}
+  #crRight{top:auto;bottom:216px;left:6px;right:6px;width:auto;height:30vh}
+  #crTitle{top:96px}
+  #moriLine{max-width:58vw;font-size:11px}
+  .panel{top:auto;height:52vh;left:6px;right:6px;width:auto}
+}
+#ctx #bInteract.hot{display:block}
+#joy.on{display:block}
+.q.sel{outline:2px solid var(--acc)} #crLeft .q{cursor:pointer}
+.chip{display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px 6px;font-size:12px}
+table.pt{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0}table.pt td,table.pt th{border-bottom:1px solid #fff1;padding:3px;text-align:left}
+.quote{background:#1f1530;border-left:3px solid var(--pink);padding:6px 10px;margin:6px 0;border-radius:6px;font-style:italic}
+.rollbox{background:#0c0914;border:1px solid #facc1555;border-radius:10px;padding:6px 10px;margin:6px 0}.rollbox .pct b{display:inline-block;background:#facc15;color:#111;border-radius:6px;padding:1px 6px;margin:0 2px;font-family:monospace}
+.lock{background:#2a1a0a;border:1px solid #facc15;border-radius:8px;padding:6px;margin:6px 0;color:#facc15;font-size:12px}
+#crThumbLab{position:fixed;pointer-events:none;font-size:10px}
+.help li{margin:5px 0}
+
+.msg{position:relative;padding-right:56px}.msg .msgT{display:block}.msgCtl{position:absolute;right:2px;top:0;display:flex;gap:2px;opacity:.55}.msg:hover .msgCtl,.msg.ctlOn .msgCtl{opacity:1}.msgCtl button{padding:1px 5px;font-size:11px;border-radius:6px}
+.lorecard{border:1px solid var(--ln);border-radius:8px;padding:6px 8px;margin:4px 0;background:rgba(255,255,255,.03)}.lorecard.off{opacity:.45}.lorecard.on{border-color:#facc1555}
+.mem{display:flex;justify-content:space-between;gap:6px;align-items:center;background:rgba(255,255,255,.04);border-radius:8px;padding:4px 6px;margin:3px 0;font-size:12px}.mem.pin{border:1px solid #facc15}
+.chip.bond{background:#2a1a3a;border:1px solid #ff8af055}
+#personaCard{background:rgba(255,138,240,.08);border:1px solid rgba(255,138,240,.3);border-radius:10px;padding:8px;margin:6px 0}
+
+select,input[type=color]{background:#000a;color:#fff;border:1px solid #fff3;border-radius:6px;font:inherit}
+.msg{margin:2px 0}
+body.cr #top,body.cr #moriLine,body.cr #log,body.cr #ctx,body.cr #joy,body.cr .label3d{display:none!important}
+.sl{grid-template-columns:92px 1fr}
+@media (max-width:760px){ #crLeft{flex-wrap:nowrap;align-items:center} body.cr #bottom{display:none} #crLeft{bottom:6px!important} #crViews{bottom:104px!important;flex-wrap:nowrap;gap:3px} #crViews button{padding:4px 7px;font-size:11px} #crTitle{top:132px!important} #crRight{bottom:146px!important;height:27vh!important} #crLeft .q{min-width:110px;flex-direction:column;align-items:flex-start} #crLeft .row{flex-wrap:nowrap} #crLeft .sec{display:none} #ctx{bottom:100px} #log{bottom:96px;font-size:11px} }
+/* v3 globe */
+body.globe #ctx, body.globe #joy, body.globe .label3d, body.globe #moriLine #sugg{display:none!important}
+body.globe #seedP{left:12px; right:auto; width:min(400px,40vw)}
+.glabel{position:fixed; transform:translate(-50%,-125%); pointer-events:none; font:12px/1.2 system-ui,sans-serif; color:#fff; text-shadow:0 1px 3px #000,0 0 2px #000; white-space:nowrap; text-align:center; z-index:4; display:none}
+.glabel span{color:#d9d9e6; font-size:10px}
+#sRegion{max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+@media (max-width:760px){ body.globe #seedP{left:6px; right:6px; width:auto; top:auto; bottom:6px; max-height:44vh} body.globe #bottom, body.globe #log{display:none} #sRegion{max-width:92vw} }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top">
+  <span class="st" id="brand">MORI GUILD 3D</span>
+  <span class="st">❤ <span id="hpbar"><i></i></span> <b id="sHp">20</b></span>
+  <span class="st">🌿 Life <b id="sLife">0</b></span>
+  <span class="st">🎟 LARPy <b id="sLarpy">0</b></span>
+  <span class="st">🪙 Gold <b id="sGold">0</b></span>
+  <span class="st">🌱<b id="sHerbs">0</b> ⛏<b id="sOre">0</b> 🪵<b id="sTimber">0</b></span>
+  <span class="st" id="sRank">Crooked Walls</span>
+  <span class="st" id="sClock">☀ Day</span>
+  <span class="st" id="sRegion">🌍</span>
+  <span class="st" id="sWorld" title="World progress — Mori idle builder">🌱 3/1536</span>
+</div>
+<div id="moriLine"><b>Mori</b>: <span id="moriStatus">waking up…</span><div class="bar"><i id="moriBar"></i></div>
+  <div id="sugg"><div id="suggText" class="small"></div><button class="pri" id="suggOk">Approve</button><button id="suggNo">Not now</button></div></div>
+<div id="perf" style="display:none;position:fixed;left:6px;bottom:6px;z-index:60;font:11px monospace;color:#cfe;background:#000a;padding:3px 6px;border-radius:4px;pointer-events:none;max-width:70vw"></div>
+<div id="log">Welcome to the Guild. Mori is planning the town.</div>
+<div id="roll"><span class="die" id="rollDie">20</span><span id="rollText"></span></div>
+<div id="joy"><i></i></div>
+<div id="ctx"><button id="bInteract">E · Interact</button><button id="bBandage">🩹 Bandage</button><button id="bSalve">🧴 Salve</button><button id="bPotion">🧪 Potion</button><button id="bAttack">⚔ Attack</button></div>
+<div id="bottom">
+  <button id="bHero">🧬 HeroLock</button><button id="bJobs">🔨 Mori's Jobs</button><button id="bBag">🎒 Bag &amp; Painter</button>
+  <button id="bTalk">💬 Talk</button><button id="bQuests">📜 Quests</button><button id="bLore">🃏 Lore</button><button id="bMem">💛 Memory</button><button id="bPersona">🪪 Persona</button><button id="bBeat">🥁 Beat</button><button id="bBlue">🟦 Blue room</button>
+  <button id="bGlobe">🌍 Globe</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
+</div>
+
+<div class="panel" id="questP"><h3>📜 Quest log <button data-close="questP">✕</button></h3><div class="body" id="questBody"></div></div>
+<div class="panel" id="loreP"><h3>🃏 Lore cards <button data-close="loreP">✕</button></h3><div class="body" id="loreBody"></div></div>
+<div class="panel" id="memP"><h3>💛 Memory book <button data-close="memP">✕</button></h3><div class="body" id="memBody"></div></div>
+<div class="panel" id="personaP"><h3>🪪 Persona <button data-close="personaP">✕</button></h3><div class="body" id="personaBody"></div></div>
+<div class="panel" id="jobsP"><h3>Mori's job queue <button data-close="jobsP">✕</button></h3><div class="body" id="jobsBody"></div></div>
+<div class="panel" id="bagP"><h3>Bag · Template Painter <button data-close="bagP">✕</button></h3><div class="body" id="bagBody"></div></div>
+<div class="panel" id="talkP"><h3><span id="talkTitle">Talk to Mori</span> <button data-close="talkP">✕</button></h3><div class="body">
+  <div id="npcBar" class="row" style="display:none;align-items:center"><span id="npcWho" class="small" style="flex:1"></span><button id="npcShop" style="display:none"></button><button id="npcBack">↩ Mori</button></div>
+  <div id="chatLog"></div><div class="small" id="chatHint">Chat controls on each bubble: ✏️ Edit · 🔄 Regenerate · 📌 Pin (saved to Memory).</div>
+  <div class="row" id="chatBar"><button id="chatMic" title="Speak (Web Speech API)">🎤</button><input type="text" id="chatIn" placeholder="say something… (try: build a house)" style="flex:1"><button class="pri" id="chatSend">Send</button></div>
+  <div class="row"><label><input type="checkbox" id="ttsOn"> 🔊 Speak replies</label><label><input type="checkbox" id="wakeOn"> 👂 Say "Mori" to talk</label></div><div class="small" id="micSt"></div>
+  <div class="small">Mori's brain: <span id="brainV"></span>. "remember …" or "add room …" changes her (asks a parent first).</div>
+</div></div>
+<div class="panel" id="beatP"><h3>Mori's beat (DAW) <button data-close="beatP">✕</button></h3><div class="body">
+  <div class="row"><button class="pri" id="beatPlay">▶ Play</button><button id="beatStop">■ Stop</button><button id="beatMake">🎲 Make a beat</button></div>
+  <div id="beatGrid" style="font-family:monospace;font-size:12px;line-height:1.5"></div>
+  <div class="small">The Retired Bard's neon pulses with the beat.</div>
+</div></div>
+
+<div class="panel" id="seedP"><h3>🌍 World Seed · the planet <button data-close="seedP">✕</button></h3><div class="body" id="seedBody"></div></div>
+
+<div class="modal" id="modal"><div class="card" id="modalCard"></div></div>
+
+<div id="creator">
+  <div id="crTitle"><div style="font-size:20px;font-weight:800" id="crName">Hero</div><div class="small" id="crSub"></div></div>
+  <div id="crLeft"></div>
+  <div id="crRight"></div>
+  <div id="crViews"></div>
+</div>
+
+<script src="vendor/three-r170.min.js"></script>
+<script src="js/mori-engine.js"></script>
+<script src="js/hero.js"></script>
+<script src="assets/templates/templates.js"></script>
+<script src="js/templates.js"></script>
+<script src="js/srd.js"></script>
+<script src="js/craft.js"></script>
+<script src="js/planet.js"></script>
+<script src="js/world.js"></script>
+<script src="js/seedworld.js"></script>
+<script src="js/flowers.js"></script>
+<script src="js/terraform.js"></script>
+<script src="js/twospeed.js"></script>
+<script src="js/gather.js"></script>
+<script src="js/impostors.js"></script>
+<script src="js/demonclan.js"></script>
+<script src="js/quests.js"></script>
+<script src="js/npcs.js"></script>
+<script src="js/morichat.js"></script>
+<script src="js/memory.js"></script>
+<script src="js/lore.js"></script>
+<script src="js/dreadlord.js"></script>
+<script src="js/treasury.js"></script>
+<script src="js/herbal.js"></script>
+<script src="js/stations.js"></script>
+<script src="js/idlebuild.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

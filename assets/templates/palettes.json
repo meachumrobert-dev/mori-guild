@@ -1,0 +1,476 @@
+{
+ "_about": "Palettes k-means-extracted from Robert's approved \"Mori templates\" Drive images. Colors are sorted dark to light.",
+ "themes": {
+  "fire": {
+   "colors": [
+    "#ab5839",
+    "#f38835",
+    "#acb555",
+    "#db8d67",
+    "#fbcd35",
+    "#ecd886"
+   ],
+   "weights": [
+    3149,
+    3844,
+    2494,
+    2382,
+    3511,
+    2053
+   ],
+   "tags": [
+    "fire",
+    "forge",
+    "campfire",
+    "spell"
+   ],
+   "sources": [
+    "20260806_175102.jpg",
+    "IMG_20260806_180032.jpg"
+   ]
+  },
+  "fel_green": {
+   "colors": [
+    "#1c5631",
+    "#3c7f59",
+    "#67b261",
+    "#3bbd88",
+    "#a5e77b",
+    "#7ee9b7"
+   ],
+   "weights": [
+    2371,
+    3350,
+    1913,
+    1104,
+    1029,
+    515
+   ],
+   "tags": [
+    "spell",
+    "terraform",
+    "mori",
+    "sparks"
+   ],
+   "sources": [
+    "06b5e48e-e21c-4c53-a9fa-5e35f9dd7efd.jpg",
+    "7f451af3-60ab-4b17-a1fb-6cee9c8e9bd5.jpg"
+   ]
+  },
+  "arcane_purple": {
+   "colors": [
+    "#18122a",
+    "#241c37",
+    "#2e2445",
+    "#3c2c59",
+    "#543b79",
+    "#7c52a7"
+   ],
+   "weights": [
+    1032,
+    1787,
+    1573,
+    996,
+    554,
+    159
+   ],
+   "tags": [
+    "spell",
+    "arcane",
+    "roof"
+   ],
+   "sources": [
+    "grok_1786392586467.jpg"
+   ]
+  },
+  "storm_gold": {
+   "colors": [
+    "#8c893f",
+    "#b1a54e",
+    "#a1c75b",
+    "#dac862",
+    "#bde972",
+    "#eef091"
+   ],
+   "weights": [
+    512,
+    478,
+    377,
+    363,
+    425,
+    483
+   ],
+   "tags": [
+    "spell",
+    "lightning",
+    "trim"
+   ],
+   "sources": [
+    "06b5e48e-e21c-4c53-a9fa-5e35f9dd7efd.jpg",
+    "grok_image_1790632348506.jpg"
+   ]
+  },
+  "lawn": {
+   "colors": [
+    "#4a7a33",
+    "#5e9043",
+    "#6f9b58",
+    "#7aa742",
+    "#96b654",
+    "#c1d161"
+   ],
+   "weights": [
+    2355,
+    5643,
+    3720,
+    1880,
+    1545,
+    757
+   ],
+   "tags": [
+    "terrain",
+    "trees",
+    "terraform"
+   ],
+   "sources": [
+    "20260806_175002.jpg"
+   ]
+  },
+  "ash_stone": {
+   "colors": [
+    "#22221f",
+    "#464545",
+    "#68686b",
+    "#88898d",
+    "#a6aab2",
+    "#cad2da"
+   ],
+   "weights": [
+    4708,
+    6337,
+    6939,
+    7310,
+    5256,
+    3430
+   ],
+   "tags": [
+    "stone",
+    "walls",
+    "ground",
+    "terraform"
+   ],
+   "sources": [
+    "20260806_175111.jpg",
+    "20260806_175130.jpg"
+   ]
+  },
+  "wood": {
+   "colors": [
+    "#2a2621",
+    "#595046",
+    "#7e7168",
+    "#9f9087",
+    "#bcaea5",
+    "#dbcdc0"
+   ],
+   "weights": [
+    2880,
+    3605,
+    3883,
+    4052,
+    3897,
+    2150
+   ],
+   "tags": [
+    "wood",
+    "buildings",
+    "fence"
+   ],
+   "sources": [
+    "20260806_175032.jpg",
+    "20260806_175130.jpg"
+   ]
+  },
+  "desert": {
+   "colors": [
+    "#433627",
+    "#66533d",
+    "#7f6950",
+    "#998066",
+    "#b69f83",
+    "#d9cab4"
+   ],
+   "weights": [
+    4827,
+    10371,
+    13267,
+    9318,
+    5725,
+    2912
+   ],
+   "tags": [
+    "terrain",
+    "dust",
+    "terraform",
+    "walls"
+   ],
+   "sources": [
+    "grok_image_1791962841086.jpg"
+   ]
+  },
+  "steampunk_brass": {
+   "colors": [
+    "#2f1d15",
+    "#452f22",
+    "#5c4632",
+    "#7d6345",
+    "#a38a62",
+    "#c6b991"
+   ],
+   "weights": [
+    3121,
+    3314,
+    2727,
+    2036,
+    1544,
+    1021
+   ],
+   "tags": [
+    "buildings",
+    "roof",
+    "trim"
+   ],
+   "sources": [
+    "grok_1784996965151.jpg",
+    "grok_1785152318940.jpg",
+    "grok_image_1789607966034.jpg"
+   ]
+  },
+  "night_ruins": {
+   "colors": [
+    "#070b0c",
+    "#1c2023",
+    "#333637",
+    "#4f5150",
+    "#837260",
+    "#c5c592"
+   ],
+   "weights": [
+    15593,
+    17764,
+    19836,
+    16345,
+    8539,
+    2883
+   ],
+   "tags": [
+    "stone",
+    "walls",
+    "sky",
+    "dungeon"
+   ],
+   "sources": [
+    "8c219f91-9435-4327-8984-7680b7e45658.jpg",
+    "8vfHL.jpg"
+   ]
+  },
+  "stained_glass": {
+   "colors": [
+    "#3a6b9d",
+    "#9d7740",
+    "#7050ad",
+    "#bb68aa",
+    "#66a7cf",
+    "#b7c46b"
+   ],
+   "weights": [
+    36,
+    126,
+    38,
+    17,
+    48,
+    91
+   ],
+   "tags": [
+    "windows",
+    "lanterns",
+    "trim"
+   ],
+   "sources": [
+    "grok_image_1789607966034.jpg",
+    "grok_image_1789608029933.jpg",
+    "grok_image_1789608120763.jpg"
+   ]
+  },
+  "meadow_flowers": {
+   "colors": [
+    "#c0142a",
+    "#e0452c",
+    "#e09a05",
+    "#f0b81a",
+    "#de3c91",
+    "#f4e6ee",
+    "#e6bc03",
+    "#db301e",
+    "#b64a66"
+   ],
+   "note": "petal colors sampled from Robert's garden-flower photos"
+  },
+  "foliage": {
+   "colors": [
+    "#87ad18",
+    "#5f8a25",
+    "#3f6a1a",
+    "#898928",
+    "#504d1c",
+    "#647b1c"
+   ],
+   "note": "leaf and stem greens"
+  }
+ },
+ "buildings": {
+  "walls": [
+   "#bba893",
+   "#ccbfb2",
+   "#dcd2c5",
+   "#bab1ab",
+   "#d6cfcc",
+   "#d7cfca",
+   "#a8a8aa",
+   "#c9c9cb",
+   "#cdcfd4",
+   "#ba9c81",
+   "#bba285",
+   "#d2c5b2"
+  ],
+  "roofs": [
+   "#9e5e2d",
+   "#868e3d",
+   "#30254a",
+   "#312649",
+   "#4b3325",
+   "#5c4631",
+   "#5a8b40",
+   "#5d8249",
+   "#2a3a46",
+   "#2a3f46",
+   "#63503b",
+   "#7f614c"
+  ],
+  "trim": [
+   "#a1c75b",
+   "#dac862",
+   "#bde972"
+  ],
+  "note": "house wall / roof choices used by Mori's builds and the World Seed villages"
+ },
+ "terraform": {
+  "pine": [
+   "#4a7a33",
+   "#5e9043",
+   "#6f9b58"
+  ],
+  "oak": [
+   "#6f9b58",
+   "#7aa742",
+   "#96b654"
+  ],
+  "spark": "#a5e77b",
+  "dust": "#7f6950",
+  "note": "tree tints and particle colors for the terraform tool"
+ },
+ "flowers": {
+  "_about": "species for the procedural low-poly flowers (js/flowers.js); petals tint by instance, center/stem/leaf are vertex colors",
+  "stems": [
+   "#5f8a25",
+   "#2f4f13",
+   "#647b1c"
+  ],
+  "leaves": [
+   "#87ad18",
+   "#5f8a25",
+   "#3f6a1a"
+  ],
+  "zinnia": {
+   "petals": [
+    "#c0142a",
+    "#990118",
+    "#e0452c"
+   ],
+   "center": "#d9a521",
+   "n": [
+    12,
+    18
+   ]
+  },
+  "marigold": {
+   "petals": [
+    "#e09a05",
+    "#f0b81a",
+    "#e2c403"
+   ],
+   "center": "#a56a09",
+   "n": [
+    10,
+    14
+   ]
+  },
+  "vinca": {
+   "petals": [
+    "#de3c91",
+    "#f20f53",
+    "#f4e6ee"
+   ],
+   "center": "#c21e5a",
+   "n": [
+    5,
+    5
+   ]
+  },
+  "sunflower": {
+   "petals": [
+    "#e6bc03",
+    "#f2c81c"
+   ],
+   "center": "#4a2e14",
+   "n": [
+    14,
+    22
+   ]
+  },
+  "canna": {
+   "petals": [
+    "#db301e",
+    "#ee5a2a"
+   ],
+   "center": "#a8221a",
+   "n": [
+    4,
+    6
+   ]
+  },
+  "gloomrose": {
+   "petals": [
+    "#6a2c5c",
+    "#b64a66",
+    "#4a2a5a"
+   ],
+   "center": "#2a1830",
+   "n": [
+    6,
+    9
+   ]
+  },
+  "squash": {
+   "petals": [
+    "#e3bb02",
+    "#f0cf3a"
+   ],
+   "center": "#c08a00",
+   "n": [
+    5,
+    5
+   ]
+  }
+ }
+}

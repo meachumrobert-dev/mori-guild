@@ -1,0 +1,794 @@
+{
+ "pack": "Mori Templates",
+ "version": 2,
+ "created": "2026-11-04",
+ "origin": "Robert's Google Drive folder \"Mori templates\" (read-only; approved as game template material)",
+ "license": "Robert's own images/videos, approved by him for this game. Not CC0 - do not redistribute outside the game without his OK.",
+ "textures": {
+  "grass": {
+   "files": [
+    "textures/grass.webp",
+    "textures/grass_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175002.jpg",
+    "drive_file_id": "12r24pIPCRcEtRsUnrQaSqAZnJsR44Ifn"
+   },
+   "crop": [
+    0.3,
+    0.62,
+    0.56,
+    1.0
+   ],
+   "how": "lawn",
+   "used_for": "guild ground detail"
+  },
+  "road_gravel": {
+   "files": [
+    "textures/road_gravel.webp",
+    "textures/road_gravel_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "IMG_20260806_180032.jpg",
+    "drive_file_id": "1PDsWCKMVokRdJojJFZAYzHdSTl9H9guK"
+   },
+   "crop": [
+    0.17,
+    0.72,
+    0.66,
+    0.99
+   ],
+   "how": "gravel yard path",
+   "used_for": "roads (guild + World Seed)"
+  },
+  "ash": {
+   "files": [
+    "textures/ash.webp",
+    "textures/ash_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175130.jpg",
+    "drive_file_id": "1OJ5mItDRzeWTQ1_tUy-D8C_m5DWHj1HM"
+   },
+   "crop": [
+    0.54,
+    0.2,
+    0.8,
+    0.52
+   ],
+   "how": "fire-pit ash",
+   "used_for": "forge hearth / scorched ground"
+  },
+  "earth_cracked": {
+   "files": [
+    "textures/earth_cracked.webp",
+    "textures/earth_cracked_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "grok_image_1791962841086.jpg",
+    "drive_file_id": "1B5gBY1mxi0LPjolu0TK4eqQOtaY1tpGv"
+   },
+   "crop": [
+    0.62,
+    0.2,
+    1.0,
+    0.47
+   ],
+   "how": "cracked desert floor (Grok art)",
+   "used_for": "dungeon road / desert"
+  },
+  "stone_flag": {
+   "files": [
+    "textures/stone_flag.webp",
+    "textures/stone_flag_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "grok_image_1791962841086.jpg",
+    "drive_file_id": "1B5gBY1mxi0LPjolu0TK4eqQOtaY1tpGv"
+   },
+   "crop": [
+    0.66,
+    0.62,
+    1.0,
+    1.0
+   ],
+   "how": "cracked floor re-toned to gray flagstone",
+   "used_for": "plinths, shrine, keep floor"
+  },
+  "plaster": {
+   "files": [
+    "textures/plaster.webp",
+    "textures/plaster_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "grok_image_1791962841086.jpg",
+    "drive_file_id": "1B5gBY1mxi0LPjolu0TK4eqQOtaY1tpGv"
+   },
+   "crop": [
+    0.66,
+    0.62,
+    1.0,
+    1.0
+   ],
+   "how": "cracked floor re-toned to pale plaster",
+   "used_for": "house + guild hall walls"
+  },
+  "stone_rubble": {
+   "files": [
+    "textures/stone_rubble.webp",
+    "textures/stone_rubble_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "8c219f91-9435-4327-8984-7680b7e45658.jpg",
+    "drive_file_id": "1RBRmSUGNYSD_T-05FBr6e-uyqMqUABDT"
+   },
+   "crop": [
+    0.3,
+    0.86,
+    0.62,
+    1.0
+   ],
+   "how": "ruined-city rubble (Grok art)",
+   "used_for": "dungeon entrance"
+  },
+  "wood_planks": {
+   "files": [
+    "textures/wood_planks.webp",
+    "textures/wood_planks_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175032.jpg",
+    "drive_file_id": "1ijaqgqfWMEqaA3k6iYyP4wT3VnvA30u_"
+   },
+   "crop": [
+    0.69,
+    0.826,
+    0.99,
+    0.852
+   ],
+   "how": "weathered pallet planks",
+   "used_for": "fences, stalls, timber"
+  },
+  "roof_shingle": {
+   "files": [
+    "textures/roof_shingle.webp",
+    "textures/roof_shingle_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175032.jpg",
+    "drive_file_id": "1ijaqgqfWMEqaA3k6iYyP4wT3VnvA30u_"
+   },
+   "crop": null,
+   "how": "procedurally laid shingles; every shingle is cut from the wood plank texture",
+   "used_for": "roofs (tinted by palette)"
+  },
+  "bark_charred": {
+   "files": [
+    "textures/bark_charred.webp",
+    "textures/bark_charred_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175130.jpg",
+    "drive_file_id": "1OJ5mItDRzeWTQ1_tUy-D8C_m5DWHj1HM"
+   },
+   "crop": [
+    0.55,
+    0.122,
+    0.725,
+    0.185
+   ],
+   "how": "charred log",
+   "used_for": "forge / campfire logs"
+  },
+  "bark": {
+   "files": [
+    "textures/bark.webp",
+    "textures/bark_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175130.jpg",
+    "drive_file_id": "1OJ5mItDRzeWTQ1_tUy-D8C_m5DWHj1HM"
+   },
+   "crop": [
+    0.76,
+    0.166,
+    0.9,
+    0.21
+   ],
+   "how": "log bark",
+   "used_for": "posts, logs"
+  },
+  "stone_block": {
+   "files": [
+    "textures/stone_block.webp",
+    "textures/stone_block_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260806_175116.jpg",
+    "drive_file_id": "1gIHyFtwEkA6MsGT2n7aB4-SfFj4bFjq3"
+   },
+   "crop": [
+    0.68,
+    0.64,
+    0.75,
+    0.695
+   ],
+   "how": "cinder-block faces laid as a running-bond wall",
+   "used_for": "city walls, garden walls"
+  },
+  "stone_castle": {
+   "files": [
+    "textures/stone_castle.webp",
+    "textures/stone_castle_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "8c219f91-9435-4327-8984-7680b7e45658.jpg",
+    "drive_file_id": "1RBRmSUGNYSD_T-05FBr6e-uyqMqUABDT"
+   },
+   "crop": [
+    0.015,
+    0.14,
+    0.105,
+    0.4
+   ],
+   "how": "ruined castle tower stone (Grok art) laid as blocks",
+   "used_for": "keep, towers, forge stone"
+  },
+  "meadow": {
+   "files": [
+    "textures/meadow.webp",
+    "textures/meadow_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260530_153724.jpg",
+    "drive_file_id": "1Cm-1jbOjAVKhK-oGuM57p1w0QYnD2uvJ"
+   },
+   "crop": [
+    0.05,
+    0.4,
+    0.95,
+    0.8
+   ],
+   "how": "meadow grass",
+   "used_for": "flower meadows / grove floor",
+   "added": "v2"
+  },
+  "soil": {
+   "files": [
+    "textures/soil.webp",
+    "textures/soil_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260520_064711.jpg",
+    "drive_file_id": "1KB7sQekvrEDrb6NGJSxuAe1kp_B1I8gy"
+   },
+   "crop": [
+    0.45,
+    0.3,
+    0.95,
+    0.56
+   ],
+   "how": "tilled garden soil",
+   "used_for": "farm plots / planted beds",
+   "added": "v2"
+  },
+  "bark_gray": {
+   "files": [
+    "textures/bark_gray.webp",
+    "textures/bark_gray_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260426_190942.jpg",
+    "drive_file_id": "19BHcc-iaX_xXajLBpX0uIXJTtkUFQgmP"
+   },
+   "crop": [
+    0.1,
+    0.62,
+    0.9,
+    0.97
+   ],
+   "how": "grey tree bark",
+   "used_for": "oak/grove trunks",
+   "added": "v2"
+  },
+  "foliage": {
+   "files": [
+    "textures/foliage.webp",
+    "textures/foliage_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20240911_174037.jpg",
+    "drive_file_id": "1FGfz-0XiW8m6bLSYyInBBgqlJHSoAotn"
+   },
+   "crop": [
+    0.1,
+    0.08,
+    0.9,
+    0.6
+   ],
+   "how": "leaf foliage",
+   "used_for": "tree canopies / hedges",
+   "added": "v2"
+  },
+  "leaf_litter": {
+   "files": [
+    "textures/leaf_litter.webp",
+    "textures/leaf_litter_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260623_185249.jpg",
+    "drive_file_id": "1l-XSYPr_ufKnOOAPeBZLHv3fqS0e9CWw"
+   },
+   "crop": [
+    0.08,
+    0.62,
+    0.92,
+    0.98
+   ],
+   "how": "forest leaf litter",
+   "used_for": "grove floor",
+   "added": "v2"
+  },
+  "clover": {
+   "files": [
+    "textures/clover.webp",
+    "textures/clover_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260623_183613.jpg",
+    "drive_file_id": "1V-qw3Ye90Iqg5MkPwmRsqyfA61NNk05m"
+   },
+   "crop": [
+    0.02,
+    0.02,
+    0.98,
+    0.36
+   ],
+   "how": "clover groundcover",
+   "used_for": "meadow ground detail",
+   "added": "v2"
+  },
+  "cornfield": {
+   "files": [
+    "textures/cornfield.webp",
+    "textures/cornfield_256.webp"
+   ],
+   "size": [
+    512,
+    256
+   ],
+   "tileable": true,
+   "source": {
+    "file": "20260819_080012.jpg",
+    "drive_file_id": "1bzU9xBpWfqvbMENGpuEzmG9030hgonf3"
+   },
+   "crop": [
+    0.0,
+    0.4,
+    0.45,
+    0.76
+   ],
+   "how": "corn rows",
+   "used_for": "farm crop walls",
+   "added": "v2"
+  }
+ },
+ "sprites": {
+  "flame_fire": {
+   "file": "sprites/flame_fire.webp",
+   "frames": 16,
+   "frame_size": [
+    128,
+    160
+   ],
+   "fps": 20,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "16 frames, looped with a 4-frame crossfade"
+  },
+  "flame_fel": {
+   "file": "sprites/flame_fel.webp",
+   "frames": 16,
+   "frame_size": [
+    128,
+    160
+   ],
+   "fps": 20,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "fire luminance remapped to the fel spell gradient"
+  },
+  "flame_arcane": {
+   "file": "sprites/flame_arcane.webp",
+   "frames": 16,
+   "frame_size": [
+    128,
+    160
+   ],
+   "fps": 20,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "fire luminance remapped to the arcane spell gradient"
+  },
+  "flame_frost": {
+   "file": "sprites/flame_frost.webp",
+   "frames": 16,
+   "frame_size": [
+    128,
+    160
+   ],
+   "fps": 20,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "fire luminance remapped to the frost spell gradient"
+  },
+  "flame_gold": {
+   "file": "sprites/flame_gold.webp",
+   "frames": 16,
+   "frame_size": [
+    128,
+    160
+   ],
+   "fps": 20,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "fire luminance remapped to the gold spell gradient"
+  },
+  "spark": {
+   "file": "sprites/spark.webp",
+   "frames": 1,
+   "frame_size": [
+    64,
+    64
+   ],
+   "fps": null,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "ember blob cut from the hottest flame region"
+  },
+  "spark_white": {
+   "file": "sprites/spark_white.webp",
+   "frames": 1,
+   "frame_size": [
+    64,
+    64
+   ],
+   "fps": null,
+   "source": {
+    "file": "20260806_175652.mp4",
+    "drive_file_id": "1JMBYMZVFJ5RzIxTtL5wCd4bpYsvUui04"
+   },
+   "how": "grayscale ember for palette tinting"
+  },
+  "bolt_fel": {
+   "file": "sprites/bolt_fel.webp",
+   "frames": 4,
+   "frame_size": [
+    256,
+    128
+   ],
+   "fps": 12,
+   "source": {
+    "file": "7f451af3-60ab-4b17-a1fb-6cee9c8e9bd5.jpg",
+    "drive_file_id": "1G4xN3MQdHqJ_K4GgGeFHOhO3KmSDVKpC"
+   },
+   "how": "green lightning keyed out of the art; frames 3-4 are flips"
+  },
+  "bolt_white": {
+   "file": "sprites/bolt_white.webp",
+   "frames": 4,
+   "frame_size": [
+    256,
+    128
+   ],
+   "fps": 12,
+   "source": {
+    "file": "7f451af3-60ab-4b17-a1fb-6cee9c8e9bd5.jpg",
+    "drive_file_id": "1G4xN3MQdHqJ_K4GgGeFHOhO3KmSDVKpC"
+   },
+   "how": "grayscale bolt for tinting"
+  }
+ },
+ "palettes": {
+  "file": "palettes.json",
+  "themes": {
+   "fire": {
+    "sources": [
+     {
+      "file": "20260806_175102.jpg",
+      "drive_file_id": "1IaFnj8GcwRRe0vRWssNZ_vLuMK3p23c8"
+     },
+     {
+      "file": "IMG_20260806_180032.jpg",
+      "drive_file_id": "1PDsWCKMVokRdJojJFZAYzHdSTl9H9guK"
+     }
+    ],
+    "tags": [
+     "fire",
+     "forge",
+     "campfire",
+     "spell"
+    ]
+   },
+   "fel_green": {
+    "sources": [
+     {
+      "file": "06b5e48e-e21c-4c53-a9fa-5e35f9dd7efd.jpg",
+      "drive_file_id": "1OUxlNjLBVbYFweVUk9EVESHdM06IpMOX"
+     },
+     {
+      "file": "7f451af3-60ab-4b17-a1fb-6cee9c8e9bd5.jpg",
+      "drive_file_id": "1G4xN3MQdHqJ_K4GgGeFHOhO3KmSDVKpC"
+     }
+    ],
+    "tags": [
+     "spell",
+     "terraform",
+     "mori",
+     "sparks"
+    ]
+   },
+   "arcane_purple": {
+    "sources": [
+     {
+      "file": "grok_1786392586467.jpg",
+      "drive_file_id": "1se0qyEZw9ic8bbdp7hhM9CsA5_6wHNvQ"
+     }
+    ],
+    "tags": [
+     "spell",
+     "arcane",
+     "roof"
+    ]
+   },
+   "storm_gold": {
+    "sources": [
+     {
+      "file": "06b5e48e-e21c-4c53-a9fa-5e35f9dd7efd.jpg",
+      "drive_file_id": "1OUxlNjLBVbYFweVUk9EVESHdM06IpMOX"
+     },
+     {
+      "file": "grok_image_1790632348506.jpg",
+      "drive_file_id": "1_fjhp3h8TiuFsu5EtMZAw437rIufPHRb"
+     }
+    ],
+    "tags": [
+     "spell",
+     "lightning",
+     "trim"
+    ]
+   },
+   "lawn": {
+    "sources": [
+     {
+      "file": "20260806_175002.jpg",
+      "drive_file_id": "12r24pIPCRcEtRsUnrQaSqAZnJsR44Ifn"
+     }
+    ],
+    "tags": [
+     "terrain",
+     "trees",
+     "terraform"
+    ]
+   },
+   "ash_stone": {
+    "sources": [
+     {
+      "file": "20260806_175111.jpg",
+      "drive_file_id": "1K7j6qhp6nuRMtOfWiliml-Du7SioWAhd"
+     },
+     {
+      "file": "20260806_175130.jpg",
+      "drive_file_id": "1OJ5mItDRzeWTQ1_tUy-D8C_m5DWHj1HM"
+     }
+    ],
+    "tags": [
+     "stone",
+     "walls",
+     "ground",
+     "terraform"
+    ]
+   },
+   "wood": {
+    "sources": [
+     {
+      "file": "20260806_175032.jpg",
+      "drive_file_id": "1ijaqgqfWMEqaA3k6iYyP4wT3VnvA30u_"
+     },
+     {
+      "file": "20260806_175130.jpg",
+      "drive_file_id": "1OJ5mItDRzeWTQ1_tUy-D8C_m5DWHj1HM"
+     }
+    ],
+    "tags": [
+     "wood",
+     "buildings",
+     "fence"
+    ]
+   },
+   "desert": {
+    "sources": [
+     {
+      "file": "grok_image_1791962841086.jpg",
+      "drive_file_id": "1B5gBY1mxi0LPjolu0TK4eqQOtaY1tpGv"
+     }
+    ],
+    "tags": [
+     "terrain",
+     "dust",
+     "terraform",
+     "walls"
+    ]
+   },
+   "steampunk_brass": {
+    "sources": [
+     {
+      "file": "grok_1784996965151.jpg",
+      "drive_file_id": "1sIHgBDTBRYFeEM08lAU7wNyG7xKBPUmH"
+     },
+     {
+      "file": "grok_1785152318940.jpg",
+      "drive_file_id": "1RCYdTu9BrXXy6A_BKBNVleyHuWv23-5t"
+     },
+     {
+      "file": "grok_image_1789607966034.jpg",
+      "drive_file_id": "1zHtA3_bwTxQBfs9YCqkFmB--20p3c6PU"
+     }
+    ],
+    "tags": [
+     "buildings",
+     "roof",
+     "trim"
+    ]
+   },
+   "night_ruins": {
+    "sources": [
+     {
+      "file": "8c219f91-9435-4327-8984-7680b7e45658.jpg",
+      "drive_file_id": "1RBRmSUGNYSD_T-05FBr6e-uyqMqUABDT"
+     },
+     {
+      "file": "8vfHL.jpg",
+      "drive_file_id": "1xZBc2C_HPOaUFgpo2LNSUeDeUB3rfcM3"
+     }
+    ],
+    "tags": [
+     "stone",
+     "walls",
+     "sky",
+     "dungeon"
+    ]
+   },
+   "stained_glass": {
+    "sources": [
+     {
+      "file": "grok_image_1789607966034.jpg",
+      "drive_file_id": "1zHtA3_bwTxQBfs9YCqkFmB--20p3c6PU"
+     },
+     {
+      "file": "grok_image_1789608029933.jpg",
+      "drive_file_id": "1f3mwZt-PjvSc3H61y--qki07vkCHCHvL"
+     },
+     {
+      "file": "grok_image_1789608120763.jpg",
+      "drive_file_id": "1UWPFWEbyykXkL_Imxo0MHbOIeecjHXUM"
+     }
+    ],
+    "tags": [
+     "windows",
+     "lanterns",
+     "trim"
+    ]
+   }
+  }
+ },
+ "updated": "2026-11-04",
+ "v2_note": "v2 adds 7 tiling textures and the flower/foliage palettes from new images in Robert's 'Mori templates' Drive folder (Nov 4 2026). 114 new files reviewed: 71 used as sources, 43 skipped (privacy, not useful, or copyrighted/screen)."
+}
