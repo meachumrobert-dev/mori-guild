@@ -191,7 +191,7 @@ function buildSite(){
     const cs=st>=4?P.cityState(id,opt.guildId()):null;
     const prof=(st>=4?GROUNDED.civicProfile:GROUNDED.hamletProfile)({id, biome:inf.biome, gov:cs?cs.gov:'hamlet', power:cs?cs.power:1, guild:!!F.guild, clan:!!(cs&&cs.clan), sister:!!(cs&&cs.sister), rng:P.rngFor(P.seed,'civic',id)});
     const blocks=[]; if(F.barrow) blocks.push({x:F.barrow.x,z:F.barrow.z,r:8}); if(F.waystone) blocks.push({x:F.L.x+3,z:F.L.z-2,r:2}); if(st>=4) blocks.push({x:A.x,z:A.z-10,r:14});
-    const plan=GROUNDED.planSettlement({rng, anchor:A, city:st>=4, biome:inf.biome, heightAt, seaY:F.seaY, roadDist, nearestRoad, blocks, irrigationReach:prof.irrigationReach});
+    const plan=GROUNDED.planSettlement({rng:rnd, anchor:A, city:st>=4, biome:inf.biome, heightAt, seaY:F.seaY, roadDist, nearestRoad, blocks, irrigationReach:prof.irrigationReach});
     F.settlement={form:plan.form, civic:plan.civic, farms:plan.farms, plots:plan.plots.length, culture:prof.culture, race:prof.race, arts:prof.arts, beast:prof.beast, reach:plan.reach, crest:prof.crest};
     plan.paths.forEach(p=>{ if(Math.hypot(p[2]-p[0],p[3]-p[1])>1.5) F.roads.push(p); });
     if(Math.hypot(plan.civic.x-A.x,plan.civic.z-A.z)>4) F.flats.push({x:plan.civic.x,z:plan.civic.z,r0:8,r1:14,h:baseHeightAt(plan.civic.x,plan.civic.z)});
