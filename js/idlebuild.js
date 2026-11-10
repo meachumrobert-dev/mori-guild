@@ -122,9 +122,10 @@ function beginCatchUp(){ const c=cfg(); const now=Date.now(); catchQ=[]; summary
   return {owed:n, elapsed, missing:false}; }
 
 function flushCatchUp(dt){ if(!catchQ.length) return false;
-  catchAcc+=dt; const per=Math.max(1, catchBudget|0);
+  catchAcc+=dt; const pace=window.POWER&&POWER.pace?POWER.pace():{per:catchBudget||1, gap:0.4};
+  const per=Math.max(1, pace.per|0);
   let n=0;
-  const gap=per>1?0.2:0.4; // default is one step every 0.4 s, not a burst on the render clock
+  const gap=pace.gap||0.4;
   if(catchAcc>=gap){
     const bite=Math.min(per, catchQ.length);
     while(catchQ.length&&n<bite){ catchQ.pop(); tick(true,true); n++; }

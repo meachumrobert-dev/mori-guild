@@ -64,12 +64,15 @@ SW.init({scene, mobile:IS_TOUCH, v2height:V2H, stage:stageOf, explored:id=>!!WD(
 W.height=(x,z)=>SW.heightAt(x,z);
 /* ---------- Phase 1 performance governor: frame-time budget steps quality down (and back up) ---------- */
 const QS=new URLSearchParams(location.search);
+if(window.POWER) POWER.boot(location.search);
 const QUAL=[{name:'low',   pr:1,    shadow:false,      smap:512,  R:3, near:0, treeR:60, flowerR:55, flowerCap:IS_TOUCH?300:450, fx:0.35, refreshCap:1, refreshMs:1.5},
             {name:'medium',pr:1.25, shadow:!IS_TOUCH,  smap:512,  R:4, near:1, treeR:90, flowerR:85, flowerCap:IS_TOUCH?700:1100, fx:0.7,  refreshCap:IS_TOUCH?1:2, refreshMs:IS_TOUCH?1.5:2.5},
             {name:'high',  pr:1.75, shadow:true,       smap:1024, R:5, near:1, treeR:130, flowerR:130, flowerCap:2400, fx:1,    refreshCap:2, refreshMs:3}];
 const PERF={q:IS_TOUCH?1:2, max:IS_TOUCH?1:2, budget:IS_TOUCH?33.3:20, ema:16, js:0, step:0, over:0, under:0, cool:2, auto:true, changes:[], frames:0, overlay:QS.get('perf')==='1'};
 if(QS.get('quality')){ const i=QUAL.findIndex(q=>q.name===QS.get('quality')); if(i>=0){ PERF.q=i; PERF.auto=false; } }
-function applyQuality(i, why){ i=Math.max(0,Math.min(QUAL.length-1,i)); const Q=QUAL[i]; PERF.q=i; if(window.MT&&MT.on) MT.setTier(i);
+function applyQuality(i, why){ const cap=window.POWER?POWER.framePlan(0).qualityMax:QUAL.length-1; i=Math.max(0,Math.min(cap,i)); const Q=Object.assign({},QUAL[i]);
+  if(window.POWER){ const plan=POWER.framePlan(0); if(plan.flower<1){ Q.flowerCap=Math.max(120, Math.round(Q.flowerCap*plan.flower)); Q.flowerR=Math.round(Q.flowerR*Math.max(0.7,plan.flower)); }
+    if(plan.shadow===false) Q.shadow=false; } PERF.q=i; PERF.max=cap; if(window.MT&&MT.on) MT.setTier(i);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, Q.pr));
   if(renderer.shadowMap.enabled!==Q.shadow){ renderer.shadowMap.enabled=Q.shadow; scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.needsUpdate=true); } }); }
   sun.castShadow=Q.shadow; if(sun.shadow.mapSize.x!==Q.smap){ sun.shadow.mapSize.set(Q.smap,Q.smap); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } }
@@ -1042,9 +1045,11 @@ function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.glo
     return '<div class="q" data-city="'+id+'"><span><span class="chip" style="background:'+cs.banner[0]+';color:'+cs.banner[1]+'">⚑</span> <b>'+cs.name+'</b> — '+cs.govName+' · '+cs.ruler+(r.length?'<br><span class="small">'+r.map(x=>x.w+' '+x.name).join(' · ')+'</span>':'')+'</span></div>'; }).join(''):'<div class="small">None yet. Mori founds one when a region reaches its 4th layer.</div>');
   h+='<div class="sec">Legend</div><div class="small"><span style="color:#9aa3b5">▦ gray wireframe = void</span> · <span style="color:#a3ff12">— lime edge = programming frontier</span> · colored borders = city-state claims · <span style="color:#3dff7a">— ally</span> · <span style="color:#ff3b3b">— rival</span> · <span style="color:#ffd23b">- - vassal</span> · ⚪ explored</div>';
   if(window.IDLEBUILD) h+=IDLEBUILD.settingsHTML();
+  if(window.POWER) h+=POWER.settingsHTML();
   h+='<div class="row"><button id="seedHome">🏛 Return to the Guild</button><button id="seedClose">✕ Close globe</button></div>';
   b.innerHTML=h;
   if(window.IDLEBUILD) IDLEBUILD.bindSettings(b);
+  const pm=$('powerMode'); if(pm) pm.onchange=()=>{ POWER.setMode(pm.value); PERF.auto=pm.value==='auto'; applyQuality(POWER.framePlan(0).qualityMax, 'power '+pm.value); renderSeedPanel(); };
   $('seedApply').onclick=()=>applySeed($('seedIn').value); $('seedRand').onclick=()=>applySeed(PL.randomSeed());
   if($('seedQ')) $('seedQ').onclick=()=>{ queueJob('seed',sel); log('Queued for Mori: '+jobLabel({kind:'seed',what:sel})); renderSeedPanel(); };
   if($('seedGo')) $('seedGo').onclick=()=>travelTo(sel); if($('seedCity')) $('seedCity').onclick=()=>cityModal(sel);
@@ -1065,11 +1070,13 @@ function spawnBanditRaid(info){ const n=info&&info.tier==='low'?3:2; const kinds
   }
   const msg=info.tier==='low'?'Bandits raid the road — they can smell a light Guild purse ('+info.marks+' Marks).':'Bandits on the road! The Guild purse can spare a fight.';
   log('⚔ '+msg); showRoll('⚔','Bandit raid!',info.tier==='low'?'foe':''); addChat('mo',info.tier==='low'?'ack — bandits. my treasury is lean, so the roads got bold. help me push them back?':'bandits! i minted marks for the guild — let\'s keep the roads kind.'); return out; }
-function step(dt){ mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // Mori Templates flame/spell animation
+let phaseN=0;
+function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phaseN):{world:true,audio:true,build:true,chunk:4,bgMs:1.5}}; if(window.TWOSPEED&&heavy.plan.bgMs!=null) TWOSPEED.budget=heavy.plan.bgMs;
+  mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // flame frames stay on the render clock; new audio buffers do not
   clockT+=dt; updateCrafting(dt); for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
   if(logT>0){ logT-=dt; if(logT<=0) $('log').style.opacity=0.35; } if(rollT>0){ rollT-=dt; if(rollT<=0) $('roll').className=''; }
   // world simulation keeps running in the dungeon (Mori keeps building)
-  if(mode==='world'&&window.IDLEBUILD) IDLEBUILD.update(dt);
+  if(mode==='world'&&window.IDLEBUILD&&heavy.plan.build) IDLEBUILD.update(dt);
   if(mode==='world'&&window.TREASURY){ const r=TREASURY.tryRaid(dt); if(r) spawnBanditRaid(r); }
   updateMori(dt);
   nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; } } });
@@ -1077,7 +1084,7 @@ function step(dt){ mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // Mori
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
   updatePlayer(dt); GATHERING.update(dt); CLAN.update(dt); if(mode==='world'){ NPCS.update(dt); DREADLORD.update(dt); } npcWatch();
-  if(mode==='dungeon') updateDungeon(dt); else { SW.update(player.pos.x,player.pos.z); TF.update(dt,player.pos.x,player.pos.z); IMPOSTORS.update(); townT-=dt; if(townT<=0){ townT=1; setTownVisible(atGuild()); } }
+  if(mode==='dungeon') updateDungeon(dt); else { if(heavy.plan.world) SW.update(player.pos.x,player.pos.z, heavy.plan.chunk); if(heavy.plan.build) TF.update(dt,player.pos.x,player.pos.z); if(heavy.plan.world) IMPOSTORS.update(); townT-=dt; if(townT<=0){ townT=1; setTownVisible(atGuild()); } }
   // targets
   const tg=mode==='world'?worldTargets():dungeonTargets(); curTarget=null; let bd=1e9; tg.forEach(t=>{ const d=Math.hypot(t.x-player.pos.x,t.z-player.pos.z); if(d<t.r&&d<bd){ bd=d; curTarget=t; } });
   TS.pump(); // v3.4 two-speed: foreground jobs now, background jobs inside the frame budget
