@@ -1094,7 +1094,8 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   if(crOpen){ renderCreator(); return; }
   if(globeOpen){ [lblD,lblM,lblDoll,lblT].forEach(e=>e.style.display='none'); obeliskAnim(); SW.globe.render(renderer); return; }
   const tgt=new T.Vector3(player.pos.x, player.pos.y+1.5, player.pos.z);
-  const pitch=mode==='dungeon'?Math.max(camPitch,0.95):camPitch, dist=mode==='dungeon'?Math.min(camDist,7):camDist;
+  let pitch=mode==='dungeon'?Math.max(camPitch,0.95):camPitch, dist=mode==='dungeon'?Math.min(camDist,7):camDist;
+  if(mode==='world'&&window.DREADLORD&&DREADLORD.camera){ const dc=DREADLORD.camera(); if(dc){ dist=Math.max(dist, dc.dist); pitch=dc.pitch; } }
   camera.position.set(tgt.x+Math.sin(camYaw)*Math.cos(pitch)*dist, tgt.y+Math.sin(pitch)*dist, tgt.z+Math.cos(camYaw)*Math.cos(pitch)*dist);
   if(mode==='world'){ const gy=W.height(camera.position.x,camera.position.z)+0.6; if(camera.position.y<gy) camera.position.y=gy; }
   camera.lookAt(tgt);
