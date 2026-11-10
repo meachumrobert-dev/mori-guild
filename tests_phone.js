@@ -30,6 +30,8 @@ ok(edge.left===104 && edge.top===8, 'chat stays on screen');
 const lay=P.layout(412, 915);
 ok(!lay.land && lay.joy>=112 && lay.attack>=56, 'portrait gives a full stick and a large attack');
 ok(P.layout(915, 412).land, '915×412 is landscape');
+ok(P.overlapArea({x:0,y:0,w:10,h:10},{x:20,y:20,w:5,h:5})===0, 'separate boxes do not overlap');
+ok(P.overlapArea({x:0,y:0,w:10,h:10},{x:5,y:5,w:10,h:10})===25, 'overlap area is the intersection');
 console.log('tests_phone logic: '+n+' checks');
 
 async function browser(){
@@ -69,6 +71,8 @@ async function browser(){
     await page.mouse.up();
     const after=await page.evaluate(()=>document.getElementById('talkP').getBoundingClientRect().left);
     ok(after>before+20, 'chat header drag moves the sheet');
+    await page.mouse.move(8, h-8);
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(r)));
     await page.click('#chatFold');
     const folded=await page.evaluate(()=>document.getElementById('talkP').classList.contains('collapsed'));
     ok(folded, 'chat collapses');
@@ -80,11 +84,76 @@ async function browser(){
   ok(dpad.pad && dpad.w>=48 && dpad.h>=48, 'D-pad buttons are at least 48 px');
   await page.screenshot({path:path.join(out, 'phone-portrait-pad.png')});
   await measure(915, 412, 'phone-landscape.png');
+  async function overlap(w, h, file){
+    await page.setViewport({width:w, height:h, isMobile:true, hasTouch:true, deviceScaleFactor:1});
+    await page.goto('file://'+path.join(__dirname,'index.html')+'?phone=1&quality=low', {waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.body.classList.contains('phone'));
+    await page.evaluate(()=>{
+      document.getElementById('suggText').textContent='The cottage frame is still 99% unprogrammed. A plan from the Guild (auto-approves in a moment — I trust me)';
+      document.getElementById('sugg').style.display='block';
+    });
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    const read=()=>page.evaluate((vw, vh)=>{
+      const clip=el=>{
+        const s=getComputedStyle(el);
+        if(s.display==='none'||s.visibility==='hidden') return null;
+        const raw=el.getBoundingClientRect();
+        if(raw.width<2||raw.height<2) return null;
+        let x=raw.x, y=raw.y, x2=raw.right, y2=raw.bottom;
+        for(let p=el.parentElement; p&&p!==document.documentElement; p=p.parentElement){
+          const ps=getComputedStyle(p);
+          if(/(auto|scroll|hidden)/.test(ps.overflowX+' '+ps.overflowY+' '+ps.overflow)){
+            const b=p.getBoundingClientRect();
+            x=Math.max(x,b.x); y=Math.max(y,b.y); x2=Math.min(x2,b.right); y2=Math.min(y2,b.bottom);
+          }
+        }
+        x=Math.max(0,x); y=Math.max(0,y); x2=Math.min(vw,x2); y2=Math.min(vh,y2);
+        if(x2-x<2||y2-y<2) return null;
+        return {id:el.id||el.getAttribute('aria-label')||el.textContent.slice(0,18), x, y, w:x2-x, h:y2-y};
+      };
+      const full=el=>{ const b=el.getBoundingClientRect(); return {x:b.x,y:b.y,w:b.width,h:b.height}; };
+      const nodes=[];
+      document.querySelectorAll('#top .st, #statSheet .st, #statMore, #phoneMenu, #moriStatus, #suggText, #suggOk, #suggNo, #joy, #ctx button, #padMode, #turnText, #turnGo, #turnNo, #log').forEach(el=>{ const b=clip(el); if(b) nodes.push(b); });
+      const pairs=[];
+      for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++){
+        const area=window.PHONE.overlapArea(nodes[i], nodes[j]);
+        if(area>1) pairs.push(nodes[i].id+' × '+nodes[j].id);
+      }
+      const must=['suggOk','suggNo','joy','bAttack','statMore','phoneMenu'];
+      const off=must.filter(id=>{ const el=document.getElementById(id); if(!el||getComputedStyle(el).display==='none') return false; const b=full(el); return b.x<-1||b.y<-1||b.x+b.w>vw+1||b.y+b.h>vh+1; });
+      const ink=[...document.querySelectorAll('#top .st, #statSheet .st')].filter(el=>el.getClientRects().length&&el.scrollWidth>el.clientWidth+2).map(el=>el.id||el.textContent.replace(/\s+/g,' ').slice(0,24));
+      const okb=full(document.getElementById('suggOk'));
+      const joy=full(document.getElementById('joy'));
+      const atk=full(document.getElementById('bAttack'));
+      const hint=document.getElementById('turnText');
+      return {pairs, off, ink, okh:okb.h, joyX:joy.x, atkX:atk.x, hint:!!hint && hint.getClientRects().length>0};
+    }, w, h);
+    let hits=await read();
+    ok(hits.pairs.length===0, w+'×'+h+' HUD does not overlap'+(hits.pairs.length?': '+hits.pairs.join('; '):''));
+    ok(hits.off.length===0, w+'×'+h+' HUD stays inside the viewport'+(hits.off.length?': '+hits.off.join(', '):''));
+    ok(hits.ink.length===0, w+'×'+h+' stat text stays inside its pill'+(hits.ink.length?': '+hits.ink.join(', '):''));
+    ok(hits.okh>=48, 'Approve is at least 48 px tall');
+    ok(hits.joyX<w/2 && hits.atkX>w/2, 'joystick stays on the left thumb and attack on the right');
+    if(h>w) ok(hits.hint, 'portrait offers a landscape suggestion');
+    else ok(!hits.hint, 'landscape does not nag to rotate');
+    await page.screenshot({path:path.join(out, file)});
+    await page.click('#statMore');
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    hits=await read();
+    ok(hits.pairs.length===0, w+'×'+h+' expanded stats do not overlap'+(hits.pairs.length?': '+hits.pairs.join('; '):''));
+    ok(hits.off.length===0, w+'×'+h+' expanded stats stay inside the viewport'+(hits.off.length?': '+hits.off.join(', '):''));
+    ok(hits.ink.length===0, w+'×'+h+' expanded stat text stays inside its pill'+(hits.ink.length?': '+hits.ink.join(', '):''));
+    await page.screenshot({path:path.join(out, file.replace('.png','-stats.png'))});
+  }
+  await overlap(412, 780, 'phone-s21-portrait.png');
+  await overlap(915, 360, 'phone-s21-landscape.png');
   await page.setViewport({width:1280, height:720, isMobile:false, hasTouch:false});
   await page.goto('file://'+path.join(__dirname,'index.html')+'?phone=0&quality=low', {waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__g);
   const desk=await page.evaluate(()=>{ const joy=getComputedStyle(document.getElementById('joy')); return {phone:document.body.classList.contains('phone'), joy:joy.display}; });
   ok(!desk.phone && desk.joy==='none', 'desktop with ?phone=0 keeps the old UI');
+  const deskHud=await page.evaluate(()=>({more:getComputedStyle(document.getElementById('statMore')).display, extra:document.getElementById('sRank').parentElement.id, phone:document.body.classList.contains('phone')}));
+  ok(!deskHud.phone && deskHud.more==='none' && deskHud.extra==='top', 'desktop keeps the stat pills in the top bar');
   await page.screenshot({path:path.join(out, 'desktop-unchanged.png')});
   await browser.close();
   console.log('tests_phone browser passed');
