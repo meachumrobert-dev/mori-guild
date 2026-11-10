@@ -754,7 +754,17 @@ function refreshPhone(){ if(!window.PHONE) return; let saved=null; try{ saved=lo
   if($('bBandage')) $('bBandage').textContent=on?'🩹':'🩹 Bandage';
   if($('bSalve')) $('bSalve').textContent=on?'🧴':'🧴 Salve';
   if($('bPotion')) $('bPotion').textContent=on?'🧪':'🧪 Potion';
-  if(!on) document.body.classList.remove('menu'); }
+  if(!on){ document.body.classList.remove('menu'); document.body.classList.remove('stats'); }
+  try{ if(sessionStorage.getItem('mori.stayport')==='1') document.body.classList.add('stayport'); }catch(e){}
+  const sheet=$('statSheet'), top=$('top');
+  if(sheet&&top){ const extras=on?[...top.querySelectorAll('.extra')]:[...sheet.querySelectorAll('.extra')]; extras.forEach(el=>(on?sheet:top).appendChild(el)); }
+  const more=$('statMore'); if(more){ more.hidden=!on; more.setAttribute('aria-expanded', document.body.classList.contains('stats')?'true':'false'); more.textContent=document.body.classList.contains('stats')?'▴':'···'; }
+  const stack=$('hudStack'); if(stack){ const h=on?Math.ceil(stack.getBoundingClientRect().height):0; document.documentElement.style.setProperty('--hud-top', h+'px'); } }
+if(window.ResizeObserver && $('hudStack')) new ResizeObserver(()=>{ if(!document.body.classList.contains('phone')){ document.documentElement.style.setProperty('--hud-top','0px'); return; } document.documentElement.style.setProperty('--hud-top', Math.ceil($('hudStack').getBoundingClientRect().height)+'px'); }).observe($('hudStack'));
+if($('statMore')) $('statMore').onclick=()=>{ document.body.classList.toggle('stats'); refreshPhone(); };
+if($('turnNo')) $('turnNo').onclick=()=>{ document.body.classList.add('stayport'); try{ sessionStorage.setItem('mori.stayport','1'); }catch(e){} };
+if($('turnGo')) $('turnGo').onclick=async()=>{ try{ if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); }catch(e){} try{ if(screen.orientation&&screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(e){} };
+if(window.visualViewport) visualViewport.addEventListener('resize', ()=>{ if(typeof resize==='function') resize(); });
 if($('phoneMenu')) $('phoneMenu').onclick=()=>document.body.classList.toggle('menu');
 addEventListener('resize', refreshPhone); refreshPhone();
 document.addEventListener('gesturestart', e=>{ if(document.body.classList.contains('phone')) e.preventDefault(); });

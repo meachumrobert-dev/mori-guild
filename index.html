@@ -8,7 +8,7 @@
 <style>
 :root{--bg:rgba(14,11,22,.82);--ln:rgba(163,255,18,.25);--acc:#a3ff12;--pink:#ff8af0;--tx:#efe9ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;background:#0e0b16;color:var(--tx);font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;height:100dvh;overflow:hidden;background:#0e0b16;color:var(--tx);font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 button{font:inherit;color:inherit;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:6px 10px;cursor:pointer}
 button:hover{background:rgba(255,255,255,.14)} button:disabled{opacity:.35;cursor:default}
@@ -112,6 +112,8 @@ body.phone.pad #dpad{display:grid}
 #padMode{position:fixed;z-index:6;min-width:48px;min-height:48px;width:48px;height:48px;padding:0;border-radius:12px;left:max(148px,calc(env(safe-area-inset-left) + 136px));bottom:max(16px,env(safe-area-inset-bottom))}
 body.phone #padMode{display:block}
 body.phone #ctx{right:max(10px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));display:grid;grid-template-columns:56px 64px;gap:8px;align-items:end}
+body.phone.land #ctx{grid-template-columns:52px 52px 64px;grid-template-rows:48px 48px}
+body.phone.land #ctx #bAttack{grid-column:3;grid-row:1 / span 2}
 body.phone #ctx button{min-width:48px;min-height:48px;padding:0 6px;font-size:16px;line-height:1.05;display:flex;align-items:center;justify-content:center;overflow:hidden}
 body.phone #ctx #bAttack{grid-column:2;grid-row:1 / span 2;min-width:64px;min-height:64px;font-size:26px}
 body.phone #ctx #bInteract{display:flex;opacity:.45}
@@ -119,37 +121,63 @@ body.phone #ctx #bInteract.hot{opacity:1}
 #phoneMenu{display:none}
 body.phone #phoneMenu{display:flex;position:fixed;z-index:8;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:48px;min-height:48px;width:48px;height:48px;padding:0;align-items:center;justify-content:center;font-size:22px}
 body.phone #bottom{display:none}
-body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:max(64px,calc(env(safe-area-inset-top) + 56px));left:8px;right:8px;bottom:auto;max-height:46vh;overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
+body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:calc(var(--hud-top, 96px) + 8px);left:8px;right:8px;bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - 168px);overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
 body.phone.menu #bottom button{min-width:48px;min-height:48px}
-body.phone #log{top:max(52px,env(safe-area-inset-top));bottom:auto}
-body.phone #talkP{left:12px;top:max(64px,env(safe-area-inset-top));right:auto;bottom:auto;width:min(360px,calc(100vw - 24px));height:min(440px,52vh);max-height:52vh;font-size:16px}
+body.phone #talkP{left:12px;top:calc(var(--hud-top, 96px) + 44px);right:auto;bottom:auto;width:min(360px,calc(100vw - 24px));height:min(360px,calc(100dvh - var(--hud-top, 96px) - 212px));max-height:calc(100dvh - var(--hud-top, 96px) - 212px);font-size:16px}
+body.phone.land #talkP{left:max(148px,calc(env(safe-area-inset-left) + 132px));top:calc(var(--hud-top, 72px) + 8px);width:min(480px,calc(100vw - 310px));height:min(220px,calc(100dvh - var(--hud-top, 72px) - 148px));max-height:calc(100dvh - var(--hud-top, 72px) - 148px)}
 body.phone #talkP h3{min-height:48px;touch-action:none;cursor:grab}
 body.phone #chatFold{display:inline-flex;min-width:48px;min-height:36px;align-items:center;justify-content:center}
 body.phone #chatLog{font-size:16px;line-height:1.4;min-height:96px}
 body.phone #chatIn,#chatSend{min-height:48px;font-size:16px}
 body.phone #talkP.collapsed{height:52px;max-height:52px;overflow:hidden}
 body.phone #talkP.collapsed .body{display:none}
-body.phone #moriLine{max-width:min(280px,70vw);font-size:14px}
+#hudStack{display:contents}
+#statSheet{display:none}
+#statMore{display:none}
+#turnHint{display:none}
+body.phone #hudStack{display:flex;flex-direction:column;align-items:stretch;position:fixed;z-index:7;top:0;left:0;right:0;max-height:calc(100dvh - 168px);padding-top:env(safe-area-inset-top);pointer-events:none;overflow:auto;touch-action:pan-y}
+body.phone #hudStack>*{pointer-events:auto}
+body.phone #top{position:relative;top:auto;left:auto;right:auto;flex-wrap:nowrap;overflow:hidden;gap:4px;padding:4px 58px 4px 8px;background:linear-gradient(#0e0b16f2,#0e0b16e6);z-index:1}
+body.phone #brand{max-width:34vw;overflow:hidden;text-overflow:ellipsis}
+body.phone #top .extra{display:none}
+body.phone #statMore{display:inline-flex;align-items:center;justify-content:center;min-width:48px;min-height:48px;padding:0 10px;pointer-events:auto}
+body.phone.stats #statSheet{display:flex;flex-wrap:nowrap;gap:4px;padding:0 28px 6px 8px;background:#0e0b16;overflow-x:auto;max-height:44px;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent)}
+body.phone.stats #statSheet .st{flex:0 0 auto}
+body.phone.stats #statSheet .st{pointer-events:auto}
+body.phone #moriLine{position:relative;top:auto;left:auto;max-width:none;width:auto;margin:4px 8px 0;font-size:14px;line-height:1.3;z-index:1;background:#0e0b16}
+body.phone #moriLine .bar{display:none}
+body.phone #sugg button{min-height:48px;min-width:48px;font-size:16px;padding:8px 14px}
+body.phone #log{position:fixed;left:8px;right:8px;top:calc(var(--hud-top, 96px) + 4px);bottom:auto;transform:none;margin:0;max-width:none;max-height:2.8em;overflow:hidden;text-align:left;pointer-events:none;z-index:6;background:rgba(14,11,22,.97)}
+body.phone.land #log{left:210px;right:200px;top:auto;bottom:max(16px,env(safe-area-inset-bottom));text-align:center}
+body.phone.land #hudStack{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));max-height:calc(100dvh - 136px)}
+body.phone.land #moriLine{max-width:none;font-size:13px}
+body.phone:not(.land):not(.stayport) #turnHint{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px;padding:8px 10px;background:rgba(14,11,22,.97);border:1px solid var(--ln);border-radius:14px}
+body.phone #turnHint button{min-height:48px;min-width:48px}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="hudStack">
 <div id="top">
   <span class="st" id="brand">MORI GUILD 3D</span>
-  <span class="st">❤ <span id="hpbar"><i></i></span> <b id="sHp">20</b></span>
-  <span class="st">🌿 Life <b id="sLife">0</b></span>
-  <span class="st">🎟 LARPy <b id="sLarpy">0</b></span>
-  <span class="st">🪙 Gold <b id="sGold">0</b></span>
-  <span class="st">🌱<b id="sHerbs">0</b> ⛏<b id="sOre">0</b> 🪵<b id="sTimber">0</b></span>
-  <span class="st" id="sRank">Crooked Walls</span>
-  <span class="st" id="sClock">☀ Day</span>
-  <span class="st" id="sRegion">🌍</span>
-  <span class="st" id="sWorld" title="World progress — Mori idle builder">🌱 3/1536</span>
+  <span class="st" id="stHp">❤ <span id="hpbar"><i></i></span> <b id="sHp">20</b></span>
+  <button type="button" id="statMore" aria-expanded="false" aria-label="Show the rest of the stats">···</button>
+  <span class="st extra">🌿 Life <b id="sLife">0</b></span>
+  <span class="st extra">🎟 LARPy <b id="sLarpy">0</b></span>
+  <span class="st extra">🪙 Gold <b id="sGold">0</b></span>
+  <span class="st extra">🌱<b id="sHerbs">0</b> ⛏<b id="sOre">0</b> 🪵<b id="sTimber">0</b></span>
+  <span class="st extra" id="sRank">Crooked Walls</span>
+  <span class="st extra" id="sClock">☀ Day</span>
+  <span class="st extra" id="sRegion">🌍</span>
+  <span class="st extra" id="sWorld" title="World progress — Mori idle builder">🌱 3/1536</span>
 </div>
+<div id="statSheet"></div>
 <div id="moriLine"><b>Mori</b>: <span id="moriStatus">waking up…</span><div class="bar"><i id="moriBar"></i></div>
   <div id="sugg"><div id="suggText" class="small"></div><button class="pri" id="suggOk">Approve</button><button id="suggNo">Not now</button></div></div>
-<div id="perf" style="display:none;position:fixed;left:6px;bottom:6px;z-index:60;font:11px monospace;color:#cfe;background:#000a;padding:3px 6px;border-radius:4px;pointer-events:none;max-width:70vw"></div>
+<div id="turnHint"><span id="turnText">Landscape gives each thumb more room.</span><button type="button" id="turnGo">Try landscape</button><button type="button" id="turnNo">Stay</button></div>
+</div>
 <div id="log">Welcome to the Guild. Mori is planning the town.</div>
+<div id="perf" style="display:none;position:fixed;left:6px;bottom:6px;z-index:60;font:11px monospace;color:#cfe;background:#000a;padding:3px 6px;border-radius:4px;pointer-events:none;max-width:70vw"></div>
 <div id="roll"><span class="die" id="rollDie">20</span><span id="rollText"></span></div>
 <div id="joy"><i></i></div>
 <div id="dpad" aria-label="Move"><button type="button" data-pad="n" aria-label="Forward">▲</button><button type="button" data-pad="w" aria-label="Left">◀</button><button type="button" data-pad="e" aria-label="Right">▶</button><button type="button" data-pad="s" aria-label="Back">▼</button></div>

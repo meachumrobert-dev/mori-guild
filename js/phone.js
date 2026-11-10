@@ -37,6 +37,12 @@ function placeChat(box, dx, dy, bounds){
   const top=Math.max(8, Math.min(bh-52, box.top+dy));
   return {left, top};
 }
+function overlapArea(a, b){
+  const x=Math.min(a.x+a.w, b.x+b.w)-Math.max(a.x, b.x);
+  const y=Math.min(a.y+a.h, b.y+b.h)-Math.max(a.y, b.y);
+  if(x<=0||y<=0) return 0;
+  return x*y;
+}
 function layout(w, h){
   const land=w>h;
   const joy=land?112:128;
@@ -46,7 +52,7 @@ function settingsHTML(on){
   return '<div class="sec">Phone layout</div><div class="small">For a phone about 412×915, like a Galaxy S21 Ultra. Joystick or D-pad on the left, actions on the right. Chat can be dragged and folded. Desktop bars stay as they are until this is on.</div>'+
     '<div class="row"><label><input type="checkbox" id="phoneOn" '+(on?'checked':'')+'> Phone controls</label></div>';
 }
-const api={MIN, S21, shouldPhone, stickVector, padVector, placeChat, layout, settingsHTML,
+const api={MIN, S21, shouldPhone, stickVector, padVector, placeChat, overlapArea, layout, settingsHTML,
   getControl(){ return control; },
   setControl(c){ control=c==='pad'?'pad':'stick'; return control; }
 };
