@@ -31,3 +31,11 @@ The SRD-derived mechanics in `js/srd.js` and `js/craft.js` are Open Game Content
 ## v3.3
 - Templates v2 textures/palettes: derived from photos in Robert's approved "Mori templates" Drive folder (used with permission); only textures/colours are kept, no photos ship.
 - Geometry flowers: procedural code written for this project (MIT), no external assets.
+
+## Grounded world pass
+Rules behind `js/grounded.js` are original code. The references were read for general ideas only; no textbook text, figures, Bannerlord data, or real-place names are included. Full URLs and licenses are in `GROUNDING.md`.
+- OpenStax, *Algebra and Trigonometry 2e* (Jay Abramson and co-authors, Rice University), CC BY-NC-SA 4.0. Roof pitch uses tan and cos.
+- Dorrell, Henderson, and co-authors, *Introduction to Human Geography* 2e, University System of Georgia, CC BY 4.0. Clustered, linear, and dispersed hamlets.
+- Emilien et al., “Procedural Generation of Villages on Arbitrary Terrains,” *The Visual Computer* 2012, © Springer-Verlag. Ideas only: dry ground, footprints, paths.
+- USGS Open-File Report 93-23 (1993), US government work. Ore clusters instead of an even scatter.
+- TaleWorlds Bannerlord modding docs (https://moddocs.bannerlord.com/) as a design reference for “a village produces and is bound to a town.” No game data copied.

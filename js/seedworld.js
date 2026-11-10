@@ -142,12 +142,26 @@ function signSprite(lines, col){ const c=document.createElement('canvas'); c.wid
   x.fillStyle='#fff'; x.textAlign='center'; x.font='bold 44px Georgia,serif'; x.fillText(lines[0],256,52); x.font='26px Georgia,serif'; x.fillStyle='#e9e2cc'; x.fillText(lines[1]||'',256,98);
   const t=new T.CanvasTexture(c); t.colorSpace=T.SRGBColorSpace; const s=new T.Sprite(new T.SpriteMaterial({map:t, depthWrite:false})); s.scale.set(16,4,1); return s; }
 function mk(g,m,x,y,z,parent){ if(MTon) MT.fit(g,m); const o=new T.Mesh(g,m); o.position.set(x,y,z); o.castShadow=!opt.mobile; o.receiveShadow=!opt.mobile; (parent||siteRoot).add(o); return o; }
-function house(x,z,rnd,scale){ const h=heightAt(x,z); const w=4+rnd()*3, d=4+rnd()*2.5, ht=2.6+rnd()*1.4; const g=new T.Group(); g.position.set(x,h,z); g.rotation.y=rnd()*Math.PI*2; siteRoot.add(g);
-  const r1=rnd(), r2=rnd(); const WL=MTon?MT.list('buildings.walls',['#cdb48a']):['#cdb48a','#b9a07a','#d8cfbf','#a78462','#e2d6b8'], RL=MTon?MT.list('buildings.roofs',['#8a3b26']):['#8a3b26','#5a4a3a','#3d5a6b','#6b3a5a','#7a6a2a'];
-  const wall=WL[Math.floor(r1*WL.length)], roof=RL[Math.floor(r2*RL.length)];
-  mk(new T.BoxGeometry(w,ht,d),TX('plaster',wall,2.5),0,ht/2,0,g); const r=mk(new T.ConeGeometry(Math.hypot(w,d)/2*1.05,2.2,4),TX('roof_shingle',roof,1.5),0,ht+1.1,0,g); r.rotation.y=Math.PI/4; r.scale.z=d/w;
-  mk(new T.BoxGeometry(1,1.8,0.1),TX('wood_planks','#4a3020',1),0,0.9,d/2+0.05,g); F.colliders.circles.push({x,z,r:Math.max(w,d)*0.55});
-  g.userData.card={cell:opt.houseCell?opt.houseCell(x,z):4, w:Math.max(w,d)*1.15, h:ht+2.4, tint:wall}; return g; }
+function nearestRoad(x,z){ let best=null; for(const s of F.roads){ const x1=s[0],z1=s[1],x2=s[2],z2=s[3]; const vx=x2-x1, vz=z2-z1, L2=vx*vx+vz*vz||1; let t=((x-x1)*vx+(z-z1)*vz)/L2; t=Math.max(0,Math.min(1,t));
+    const px=x1+vx*t, pz=z1+vz*t, d=Math.hypot(x-px,z-pz), L=Math.sqrt(L2)||1; if(!best||d<best.d) best={d,px,pz,tx:vx/L,tz:vz/L}; } return best; }
+function frameHouse(plot, biome, thatch){ const h=heightAt(plot.x,plot.z); const g=new T.Group(); g.position.set(plot.x,h,plot.z); g.rotation.y=plot.yaw||0; siteRoot.add(g);
+  const rnd=P.rngFor(P.seed,'hue',F.id,Math.round(plot.x),Math.round(plot.z));
+  const WL=MTon?MT.list('buildings.walls',['#cdb48a']):['#cdb48a','#b9a07a','#d8cfbf','#a78462','#e2d6b8'];
+  const RL=thatch?['#c2a15a','#a8843a','#d8c27a']: (MTon?MT.list('buildings.roofs',['#8a3b26']):['#8a3b26','#5a4a3a','#3d5a6b','#6b3a5a','#7a6a2a']);
+  const wall=WL[Math.floor(rnd()*WL.length)], roofC=RL[Math.floor(rnd()*RL.length)];
+  const pitch=window.GROUNDED?GROUNDED.pitchFor(biome,rnd()).rad:34*Math.PI/180;
+  const spec=GROUNDED.cottageFrame({w:plot.w, d:plot.d, wallH:plot.wallH||2.5, pitch, overhang:0.4, doorW:plot.role==='work'?1.15:0.95});
+  GROUNDED.attachFrame(T, g, spec, {stone:TX('stone_block','#8d8a80',1.2), timber:TX('wood_planks','#5a3d28',1.2), wall:TX('plaster',wall,2.5), roof:TX(thatch?'cornfield':'roof_shingle',roofC,1.5), door:TX('wood_planks','#4a3020',1), window:M('#ffd27a',{e:'#ffb020',ei:0.55})}, {fit:MTon&&MT.fit, shadow:!opt.mobile});
+  F.colliders.circles.push({x:plot.x,z:plot.z,r:Math.max(plot.w,plot.d)*0.42});
+  g.userData.card={cell:opt.houseCell?opt.houseCell(plot.x,plot.z):4, w:Math.max(plot.w,plot.d)*1.1, h:(g.userData.h||4), tint:wall, role:plot.role};
+  return g; }
+function layFarm(f){ const h=heightAt(f.x,f.z); const g=new T.Group(); g.position.set(f.x,h,f.z); g.rotation.y=f.yaw||0; siteRoot.add(g);
+  const soil=TX('soil','#6a4a28',2.2), straw=TX('cornfield','#c2a15a',2);
+  mk(new T.BoxGeometry(f.w,0.08,f.d),soil,0,0.05,0,g);
+  for(let i=-2;i<=2;i++) mk(new T.BoxGeometry(f.w*0.86,0.06,0.28),straw,0,0.1,i*(f.d/6),g);
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>mk(new T.BoxGeometry(0.14,0.7,0.14),TX('wood_planks','#5a3d28',1),sx*(f.w/2-0.2),0.35,sz*(f.d/2-0.2),g));
+  g.userData.card={cell:4, w:f.w, h:0.8, tint:'#c2a15a', role:'farm'};
+  return g; }
 function buildSite(){
   const id=F.id, st=F.stage, inf=F.info; const rnd=P.rngFor(P.seed,'site',id); const A=F.A;
   // the waystone you arrive at
@@ -161,9 +175,8 @@ function buildSite(){
     if(!dirs.length) dirs.push([1,0],[-0.3,-0.95]);
     dirs.forEach(([dx,dz])=>F.roads.push([A.x,A.z,A.x+dx*900,A.z+dz*900]));
     if(F.guild) F.roads.push([0,22,A.x,A.z]);
-    // milestones
-    F.roads.forEach(([x1,z1,x2,z2])=>{ const L=Math.hypot(x2-x1,z2-z1); for(let s=90;s<L;s+=120){ const x=x1+(x2-x1)*s/L+3, z=z1+(z2-z1)*s/L; mk(new T.BoxGeometry(0.6,1.2,0.4),TX('stone_rubble','#8d8a80',1),x,heightAt(x,z)+0.5,z); } });
-    if(MTon) MT.road(siteRoot,F.roads,heightAt,{width:4.6,step:4,scale:4,lift:0.09}); } // Mori Templates gravel ribbons over the tinted road bed
+    F.roads.forEach(([x1,z1,x2,z2])=>{ const L=Math.hypot(x2-x1,z2-z1); if(L<80) return; for(let s=90;s<L;s+=120){ const x=x1+(x2-x1)*s/L+3, z=z1+(z2-z1)*s/L; mk(new T.BoxGeometry(0.6,1.2,0.4),TX('stone_rubble','#8d8a80',1),x,heightAt(x,z)+0.5,z); } });
+    }
   // barrow dungeon
   if(st>=2&&!F.guild&&rnd()<0.75){ const bx=A.x-80, bz=A.z-70; F.flats.push({x:bx,z:bz,r0:8,r1:18,h:rawH(bx,bz).h});
     const g=new T.Group(); g.position.set(bx,heightAt(bx,bz),bz); siteRoot.add(g); const stone=TX('stone_rubble','#5d5a56',1.4);
@@ -172,10 +185,29 @@ function buildSite(){
     mk(new T.PlaneGeometry(2.7,2.8),new T.MeshBasicMaterial({color:'#050508'}),0,1.4,5.5,g);
     const nm=P.regionName(id).replace(/^The /,'').split(' ')[0]+' Barrow'; const lv=Math.min(9,1+Math.round(P.angle(P.regionCenter(id),P.regionCenter(opt.guildId()))*4));
     F.colliders.circles.push({x:bx,z:bz,r:6.4}); F.targets.push({x:bx,z:bz+8,r:3.4,label:'🕳 Enter the '+nm+' (danger +'+lv+')',kind:'dungeon',name:nm,lvl:lv}); F.barrow={x:bx,z:bz+9}; }
-  // villages
-  if(st>=3){ const n=st>=4?14:9; for(let i=0;i<n;i++){ const a=rnd()*Math.PI*2, r=18+rnd()*(st>=4?44:40); const x=A.x+Math.cos(a)*r, z=A.z+Math.sin(a)*r; if(F.roads.length&&roadDist(x,z)<5) continue; house(x,z,rnd); }
-    const wl=mk(new T.CylinderGeometry(1.2,1.3,1,10),TX('stone_block','#8d8a80',1.2),A.x,heightAt(A.x,A.z)+0.5,A.z); F.colliders.circles.push({x:A.x,z:A.z,r:1.5});
-    if(st<4) F.targets.push({x:A.x,z:A.z+2.5,r:4,label:'🏘 Village of '+P.regionName(id).replace(/^The |^High |^Low |^Old /,'').split(' ')[0],kind:'village'}); }
+  // villages: plots, a haul path, and a field sited by a water probe — not a flow model
+  const mains=F.roads.slice();
+  if(st>=3&&window.GROUNDED){
+    const cs=st>=4?P.cityState(id,opt.guildId()):null;
+    const prof=(st>=4?GROUNDED.civicProfile:GROUNDED.hamletProfile)({id, biome:inf.biome, gov:cs?cs.gov:'hamlet', power:cs?cs.power:1, guild:!!F.guild, clan:!!(cs&&cs.clan), sister:!!(cs&&cs.sister), rng:P.rngFor(P.seed,'civic',id)});
+    const blocks=[]; if(F.barrow) blocks.push({x:F.barrow.x,z:F.barrow.z,r:8}); if(F.waystone) blocks.push({x:F.L.x+3,z:F.L.z-2,r:2}); if(st>=4) blocks.push({x:A.x,z:A.z-10,r:14});
+    const plan=GROUNDED.planSettlement({rng, anchor:A, city:st>=4, biome:inf.biome, heightAt, seaY:F.seaY, roadDist, nearestRoad, blocks, irrigationReach:prof.irrigationReach});
+    F.settlement={form:plan.form, civic:plan.civic, farms:plan.farms, plots:plan.plots.length, culture:prof.culture, race:prof.race, arts:prof.arts, beast:prof.beast, reach:plan.reach, crest:prof.crest};
+    plan.paths.forEach(p=>{ if(Math.hypot(p[2]-p[0],p[3]-p[1])>1.5) F.roads.push(p); });
+    if(Math.hypot(plan.civic.x-A.x,plan.civic.z-A.z)>4) F.flats.push({x:plan.civic.x,z:plan.civic.z,r0:8,r1:14,h:baseHeightAt(plan.civic.x,plan.civic.z)});
+    plan.plots.forEach(p=>frameHouse(p, inf.biome, prof.thatch));
+    plan.farms.forEach(layFarm);
+    if(prof.beast==='brush-kin'){ const bx=plan.civic.x+22, bz=plan.civic.z-16; frameHouse({x:bx,z:bz,yaw:0.4,w:3.2,d:2.8,wallH:2.2,role:'camp'}, inf.biome, true);
+      F.targets.push({x:bx,z:bz+2,r:3,label:'brush-kin camp',kind:'camp'}); }
+    mk(new T.CylinderGeometry(0.7,0.9,0.9,8),TX('stone_block','#8d8a80',1.2),plan.civic.x,heightAt(plan.civic.x,plan.civic.z)+0.45,plan.civic.z);
+    F.colliders.circles.push({x:plan.civic.x,z:plan.civic.z,r:1.3});
+    const who=prof.race+(prof.minorities&&prof.minorities.length?' · also '+prof.minorities[0]:'');
+    const nm=P.regionName(id).replace(/^The |^High |^Low |^Old /,'').split(' ')[0];
+    if(st<4) F.targets.push({x:plan.civic.x,z:plan.civic.z+2.5,r:4,label:'🏘 '+nm+' · '+who,kind:'village'});
+    plan.farms.forEach(f=>F.targets.push({x:f.x,z:f.z,r:3.2,label:'🌾 '+f.crop+' · water probe '+f.waterM+' m · haul '+f.haul+' m',kind:'farm'}));
+  }
+  if(MTon&&mains.length) MT.road(siteRoot,mains,heightAt,{width:4.6,step:4,scale:4,lift:0.09});
+  if(MTon){ const paths=F.roads.slice(mains.length); if(paths.length) MT.road(siteRoot,paths,heightAt,{width:2.2,step:3,scale:3,lift:0.08}); }
   // city-state
   if(st>=4){ const cs=P.cityState(id,opt.guildId()); const stone=TX('stone_castle','#9a958a',3), dark=TX('stone_castle','#6e6a62',3); const h0=heightAt(A.x,A.z); const RW=72, segs=28;
     const gates=F.roads.filter(r=>r[0]===A.x&&r[1]===A.z).map(r=>Math.atan2(r[3]-r[1],r[2]-r[0]));
@@ -192,19 +224,20 @@ function buildSite(){
     const sg=signSprite([(cs.guild?'⚒ ':'⚑ ')+cs.name, cs.govName+' · '+cs.ruler], cs.banner[0]); sg.position.set(0,25,0); kp.add(sg);
     F.colliders.circles.push({x:A.x,z:A.z-10,r:10}); F.targets.push({x:A.x,z:A.z-2,r:5,label:'⚑ '+cs.name+' — '+cs.ruler,kind:'city',city:id});
     F.city=cs; }
+  function house(x,z,rndFn){ const r=rndFn||rnd; return frameHouse({x,z,yaw:r()*6.28,w:4+r()*1.5,d:3.4+r(),wallH:2.5,role:'house'}, inf.biome, true); }
   if(opt.siteHook) opt.siteHook(F,{root:siteRoot,mk,M,TX,heightAt,signSprite,bannerTex,house,rnd});
 }
 
 /* ---------- frames ---------- */
 function setFrame(id, guild){
   clearChunks(); tlCache.clear(); while(siteRoot.children.length){ const o=siteRoot.children.pop(); o.traverse(q=>{ if(q.geometry) q.geometry.dispose(); }); }
-  F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null;
+  F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null; F.settlement=null;
   const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(...E)<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
   F.e0=F.stage>0?P.elevation(O[0],O[1],O[2]):0; F.d0=0; F.d0=F.stage>0?(rawH(0,0).h):0;
   const inf=F.info; F.seaY=(F.stage>0&&F.e0<400)?-F.e0:null;
   TFD=(opt.tf&&F.stage>0)?opt.tf.bind(id):(opt.tf&&opt.tf.bind(-1),null);
   F.A=guild?{x:170,z:140}:{x:0,z:0}; F.L=guild?{x:0,z:8}:{x:0,z:F.stage>=4?55:F.stage>=3?50:26};
-  if(F.stage>0&&inf.isLand&&F.stage>=3) F.flats.push({x:F.A.x,z:F.A.z,r0:F.stage>=4?84:66,r1:F.stage>=4?140:110,h:rawH(F.A.x,F.A.z).h});
+  if(F.stage>0&&inf.isLand&&F.stage>=3) F.flats.push({x:F.A.x,z:F.A.z,r0:F.stage>=4?20:10,r1:F.stage>=4?36:18,h:rawH(F.A.x,F.A.z).h});
   if(!guild&&F.stage>0) F.flats.push({x:F.L.x,z:F.L.z,r0:6,r1:20,h:rawH(F.L.x,F.L.z).h});
   if(water){ root.remove(water); water=null; }
   if(F.seaY!=null){ water=new T.Mesh(new T.PlaneGeometry(1600,1600),new T.MeshLambertMaterial({color:'#2a6db5',transparent:true,opacity:0.82})); water.rotation.x=-Math.PI/2; water.position.y=F.seaY; water.userData.sw=true; root.add(water); }

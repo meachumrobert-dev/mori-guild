@@ -131,8 +131,24 @@ function genCell(ci,cj){ const SW=X.SW, F=SW.F, rnd=P().rngFor(P().seed,'gath',F
     const B=b==='guild'?'grass':b; const dens=(DENS[b]||0.4)*(k?0.45:1)*(X.mobile?0.8:1); if(roll>dens) continue; if(!okSpot(x,z)) continue;
     const tw=TYPEW[B]||TYPEW.grass; const type=pickW(()=>roll2,['herb','ore','stone','wood'],t=>tw[['herb','ore','stone','wood'].indexOf(t)]); if(type==='wood'&&!(tw[3]>0)) continue;
     const list=(type==='herb'?HERBS[B]||HERBS.grass:type==='ore'?ORES[B]||ORES._:type==='stone'?STONES[B]||STONES._:WOODS[B]||WOODS._);
-    const rid=pickW(rnd,list,id=>TW[R[id].tier]*(B==='mountain'&&R[id].fam==='ore'&&R[id].tier>=3?3:1)); const r=R[rid];
-    out.push({key:P().seed+'|'+F.id+'|'+ci+','+cj+'|'+k, x, z, y:SW.heightAt(x,z), type, rid, tier:r.tier, req:REQ[r.tier], rot, s, sp:r.sp?FLORA.code(r.sp):-1}); }
+    let rid=pickW(rnd,list,id=>TW[R[id].tier]*(B==='mountain'&&R[id].fam==='ore'&&R[id].tier>=3?3:1));
+    if(window.GROUNDED){
+      const Gnd=GROUNDED, ctx={seed:P().seed, regionId:F.id, guild:!!F.guild, rng:P().rngFor, biomeAt:(x,z)=>SW.biomeAt(x,z), elevAt:(x,z)=>{ const d=SW.toDir(x,z); return P().elevation(d[0],d[1],d[2]); }};
+      if(type==='herb'){ const hit=Gnd.flowerWeight(x,z,ctx); if(!hit) continue;
+        const j=P().rngFor(P().seed,'flj',F.id,ci,cj,k); const spot=Gnd.clusterPoints(hit.node,1,j,(px,pz)=>okSpot(px,pz))[0];
+        if(spot){ x=spot.x; z=spot.z; } else if(!okSpot(x,z)) continue;
+        const prefer=Gnd.SPECIES_REAGENT[hit.node.species]; if(prefer&&(HERBS[B]||HERBS.grass).indexOf(prefer)>=0&&rnd()<0.7) rid=prefer;
+        const farm=F.settlement&&F.settlement.farms&&F.settlement.farms.filter(f=>Math.hypot(f.x-x,f.z-z)<6)[0];
+        if(farm&&farm.reagent&&R[farm.reagent]) rid=farm.reagent;
+      } else if(type==='ore'){ const hit=Gnd.oreAt(x,z,ctx); if(!hit) continue;
+        const j=P().rngFor(P().seed,'orej',F.id,ci,cj,k); const n=hit.node, along=(j()-0.5)*n.length*0.7, cross=(j()-0.5)*n.halfW*0.45;
+        const c=Math.cos(n.strike), s=Math.sin(n.strike); const nx=n.x+along*c-cross*s, nz=n.z+along*s+cross*c;
+        if(Gnd.inVein(n,nx,nz)&&okSpot(nx,nz)){ x=nx; z=nz; } else if(!okSpot(x,z)) continue;
+        if(R[hit.rid]) rid=hit.rid;
+      }
+    }
+    const r=R[rid];
+    out.push({key:window.GROUNDED?GROUNDED.gatherKey(P().seed,F.id,ci,cj,k):P().seed+'|'+F.id+'|'+ci+','+cj+'|'+k, x, z, y:SW.heightAt(x,z), type, rid, tier:r.tier, req:REQ[r.tier], rot, s, sp:r.sp?FLORA.code(r.sp):-1}); }
   // critters (a few per region, by biome)
   const cr=P().rngFor(P().seed,'crit',F.id,ci,cj); if(cr()<(X.mobile?0.045:0.06)){ const x=(ci+0.5)*CELL+(cr()-0.5)*10, z=(cj+0.5)*CELL+(cr()-0.5)*10; const b=SW.biomeAt(x,z); const kind=CRIT[b];
     if(kind&&okSpot(x,z)&&!(F.guild&&Math.hypot(x,z)<90)) out.crit={key:'c|'+P().seed+'|'+F.id+'|'+ci+','+cj, kind, x, z}; }
