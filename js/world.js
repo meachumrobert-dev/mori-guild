@@ -57,15 +57,18 @@ function fence(scene, colliders){
 
 function guildHall(scene){
   const g=new T.Group(); g.position.set(STATIONS.hall.x,0,STATIONS.hall.z); scene.add(g);
-  const stone=TX('stone_block','#8d8a83',1.6), wood=TX('wood_planks','#6a4628',1.5), roof=TX('roof_shingle','#3d5a3a',1.6), trim=M('#c9a227');
-  mesh(new T.BoxGeometry(12,0.5,7),stone,0,0.25,0,g);
-  mesh(new T.BoxGeometry(11,4,6),TX('plaster','#d8cfb8',2.5),0,2.5,0,g);
-  for(let i=-2;i<=2;i++) mesh(new T.BoxGeometry(0.35,4,0.35),wood,i*2.6,2.5,3.05,g);
-  mesh(new T.BoxGeometry(11.4,0.35,0.4),wood,0,4.4,3.05,g);
-  const r=mesh(new T.CylinderGeometry(0.01,7.2,3,4,1),roof,0,6.0,0,g); r.rotation.y=Math.PI/4; r.scale.set(1.12,1,0.62);
-  mesh(new T.BoxGeometry(2,2.8,0.2),M('#3a2412'),0,1.9,3.05,g);
-  const s=new T.Mesh(new T.PlaneGeometry(4.4,0.9),new T.MeshBasicMaterial({map:signTex('ADVENTURE GUILD',512,104,'#2a1a0c','#facc15','#facc15')})); s.position.set(0,3.75,3.2); g.add(s);
-  mesh(new T.CylinderGeometry(0.06,0.06,3,6),wood,5.2,6,1,g); const f=mesh(new T.BoxGeometry(1.2,0.7,0.04),M('#7dff8f',{e:'#2a8a3a',ei:0.6}),5.8,7,1,g); f.castShadow=false;
+  const stone=TX('stone_block','#8d8a83',1.6), wood=TX('wood_planks','#6a4628',1.5), roof=TX('roof_shingle','#3d5a3a',1.6);
+  const pitch=window.GROUNDED?GROUNDED.pitchFor('grass',0.4).rad:34*Math.PI/180;
+  if(window.GROUNDED){
+    const spec=GROUNDED.cottageFrame({w:11, d:6.4, wallH:3.5, pitch, overhang:0.55, doorW:1.6});
+    GROUNDED.attachFrame(T, g, spec, {stone, timber:wood, wall:TX('plaster','#d8cfb8',2.5), roof, door:TX('wood_planks','#3a2412',1.2), window:M('#ffd27a',{e:'#ffb020',ei:0.7})}, {fit:MTon?MT.fit:null, shadow:true});
+  } else {
+    mesh(new T.BoxGeometry(12,0.5,7),stone,0,0.25,0,g);
+    mesh(new T.BoxGeometry(11,4,6),TX('plaster','#d8cfb8',2.5),0,2.5,0,g);
+    const r=mesh(new T.CylinderGeometry(0.01,7.2,3,4,1),roof,0,6.0,0,g); r.rotation.y=Math.PI/4; r.scale.set(1.12,1,0.62);
+  }
+  const s=new T.Mesh(new T.PlaneGeometry(4.4,0.9),new T.MeshBasicMaterial({map:signTex('ADVENTURE GUILD',512,104,'#2a1a0c','#facc15','#facc15')})); s.position.set(0,3.55,3.45); g.add(s);
+  mesh(new T.CylinderGeometry(0.06,0.06,3,6),wood,5.2,g.userData.ridge||6,1,g); const f=mesh(new T.BoxGeometry(1.2,0.7,0.04),M('#7dff8f',{e:'#2a8a3a',ei:0.6}),5.8,(g.userData.ridge||6)+1,1,g); f.castShadow=false;
   return g;
 }
 
@@ -246,12 +249,15 @@ function buildStructure(type, seed){
   if(type==='house'){
     const r1=R(), r2=R(); const WL=MTon?MT.list('buildings.walls',['#d8cfb8']):['#d8cfb8','#cdbb98','#e0d6c2'], RL=MTon?MT.list('buildings.roofs',['#8b3a2a']):['#8b3a2a','#3d5a3a','#4a3a6a'];
     const wc=WL[Math.floor(r1*WL.length)], rc=RL[Math.floor(r2*RL.length)];
-    mesh(new T.BoxGeometry(4,0.3,3.4),stone,0,0.15,0,g); mesh(new T.BoxGeometry(3.6,2.4,3),TX('plaster',wc,2.5),0,1.5,0,g);
-    [-1.8,1.8].forEach(x=>[-1.5,1.5].forEach(z=>mesh(new T.BoxGeometry(0.2,2.4,0.2),dark,x,1.5,z,g)));
-    const r=mesh(new T.CylinderGeometry(0.01,3.2,1.8,4),TX('roof_shingle',rc,1.4),0,3.6,0,g); r.rotation.y=Math.PI/4; r.scale.z=0.9;
-    mesh(new T.BoxGeometry(0.9,1.5,0.1),dark,0,1.05,1.52,g);
-    mesh(new T.BoxGeometry(0.7,0.6,0.1),M('#ffd27a',{e:'#ffb020',ei:0.8}),1.1,1.7,1.52,g);
-    mesh(new T.BoxGeometry(0.4,1,0.4),stone,1,3.7,-0.6,g); g.userData.h=4.6;
+    const pitch=window.GROUNDED?GROUNDED.pitchFor('grass',r1).rad:34*Math.PI/180;
+    if(window.GROUNDED){
+      const spec=GROUNDED.cottageFrame({w:4.0, d:3.4, wallH:2.5, pitch, overhang:0.4, doorW:0.95});
+      GROUNDED.attachFrame(T, g, spec, {stone, timber:dark, wall:TX('plaster',wc,2.5), roof:TX('roof_shingle',rc,1.4), door:dark, window:M('#ffd27a',{e:'#ffb020',ei:0.8})}, {fit:MTon?MT.fit:null, shadow:true});
+    } else {
+      mesh(new T.BoxGeometry(4,0.3,3.4),stone,0,0.15,0,g); mesh(new T.BoxGeometry(3.6,2.4,3),TX('plaster',wc,2.5),0,1.5,0,g);
+      const r=mesh(new T.CylinderGeometry(0.01,3.2,1.8,4),TX('roof_shingle',rc,1.4),0,3.6,0,g); r.rotation.y=Math.PI/4; r.scale.z=0.9;
+      g.userData.h=4.6;
+    }
   } else if(type==='wall'){
     mesh(new T.BoxGeometry(4.4,1.8,0.8),castle,0,0.9,0,g);
     for(let i=0;i<4;i++) mesh(new T.BoxGeometry(0.7,0.5,0.9),castle,-1.65+i*1.1,2.05,0,g);

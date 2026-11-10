@@ -166,3 +166,13 @@ Ships the top love-to-effort gaps from the Mori Price Check page — without ene
 - **Healing ladder:** 🧴 salves = HoT, no roll (auto from hotbar). 🩹 bandages on every hotbar = HoT + D&D 3.5 Heal check (d20+Wis+ranks). ⚪ grey draughts = stronger HoT. 💚 green potions = instant (brass+ pot).
 - **Stations:** alchemy pots & forges climb clay → cast iron (DC 10) → steel (masterwork sword DC 15) → copper/bronze → brass (jewelry; zinc starts green) → ironwood → orichalcum/mythril/adamantine. Brass+ironwood unlock mythic metals. Enchanting Forge (magic arms) and Enchanting Circle (wondrous) are separate; Mori's pot is one high-tier pot, not the only one.
 - Use-based craft skills; crafted gear has durability + lifetime max. Merchants stock herbs/metals; guild treasury buys crafted goods. **No energy timers, no paywalls.** Behave stays #1.
+
+## Grounded hamlets, frames, and deposits
+`js/grounded.js` is a first pass on top of the existing seed, not a new world. `GROUNDING.md` lists the sources, the licenses, and what is still only a design note.
+- Seeded houses, the Guild hall, and a built cottage use one pitched roof (rise = run × tan, rafter = run / cos) with posts, a plate, and a king post only when the span is long.
+- A programmed village is nucleated, linear along a road, or dispersed on steep ground. Footprints do not overlap. Doors link to the well or the road.
+- A field is placed only if a soil score and a water **probe** (well, or standing water on a short ray) agree, and a haul path is short enough. That probe is not a river model.
+- Wild flowers and herb gathers cluster on seeded nodes. Those nodes are not objects you can click. Ore sits in biome-and-elevation veins, patchy inside the vein, instead of an even scatter.
+- A city card shows one dominant culture, a short material tech list (a pot is not a pipe; bronze is not iron), and a grand crest of 4 captains × 6. Nothing here fields an army or grants a throne from a level. Selling the right good, or finishing a mapped quest, can teach one art if the prerequisites are already known.
+- `?power=gaming` (or Low power in the World Seed panel) keeps chunk builds, new audio buffers, and background terraforming on three different frames. Gaming caps quality at medium and turns shadows off. It is aimed at a handheld that sits near 90% RAM in a game and under 60% when idle. It does not read the battery.
+- On a phone (about 412×915, the Galaxy S21 Ultra size) the left thumb gets a joystick or a D-pad and the right thumb gets attack, interact, and the healing hotbar. Chat is a sheet you can drag and fold. Targets are at least 48 px. `?phone=0` keeps the desktop bars. The World Seed panel has the same switch.

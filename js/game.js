@@ -14,7 +14,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, IS_TOUCH?1.25:1.75))
 renderer.shadowMap.enabled=!IS_TOUCH; renderer.shadowMap.type=T.PCFSoftShadowMap;
 renderer.outputColorSpace=T.SRGBColorSpace;
 const camera=new T.PerspectiveCamera(55,1,0.1,900);
-function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(crCam){ crCam.aspect=w/h; crCam.updateProjectionMatrix(); } }
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(crCam){ crCam.aspect=w/h; crCam.updateProjectionMatrix(); } if(window.PHONE&&typeof refreshPhone==='function') refreshPhone(); }
 
 /* ---------- state ---------- */
 const DYES=[{name:'Gothic Rose',hex:'#ff4d6d'},{name:'Holo Pink',hex:'#ff8af0'},{name:'Obsidian Black',hex:'#1a1a1f'},{name:'Legion Cyan',hex:'#22d3ee'},{name:'Void Purple',hex:'#8b5cf6'},{name:'Mori Lime',hex:'#a3ff12'},{name:'Guild Gold',hex:'#facc15'},{name:'Ectoplasm',hex:'#7fffd4'},{name:'Starter White',hex:'#efe6d2'},{name:'Starter Brown',hex:'#6b4a2b'}];
@@ -64,12 +64,15 @@ SW.init({scene, mobile:IS_TOUCH, v2height:V2H, stage:stageOf, explored:id=>!!WD(
 W.height=(x,z)=>SW.heightAt(x,z);
 /* ---------- Phase 1 performance governor: frame-time budget steps quality down (and back up) ---------- */
 const QS=new URLSearchParams(location.search);
+if(window.POWER) POWER.boot(location.search);
 const QUAL=[{name:'low',   pr:1,    shadow:false,      smap:512,  R:3, near:0, treeR:60, flowerR:55, flowerCap:IS_TOUCH?300:450, fx:0.35, refreshCap:1, refreshMs:1.5},
             {name:'medium',pr:1.25, shadow:!IS_TOUCH,  smap:512,  R:4, near:1, treeR:90, flowerR:85, flowerCap:IS_TOUCH?700:1100, fx:0.7,  refreshCap:IS_TOUCH?1:2, refreshMs:IS_TOUCH?1.5:2.5},
             {name:'high',  pr:1.75, shadow:true,       smap:1024, R:5, near:1, treeR:130, flowerR:130, flowerCap:2400, fx:1,    refreshCap:2, refreshMs:3}];
 const PERF={q:IS_TOUCH?1:2, max:IS_TOUCH?1:2, budget:IS_TOUCH?33.3:20, ema:16, js:0, step:0, over:0, under:0, cool:2, auto:true, changes:[], frames:0, overlay:QS.get('perf')==='1'};
 if(QS.get('quality')){ const i=QUAL.findIndex(q=>q.name===QS.get('quality')); if(i>=0){ PERF.q=i; PERF.auto=false; } }
-function applyQuality(i, why){ i=Math.max(0,Math.min(QUAL.length-1,i)); const Q=QUAL[i]; PERF.q=i; if(window.MT&&MT.on) MT.setTier(i);
+function applyQuality(i, why){ const cap=window.POWER?POWER.framePlan(0).qualityMax:QUAL.length-1; i=Math.max(0,Math.min(cap,i)); const Q=Object.assign({},QUAL[i]);
+  if(window.POWER){ const plan=POWER.framePlan(0); if(plan.flower<1){ Q.flowerCap=Math.max(120, Math.round(Q.flowerCap*plan.flower)); Q.flowerR=Math.round(Q.flowerR*Math.max(0.7,plan.flower)); }
+    if(plan.shadow===false) Q.shadow=false; } PERF.q=i; PERF.max=cap; if(window.MT&&MT.on) MT.setTier(i);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, Q.pr));
   if(renderer.shadowMap.enabled!==Q.shadow){ renderer.shadowMap.enabled=Q.shadow; scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.needsUpdate=true); } }); }
   sun.castShadow=Q.shadow; if(sun.shadow.mapSize.x!==Q.smap){ sun.shadow.mapSize.set(Q.smap,Q.smap); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } }
@@ -186,7 +189,8 @@ const potions=()=>S.inv.filter(i=>i.kind==='potion');
 
 /* ---------- UI helpers ---------- */
 let logT=0; function log(msg){ const l=$('log'); l.textContent=msg; l.style.opacity=1; logT=5; }
-let rollT=0; function showRoll(die, text, cls){ const r=$('roll'); $('rollDie').textContent=die; $('rollText').innerHTML=text; r.className='show '+(cls||''); rollT=2.2; }
+let rollT=0; function showRoll(die, text, cls){ const r=$('roll'); $('rollDie').textContent=die; $('rollText').innerHTML=text; r.className='show '+(cls||''); r.dataset.where=mode; rollT=2.2; }
+function dismissRoll(){ rollT=0; const r=$('roll'); if(r){ r.className=''; r.dataset.where=''; } }
 function speak(t,v){ if(!$('ttsOn').checked||!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(t); u.pitch=v?v.pitch:1.4; u.rate=v?v.rate:1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){} }
 const reagName=k=>k.startsWith('r:')?(GATHERING.R[k.slice(2)]||{name:k}).name:k.startsWith('f:')?'any '+k.slice(2):k;
 const fmt=o=>Object.entries(o).map(([k,v])=>v+' '+reagName(k)).join(', ');
@@ -450,7 +454,7 @@ function benchUI(){
   h+='<div class="row"><label>Crafter <select id="bCrafter">'+Object.keys(C.CRAFTERS).map(k=>'<option value="'+k+'" '+(k===(benchCfg.crafter||'mori')?'selected':'')+'>'+crafterName(k)+' · CL '+crafterCL(k)+'</option>').join('')+'</select></label></div>';
   h+='<div class="row"><label>Base <select id="bBase">'+benchOrder(ccl).map(k=>{ const b=C.BASES[k], f=C.FEATS[b.feat], lk=baseLock(k,ccl); return '<option value="'+k+'" '+(k===benchCfg.base?'selected':'')+'>'+(lk?'🔒 ':'')+b.name+(b.price?' ('+b.price+' gp)':'')+(lk?' — '+lk:(f?' · '+f.name+' CL'+f.cl:''))+'</option>'; }).join('')+'</select></label>'+(C.BASES[benchCfg.base].use?'<span class="small">'+C.USES[p.use].name+'</span>':'<label>Use <select id="bUse">'+Object.keys(C.USES).filter(k=>!C.USES[k].fixed).map(k=>'<option value="'+k+'" '+(k===p.use?'selected':'')+'>'+C.USES[k].name+'</option>').join('')+'</select></label>')+(p.use==='charges'?'<label>Charges/day <select id="bCh">'+[1,2,3,4,5].map(n=>'<option '+(n==benchCfg.charges?'selected':'')+'>'+n+'</option>').join('')+'</select></label>':'')+'</div>';
   if(p.base.kind==='armor'||p.base.kind==='weapon') h+='<div class="row"><label>Enhancement bonus <select id="bEnh">'+Array.from({length:p.enhMax+1},(_,n)=>'<option value="'+n+'" '+(n==Math.min(benchCfg.enh||0,p.enhMax)?'selected':'')+'>+'+n+'</option>').join('')+'</select></label><span class="small">max +'+p.enhMax+(HR.maxEnh5?' (house rule)':' (house rule off)')+'</span></div>';
-  h+='<div class="sec">SRD spells</div><div class="row">'+Object.keys(C.SPELLS).map(k=>{ const s=C.SPELLS[k]; return '<label class="chip"><input type="checkbox" data-sp="'+k+'" '+(benchCfg.spells.includes(k)?'checked':'')+'> '+s.name+' <span class="small">'+s.lvl+'</span></label>'; }).join('')+'</div>';
+  h+='<div class="sec">SRD spells</div><div class="row">'+Object.keys(C.SPELLS).map(k=>{ const s=C.SPELLS[k], on=benchCfg.spells.includes(k); return '<button type="button" class="chip'+(on?' on':'')+'" data-sp="'+k+'">'+s.name+' <span class="small">'+s.lvl+'</span></button>'; }).join('')+'</div>';
   h+='<div class="sec">Metamagic on the item\'s spells</div>'+(metaOff?'<div class="lock">DM ruling is off: no metamagic on '+C.USES[p.use].name.toLowerCase()+' items.</div>':'')+'<div class="row">'+Object.keys(C.METAMAGIC).map(k=>'<label class="chip"><input type="checkbox" data-mm="'+k+'" '+(benchCfg.meta.includes(k)?'checked':'')+' '+(metaOff?'disabled':'')+'> '+C.METAMAGIC[k].name+' <span class="small">+'+C.METAMAGIC[k].up+'</span></label>').join('')+'</div>';
   h+='<div class="row"><label>Caster level above minimum: <input type="range" id="bCl" min="0" max="10" value="'+(benchCfg.clBonus||0)+'"> +'+(benchCfg.clBonus||0)+'</label></div>';
   // budget bar
@@ -478,7 +482,7 @@ function benchUI(){
     const en=c.querySelector('#bEnh'); if(en) en.onchange=e=>{ benchCfg.enh=+e.target.value; re(); };
     const rt=c.querySelector('#bRitual'); if(rt) rt.onchange=e=>{ benchCfg.ritual=e.target.checked; re(); };
     const ch=c.querySelector('#bCh'); if(ch) ch.onchange=e=>{ benchCfg.charges=+e.target.value; re(); };
-    c.querySelectorAll('[data-sp]').forEach(x=>x.onchange=()=>{ const k=x.dataset.sp; benchCfg.spells=x.checked?benchCfg.spells.concat(k):benchCfg.spells.filter(s=>s!==k); re(); });
+    c.querySelectorAll('[data-sp]').forEach(x=>x.onclick=()=>{ const k=x.dataset.sp; benchCfg.spells=benchCfg.spells.includes(k)?benchCfg.spells.filter(s=>s!==k):benchCfg.spells.concat(k); re(); });
     c.querySelectorAll('[data-mm]').forEach(x=>x.onchange=()=>{ const k=x.dataset.mm; benchCfg.meta=x.checked?benchCfg.meta.concat(k):benchCfg.meta.filter(s=>s!==k); re(); });
     c.querySelector('#bCl').onchange=e=>{ benchCfg.clBonus=+e.target.value; re(); };
     c.querySelector('#bCraft').onclick=()=>craftItem();
@@ -516,7 +520,7 @@ function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(
   b.querySelectorAll('[data-use]').forEach(x=>x.onclick=()=>{ drink(S.inv.find(i=>i.id===x.dataset.use)); renderBag(); });
   b.querySelectorAll('[data-sell]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.sell); if(!it) return; const g=Math.floor(it.value/2); S.inv.splice(S.inv.indexOf(it),1); S.gold+=g; log('Sold '+it.name+' for '+g.toLocaleString()+' gold (half its '+it.value.toLocaleString()+' gp price). 1 gold = 1 gp.'); save(); renderBag(); });
   b.querySelectorAll('[data-treas]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.treas); if(!it||!window.STATIONS) return; const r=STATIONS.treasuryBuyCrafted(it); if(!r.ok){ log('Treasury: '+ (r.why||'cannot buy')); return; } S.inv.splice(S.inv.indexOf(it),1); log('Guild treasury bought '+it.name+' for '+r.paid+' Mori Marks.'); save(); renderBag(); });
-  b.querySelectorAll('[data-rsell]').forEach(x=>x.onclick=()=>{ const id=x.dataset.rsell, nm=GATHERING.R[id].name, n=S.reag[id]; const g=GATHERING.sell(id); log('Sold '+n+'× '+nm+' for '+g+' gold.'); save(); renderBag(); });
+  b.querySelectorAll('[data-rsell]').forEach(x=>x.onclick=()=>{ const id=x.dataset.rsell, nm=GATHERING.R[id].name, n=S.reag[id]; const g=GATHERING.sell(id); log('Sold '+n+'× '+nm+' for '+g+' gold.'); noteCivic('trade', id); save(); renderBag(); });
   b.querySelectorAll('[data-eq]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.eq); const was=it.equipped; if(!was&&['weapon','armor','ring','shield'].includes(it.kind)) S.inv.forEach(o=>{ if(o.kind===it.kind) o.equipped=false; }); it.equipped=!was; renderBag(); save(); });
   b.querySelectorAll('[data-tpl]').forEach(x=>x.onclick=()=>{ const [k,v]=x.dataset.tpl.split('|'); const val=v==='true'?true:v; ch[k]=ch[k]===val?(k==='hairStyle'?'short':k==='bootStyle'?'plain':false):val; saveChars(); rebuildPlayer(); renderBag(); });
   b.querySelectorAll('[data-dye]').forEach(x=>x.onclick=()=>{ ch[$('dyeSlot').value]=x.dataset.dye; saveChars(); rebuildPlayer(); renderBag(); });
@@ -546,8 +550,10 @@ function drink(it){
   else if(f.heal){ const n=SRD.dice(f.heal); S.hp=Math.min(stats().maxHp,S.hp+n); showRoll(n,it.name+': healed '+f.heal+' = '+n,''); }
   save(); renderHotbar(); }
 function useHotbar(slot){ const it=HERBAL.pickHotbar(slot); if(!it){ log(slot==='bandage'?'No bandages — craft linen bandages at the alchemy table.':slot==='salve'?'No salves — brew a lavender or yarrow blend.':'No potions.'); return; } drink(it); }
-function renderHotbar(){ const h=HERBAL.hotbarHTML(); const b=$('bBandage'), s=$('bSalve'), p=$('bPotion');
-  if(b) b.textContent='🩹 Bandage ('+h.bandage+')'; if(s) s.textContent='🧴 Salve ('+h.salve+')'; if(p) p.textContent='🧪 Potion ('+h.potion+')'+(h.green?' 💚'+h.green:'')+(h.grey?' ⚪'+h.grey:''); }
+function renderHotbar(){ const h=HERBAL.hotbarHTML(); const phone=document.body.classList.contains('phone'); const b=$('bBandage'), s=$('bSalve'), p=$('bPotion');
+  if(b){ b.textContent=phone?'🩹 '+h.bandage:'🩹 Bandage ('+h.bandage+')'; b.title='Bandage ('+h.bandage+')'; }
+  if(s){ s.textContent=phone?'🧴 '+h.salve:'🧴 Salve ('+h.salve+')'; s.title='Salve ('+h.salve+')'; }
+  if(p){ p.textContent=phone?'🧪 '+h.potion:'🧪 Potion ('+h.potion+')'+(h.green?' 💚'+h.green:'')+(h.grey?' ⚪'+h.grey:''); p.title='Potion ('+h.potion+')'; } }
 
 /* ---------- Talk / Beat / Blue room ---------- */
 let chatHist=[], chatAlt=0, lastUser='', lastReply=null;
@@ -638,7 +644,7 @@ function npcState(d){ const m=(S.npcMem||(S.npcMem={}))[d.id]||{}; const offer=Q
 function npcApply(d,res){ if(!res) return; S.npcMem[d.id]=res.mem||S.npcMem[d.id]; npcChain=[]; addChat('npc',res.text||'…',d,{alts:res.alts,intent:res.intent});
   MEMORY.onTalk(d.id); LORE.meet(d.id);
   (res.actions||[]).forEach(a=>{ if(a.type==='accept'){ const q=QUESTS.accept(a.id); if(q) addChat('sys','📜 Quest accepted: '+q.title+' (L for the quest log)'); }
-    if(a.type==='turnIn'){ const r=QUESTS.turnIn(a.id,d.id); if(r){ addChat('sys','✦ Quest complete: '+r.q.title+' — '+r.reward); MEMORY.onQuest(d.id,r.q.title); } }
+    if(a.type==='turnIn'){ const r=QUESTS.turnIn(a.id,d.id); if(r){ addChat('sys','✦ Quest complete: '+r.q.title+' — '+r.reward); MEMORY.onQuest(d.id,r.q.title); noteCivic('quest', r.q.id); } }
     if(a.type==='haggle') log((a.won?'🤝 Haggle won: 10% off at ':'Haggle failed at ')+d.name+(a.won?' today.':'.'));
     if(a.type==='talkcheck'){ if(a.ok){ QUESTS.event('talkcheck',d.id,a.skill); addChat('sys','Talk goal met ('+a.skill+' '+a.roll+(a.mod>=0?'+':'')+a.mod+' vs DC '+a.dc+'). Turn in when ready.'); if($('questP').classList.contains('open')) renderQuests(); } else addChat('sys','Check failed — try again (new d20 each attempt).'); }
     if(a.type==='gift'){ if(S.reag&&(S.reag.marigold|0)>0){ S.reag.marigold--; MEMORY.onGift(d.id,'Marigold Petals'); addChat('sys','Gifted Marigold. Bond up.'); }
@@ -699,7 +705,7 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 /* ---------- panels ---------- */
 function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
-$('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ const n=mode==='world'&&NPCS.nearest(3.2); if(n){ openNpc(n.d.id); return; } if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
+$('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
 $('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
  '<li><b>Move</b>: WASD / arrows (phones: left-thumb joystick). <b>Look</b>: drag to orbit, wheel / pinch to zoom.</li>'+
@@ -723,7 +729,7 @@ const joy={id:null, x:0, y:0, cx:0, cy:0}; const pts=new Map(); let pinch0=0;
 let gDown=null;
 canvas.addEventListener('pointerdown',e=>{ canvas.setPointerCapture(e.pointerId);
   if(globeOpen){ pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pts.size===2){ const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); } gDown={x:e.clientX,y:e.clientY,m:0}; return; }
-  if(e.pointerType!=='mouse'&&e.clientX<innerWidth*0.42&&e.clientY>innerHeight*0.45&&joy.id===null&&!crOpen){ joy.id=e.pointerId; joy.cx=e.clientX; joy.cy=e.clientY; const j=$('joy'); j.style.left=(e.clientX-55)+'px'; j.style.top=(e.clientY-55)+'px'; j.style.bottom='auto'; j.classList.add('on'); return; }
+  if(!document.body.classList.contains('phone')&&e.pointerType!=='mouse'&&e.clientX<innerWidth*0.42&&e.clientY>innerHeight*0.45&&joy.id===null&&!crOpen){ joy.id=e.pointerId; joy.cx=e.clientX; joy.cy=e.clientY; const j=$('joy'); j.style.left=(e.clientX-55)+'px'; j.style.top=(e.clientY-55)+'px'; j.style.bottom='auto'; j.classList.add('on'); return; }
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pts.size===2){ const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); } });
 canvas.addEventListener('pointermove',e=>{
   if(e.pointerId===joy.id){ let dx=e.clientX-joy.cx, dy=e.clientY-joy.cy; const d=Math.hypot(dx,dy), m=45; if(d>m){ dx=dx/d*m; dy=dy/d*m; } joy.x=dx/m; joy.y=dy/m; $('joy').firstElementChild.style.transform='translate('+dx+'px,'+dy+'px)'; return; }
@@ -733,7 +739,32 @@ canvas.addEventListener('pointermove',e=>{
   if(pts.size===2){ p.x=e.clientX; p.y=e.clientY; const [a,b]=[...pts.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if(pinch0){ const k=pinch0/d; if(crOpen) crDist=Math.max(0.8,Math.min(5,crDist*k)); else camDist=Math.max(3.5,Math.min(22,camDist*k)); } pinch0=d; return; }
   const dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY;
   if(crOpen){ crYaw-=dx*0.01; crPitch=Math.max(-0.8,Math.min(0.8,crPitch+dy*0.005)); } else { camYaw-=dx*0.006; camPitch=Math.max(0.05,Math.min(1.35,camPitch+dy*0.004)); } });
-const endPtr=e=>{ if(globeOpen&&gDown&&gDown.m<8&&e.type==='pointerup'&&pts.size===1){ const id=SW.globe.pick(e.clientX,e.clientY); if(id>=0){ SW.globe.select(id); renderSeedPanel(); } } if(globeOpen) gDown=null; if(e.pointerId===joy.id){ joy.id=null; joy.x=joy.y=0; $('joy').classList.remove('on'); $('joy').firstElementChild.style.transform=''; } pts.delete(e.pointerId); if(pts.size<2) pinch0=0; };
+const endPtr=e=>{ if(globeOpen&&gDown&&gDown.m<8&&e.type==='pointerup'&&pts.size===1){ const id=SW.globe.pick(e.clientX,e.clientY); if(id>=0){ SW.globe.select(id); renderSeedPanel(); } } if(globeOpen) gDown=null; if(e.pointerId===joy.id){ joy.id=null; if(!padHeld()){ joy.x=joy.y=0; } if(!document.body.classList.contains('phone')){ $('joy').classList.remove('on'); $('joy').style.left=''; $('joy').style.top=''; $('joy').style.bottom=''; } $('joy').firstElementChild.style.transform=''; } pts.delete(e.pointerId); if(pts.size<2) pinch0=0; };
+function stickMove(e){ if(e.pointerId!==joy.id) return; const r=$('joy').getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+r.height/2; const v=PHONE.stickVector(e.clientX-cx, e.clientY-cy, r.width*0.42); joy.x=v.x; joy.y=v.y; const n=$('joy').firstElementChild; n.style.transform='translate('+(v.x*r.width*0.32)+'px,'+(v.y*r.height*0.32)+'px)'; }
+if($('joy')){ $('joy').addEventListener('pointerdown',e=>{ if(!document.body.classList.contains('phone')||document.body.classList.contains('pad')) return; e.preventDefault(); e.stopPropagation(); joy.id=e.pointerId; $('joy').setPointerCapture(e.pointerId); stickMove(e); }); $('joy').addEventListener('pointermove',stickMove); $('joy').addEventListener('pointerup',endPtr); $('joy').addEventListener('pointercancel',endPtr); }
+const pad={n:0,s:0,e:0,w:0}; const padHeld=()=>pad.n||pad.s||pad.e||pad.w;
+function applyPad(){ if(!padHeld()){ if(joy.id==null) joy.x=joy.y=0; return; } const v=PHONE.padVector(pad); joy.x=v.x; joy.y=v.y; }
+document.querySelectorAll('[data-pad]').forEach(b=>{ const dir=b.dataset.pad; const down=ev=>{ ev.preventDefault(); pad[dir]=1; applyPad(); }; const up=()=>{ pad[dir]=0; applyPad(); }; b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); });
+if($('padMode')) $('padMode').onclick=()=>{ PHONE.setControl(PHONE.getControl()==='pad'?'stick':'pad'); refreshPhone(); };
+function refreshPhone(){ if(!window.PHONE) return; let saved=null; try{ saved=localStorage.getItem('mori.phone'); }catch(e){}
+  const on=PHONE.shouldPhone({touch:IS_TOUCH, coarse:matchMedia('(pointer:coarse)').matches, w:innerWidth, h:innerHeight, query:QS.get('phone'), saved});
+  document.body.classList.toggle('phone', on); document.body.classList.toggle('land', innerWidth>innerHeight); document.body.classList.toggle('pad', on&&PHONE.getControl()==='pad');
+  const pm=$('padMode'); if(pm) pm.textContent=PHONE.getControl()==='pad'?'◉':'✥';
+  if($('bAttack')) $('bAttack').textContent=on?'⚔':'⚔ Attack';
+  if($('bBandage')) $('bBandage').textContent=on?'🩹':'🩹 Bandage';
+  if($('bSalve')) $('bSalve').textContent=on?'🧴':'🧴 Salve';
+  if($('bPotion')) $('bPotion').textContent=on?'🧪':'🧪 Potion';
+  if(!on) document.body.classList.remove('menu'); }
+if($('phoneMenu')) $('phoneMenu').onclick=()=>document.body.classList.toggle('menu');
+addEventListener('resize', refreshPhone); refreshPhone();
+document.addEventListener('gesturestart', e=>{ if(document.body.classList.contains('phone')) e.preventDefault(); });
+document.addEventListener('touchmove', e=>{ if(!document.body.classList.contains('phone')) return; if(e.touches.length>1 && !e.target.closest('#chatLog,.panel .body,.modal .card,#bottom')) e.preventDefault(); }, {passive:false});
+(function bindChat(){ const head=$('talkHead'); if(!head) return; let drag=null;
+  head.addEventListener('pointerdown', e=>{ if(!document.body.classList.contains('phone')||e.target.closest('button')) return; const box=$('talkP').getBoundingClientRect(); drag={id:e.pointerId,x:e.clientX,y:e.clientY,l:box.left,t:box.top,w:box.width,h:box.height}; head.setPointerCapture(e.pointerId); });
+  head.addEventListener('pointermove', e=>{ if(!drag||e.pointerId!==drag.id) return; const p=PHONE.placeChat({left:drag.l,top:drag.t,w:drag.w,h:drag.h}, e.clientX-drag.x, e.clientY-drag.y, {w:innerWidth,h:innerHeight}); const el=$('talkP'); el.style.left=p.left+'px'; el.style.top=p.top+'px'; el.style.right='auto'; el.style.bottom='auto'; });
+  head.addEventListener('pointerup', ()=>{ drag=null; });
+  if($('chatFold')) $('chatFold').onclick=()=>{ const el=$('talkP'); el.classList.toggle('collapsed'); $('chatFold').textContent=el.classList.contains('collapsed')?'+':'–'; }; }
+)();
 canvas.addEventListener('pointerup',endPtr); canvas.addEventListener('pointercancel',endPtr);
 canvas.addEventListener('wheel',e=>{ e.preventDefault(); if(globeOpen){ SW.globe.zoom(1+e.deltaY*0.001); return; } if(crOpen) crDist=Math.max(0.8,Math.min(5,crDist*(1+e.deltaY*0.001))); else camDist=Math.max(3.5,Math.min(22,camDist*(1+e.deltaY*0.001))); },{passive:false});
 $('bInteract').onclick=()=>interact(); $('bAttack').onclick=()=>attack(); $('bPotion').onclick=()=>useHotbar('potion'); if($('bBandage')) $('bBandage').onclick=()=>useHotbar('bandage'); if($('bSalve')) $('bSalve').onclick=()=>useHotbar('salve');
@@ -826,14 +857,16 @@ function enterDungeon(o){ o=o&&o.ret?o:null;
   if(!renderer.shadowMap.enabled) dun.lights.forEach(l=>l.castShadow=false);
   log(dunName+' — '+dun.rooms.map(r=>r.name).join(' → ')+'. Templates: '+([...new Set(mobs.map(x=>x.m.tmpl).filter(t=>t!=='none'))].map(t=>SRD.TEMPLATES[t].name).join(', ')||'none this time'));
 }
-function leaveDungeon(msg){ if(mode!=='dungeon') return; dunSaveState(); GATHERING.clearDungeon(); mode='world'; dun.scene.remove(player.model); scene.add(player.model); comps.forEach((c,i)=>{ dun.scene.remove(c.model); scene.add(c.model); });
+function leaveDungeon(msg){ if(mode!=='dungeon') return; dunSaveState(); if(S.dun[dunName]) S.dun[dunName].rested=false; GATHERING.clearDungeon(); mode='world'; dismissRoll();
+  const card=$('modalCard'); if(card&&/Loot chest|Boss chest/.test(card.textContent||'')) closeModal();
+  dun.scene.remove(player.model); scene.add(player.model); comps.forEach((c,i)=>{ dun.scene.remove(c.model); scene.add(c.model); });
   const st=dunRet||{x:W.STATIONS.dungeon.x,z:W.STATIONS.dungeon.z+4}; player.pos.set(st.x,0,st.z); comps.forEach((c,i)=>c.pos.set(st.x-1+i,0,st.z+1.5)); camYaw=Math.PI; trail.length=0; dunRet=null;
   dun.scene.traverse(o=>{ if(o.geometry&&o.geometry.dispose) o.geometry.dispose(); }); dun=null; mobs=[]; chests=[]; if(msg) log(msg); save(); }
 function zeroReturn(){ const keep=S.inv.some(i=>i.equipped&&i.fx&&i.fx.zeroKeep); const lost=keep?0:Math.floor(S.gold*0.1); S.gold-=lost; S.hp=stats().maxHp;
   if(mode==='dungeon'){ leaveDungeon(); } if(!atGuild()) travelTo(guildId,true); const h=W.STATIONS.hall; player.pos.set(h.x,0,h.z+7); comps.forEach((c,i)=>c.pos.set(h.x-1+i,0,h.z+8.5));
   modal('<h3>⭕ Zero-Return</h3><div class="quote">Your HP hit zero. The Guild calls you home to re-center.</div><div>'+(keep?'Your Zero-Return Band glows — you keep all your gold.':'You dropped '+lost+' gold on the way back.')+'</div>'); save(); }
 function dungeonTargets(){ const t=GATHERING.targets(); chests.forEach(c=>{ if(!c.open) t.push({x:c.x,z:c.z,r:2.2,label:(c.big?'💎 Boss chest':'📦 Loot chest')+' — roll d%',act:()=>openChest(c)}); });
-  if(dun.camp) t.push({x:dun.camp.x,z:dun.camp.z,r:2.6,label:(S.dun[dunName]||{}).rested?'🔥 Campfire (used this dive)':'🔥 Rest at the campfire (full heal, once per dive)',act:restAtCamp});
+  if(dun.camp) t.push({x:dun.camp.x,z:dun.camp.z,r:2.6,label:(S.dun[dunName]||{}).rested?'🔥 Campfire (used this visit)':'🔥 Rest at the campfire (full heal, once this visit)',act:restAtCamp});
   t.push({x:dun.exitAt[0],z:dun.exitAt[1],r:2.6,label:dunRet?'🪜 Climb back out':'🪜 Climb back to the Guild',act:()=>leaveDungeon('You climb out of the Undercroft.')});
   if(!mobs.some(m=>m.alive&&m.m.boss)) t.push({x:dun.portalAt[0],z:dun.portalAt[1],r:2.4,label:'🌀 Portal home (cleared!)',act:()=>{ S.clears++; delete S.dun[dunName]; S.hp=stats().maxHp; leaveDungeon(dunName+' cleared! Level up: you are now level '+charLevel()+' ('+S.hp+' HP). Dungeons feel deeper next time (treasure level '+(S.clears+1)+').'); }});
   return t; }
@@ -868,10 +901,10 @@ function foeAttack(mb){ const st=stats(); if(S.buffs.halt>0&&mb.m.type==='undead
 function dunRoomAt(x,z){ if(!dun) return -1; const tx=Math.floor(x/2+13), ty=Math.floor(z/2+23); return dun.rooms.findIndex(r=>tx>=r.x0&&tx<=r.x1&&ty>=r.y0&&ty<=r.y1); }
 function dunRoomName(){ const i=dunRoomAt(player.pos.x,player.pos.z); return i>=0?dun.rooms[i].name:(dun&&dun.camp&&Math.hypot(player.pos.x-dun.camp.x,player.pos.z-dun.camp.z)<5?'campfire alcove':''); }
 function dunSaveState(){ const DS=S.dun[dunName]; if(!DS) return; DS.dead=mobs.filter(m=>!m.alive).map(m=>m.idx); DS.open=chests.filter(c=>c.open).map(c=>c.ci); DS.lvl=dunLvl; }
-function restAtCamp(){ const DS=S.dun[dunName]; if(DS&&DS.rested){ log('You already rested here this dive. The fire is embers now.'); return; }
-  if(mobs.some(m=>m.alive&&m.ag&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14)){ log('You can\'t rest with enemies hunting you!'); return; }
+function restAtCamp(){ const DS=S.dun[dunName]; if(DS&&DS.rested){ log('You already rested on this visit. Leave and come back if you need the fire again.'); return false; }
+  if(mobs.some(m=>m.alive&&m.ag&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14)){ log('You can\'t rest with enemies hunting you!'); return false; }
   const mx=stats().maxHp, got=mx-S.hp; S.hp=mx; if(DS) DS.rested=true; if(dun.camp){ dun.camp.light.intensity=1.5; dun.camp.flame.scale.setScalar(0.4); }
-  log('🔥 You rest at the campfire: +'+got+' HP (full). One rest per dive.'); save(); }
+  log('🔥 You rest at the campfire: +'+got+' HP (full). Once this visit — leaving the dungeon relights it.'); save(); return true; }
 function updateDungeon(dt){
   const st=stats(); const proom=dunRoomAt(player.pos.x,player.pos.z);
   mobs.forEach(mb=>{ if(!mb.alive||mode!=='dungeon') return; const dx=player.pos.x-mb.x, dz=player.pos.z-mb.z, d=Math.hypot(dx,dz); const reach=mb.m.size*0.5+0.9;
@@ -985,7 +1018,7 @@ function hud(){ const st=stats(); $('sHp').textContent=S.hp+'/'+st.maxHp; $('hpb
   $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=S.ore; $('sTimber').textContent=S.timber;
   { const id=curRegion(), inf=PL.regionInfo(id), st=stageOf(id); $('sRegion').textContent=mode==='dungeon'&&dun?'🕳 '+dunName+' · '+(dunRoomName()||'passage')+' · treasure level '+dunLvl+' · under '+inf.name:'🌍 '+(atGuild()?'The Guild · ':'')+inf.name+' · '+(st?PL.BIOMES[inf.biome].name:'void')+' · '+STAGES[st];
   if($('sWorld')&&window.IDLEBUILD) $('sWorld').textContent=IDLEBUILD.progressChip(); }
-  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=mode==='dungeon'?'':'none'; }
+  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none'; }
 
 /* ---------- World Seed: travel, globe map, seed panel (v3) ---------- */
 function setTownVisible(v){ const skip=new Set([hemi,sun,sun.target,stars,player.model].concat(comps.map(c=>c.model)));
@@ -1006,8 +1039,27 @@ function closeGlobe(){ if(!globeOpen) return; globeOpen=false; document.body.cla
 const relWord={ally:'🤝 ally',rival:'⚔ rival',vassal:'👑 vassal',neutral:'· neutral'};
 function cityRels(id){ const G=SW.globe.G; return (G.rels||[]).filter(r=>r.a===id||r.b===id).map(r=>{ const o=r.a===id?r.b:r.a; const cs=PL.cityState(o,guildId); let w=relWord[r.type];
   if(r.type==='vassal') w=r.vassal===id?'👑 vassal of':'👑 overlord of'; return {w, name:cs.name, type:r.type}; }); }
+function civicProfileFor(id){ if(!window.GROUNDED) return null; const cs=PL.cityState(id,guildId), inf=PL.regionInfo(id);
+  return GROUNDED.civicProfile({id, biome:inf.biome, gov:cs.gov, power:cs.power, guild:id===guildId, clan:!!cs.clan, sister:!!cs.sister, rng:PL.rngFor(PL.seed,'civic',id)}); }
+function civicHTML(id){ const prof=civicProfileFor(id); if(!prof) return ''; const saved=(WD().civic||{})[id]; const d=GROUNDED.displayArts(prof, saved);
+  const names=d.frontier.map(a=>{ const t=GROUNDED.techById(a); return t?t.name:a; }).slice(0,6).join(', ');
+  const cap=GROUNDED.commandCapacity('grand');
+  return '<div class="sec">Civic knowledge</div><div class="small">Dominant face: <b>'+prof.race+'</b>'+(prof.minorities&&prof.minorities.length?' · also '+prof.minorities.join(', '):'')+(prof.beast?' · a small '+prof.beast+' band':'')+'. Mixed company is welcome; the map still reads as one people.</div>'
+    +'<div class="small">Arts at the frontier: '+names+'.</div>'
+    +(d.taught.length?'<div class="small">Learned from trade or a teacher: '+d.taught.map(a=>GROUNDED.techById(a).name).join(', ')+'.</div>':'')
+    +'<div class="small">Grand crest: '+cap.subordinateCrests+' captains, each leading a band of '+GROUNDED.CREST.personal.bandSize+'. Allies and teachers keep their own crest and do not fill those seats. No host is raised from a character level.</div>'; }
+function noteCivic(via, hint){ if(!window.GROUNDED||via==='level') return null; const id=curRegion(); if(stageOf(id)<1) return null;
+  const art=GROUNDED.artForHint(hint); if(!art) return null; const prof=civicProfileFor(id); if(!prof) return null;
+  const w=WD(); if(!w.civic) w.civic={}; const saved=w.civic[id]||(w.civic[id]={taught:[], dev:0, log:[]});
+  const res=GROUNDED.teachArt(prof.arts.concat(saved.taught), art, {via, teacherCulture:via==='teacher'?prof.culture:null});
+  const cs=PL.cityState(id,guildId);
+  if(res.ok){ saved.taught.push(art); saved.dev=(saved.dev||0)+1; saved.log.push({via, art}); if(saved.log.length>8) saved.log.shift();
+    log('📘 '+cs.name+' learns '+GROUNDED.techById(art).name+' from '+via+'. A character level would not have taught it.'); }
+  else if(res.reason==='prereq'&&!saved.log.some(l=>l.miss===art)){ saved.log.push({miss:art, via}); if(saved.log.length>8) saved.log.shift();
+    log('📘 '+cs.name+' can use the '+String(hint).replace(/_/g,' ')+', but not yet: still needs '+res.missing.join(', ')+'.'); }
+  return res; }
 function cityModal(id){ if(!SW.globe.G.mesh) SW.globe.build(); else if(globeDirty){ SW.globe.refresh(); globeDirty=false; } const cs=PL.cityState(id,guildId); const rels=cityRels(id);
-  modal('<h3>⚑ '+cs.name+'</h3><div class="row"><span class="chip" style="background:'+cs.banner[0]+';color:'+cs.banner[1]+'">banner</span><b>'+cs.govName+'</b></div><div>Ruled by <b>'+cs.ruler+'</b></div><div class="quote">“'+cs.motto+'”</div><div class="small">Power '+cs.power+'/10 · '+PL.regionInfo(id).name+'</div><div class="sec">Relations</div>'+(rels.length?rels.map(r=>'<div>'+r.w+' <b>'+r.name+'</b></div>').join(''):'<div class="small">No neighbours close enough to care yet.</div>')+CLAN.cityHTML(id)); }
+  modal('<h3>⚑ '+cs.name+'</h3><div class="row"><span class="chip" style="background:'+cs.banner[0]+';color:'+cs.banner[1]+'">banner</span><b>'+cs.govName+'</b></div><div>Ruled by <b>'+cs.ruler+'</b></div><div class="quote">“'+cs.motto+'”</div><div class="small">Power '+cs.power+'/10 · '+PL.regionInfo(id).name+'</div>'+civicHTML(id)+'<div class="sec">Relations</div>'+(rels.length?rels.map(r=>'<div>'+r.w+' <b>'+r.name+'</b></div>').join(''):'<div class="small">No neighbours close enough to care yet.</div>')+CLAN.cityHTML(id)); }
 function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.globe.G; const sel=G.sel; const n=programmedCount(); const cities=(G.cities||[]); const ex=Object.keys(WD().exp).length;
   let h='<div class="sec">World Seed</div><div class="row"><input id="seedIn" type="text" value="'+String(S.seed).replace(/"/g,'')+'" style="flex:1;min-width:0"><button id="seedApply">Apply</button><button id="seedRand">🎲 Randomize</button></div>';
   h+='<div class="small">Same seed → same planet, every time. Radius <b>3,185 km</b> (¼ of Earth\'s surface area). '+PL.COUNT+' regions of ~'+Math.round(PL.RADIUS_KM*Math.PI/2/PL.N)+' km. Only the seed and Mori\'s progress are saved; terrain, biomes and names are recomputed.</div>';
@@ -1020,9 +1072,13 @@ function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.glo
     return '<div class="q" data-city="'+id+'"><span><span class="chip" style="background:'+cs.banner[0]+';color:'+cs.banner[1]+'">⚑</span> <b>'+cs.name+'</b> — '+cs.govName+' · '+cs.ruler+(r.length?'<br><span class="small">'+r.map(x=>x.w+' '+x.name).join(' · ')+'</span>':'')+'</span></div>'; }).join(''):'<div class="small">None yet. Mori founds one when a region reaches its 4th layer.</div>');
   h+='<div class="sec">Legend</div><div class="small"><span style="color:#9aa3b5">▦ gray wireframe = void</span> · <span style="color:#a3ff12">— lime edge = programming frontier</span> · colored borders = city-state claims · <span style="color:#3dff7a">— ally</span> · <span style="color:#ff3b3b">— rival</span> · <span style="color:#ffd23b">- - vassal</span> · ⚪ explored</div>';
   if(window.IDLEBUILD) h+=IDLEBUILD.settingsHTML();
+  if(window.POWER) h+=POWER.settingsHTML();
+  if(window.PHONE) h+=PHONE.settingsHTML(document.body.classList.contains('phone'));
   h+='<div class="row"><button id="seedHome">🏛 Return to the Guild</button><button id="seedClose">✕ Close globe</button></div>';
   b.innerHTML=h;
   if(window.IDLEBUILD) IDLEBUILD.bindSettings(b);
+  const pm=$('powerMode'); if(pm) pm.onchange=()=>{ POWER.setMode(pm.value); PERF.auto=pm.value==='auto'; applyQuality(POWER.framePlan(0).qualityMax, 'power '+pm.value); renderSeedPanel(); };
+  const ph=$('phoneOn'); if(ph) ph.onchange=()=>{ try{ localStorage.setItem('mori.phone', ph.checked?'on':'off'); }catch(e){} refreshPhone(); };
   $('seedApply').onclick=()=>applySeed($('seedIn').value); $('seedRand').onclick=()=>applySeed(PL.randomSeed());
   if($('seedQ')) $('seedQ').onclick=()=>{ queueJob('seed',sel); log('Queued for Mori: '+jobLabel({kind:'seed',what:sel})); renderSeedPanel(); };
   if($('seedGo')) $('seedGo').onclick=()=>travelTo(sel); if($('seedCity')) $('seedCity').onclick=()=>cityModal(sel);
@@ -1043,11 +1099,13 @@ function spawnBanditRaid(info){ const n=info&&info.tier==='low'?3:2; const kinds
   }
   const msg=info.tier==='low'?'Bandits raid the road — they can smell a light Guild purse ('+info.marks+' Marks).':'Bandits on the road! The Guild purse can spare a fight.';
   log('⚔ '+msg); showRoll('⚔','Bandit raid!',info.tier==='low'?'foe':''); addChat('mo',info.tier==='low'?'ack — bandits. my treasury is lean, so the roads got bold. help me push them back?':'bandits! i minted marks for the guild — let\'s keep the roads kind.'); return out; }
-function step(dt){ mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // Mori Templates flame/spell animation
+let phaseN=0;
+function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phaseN):{world:true,audio:true,build:true,chunk:4,bgMs:1.5}}; if(window.TWOSPEED&&heavy.plan.bgMs!=null) TWOSPEED.budget=heavy.plan.bgMs;
+  mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // flame frames stay on the render clock; new audio buffers do not
   clockT+=dt; updateCrafting(dt); for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
   if(logT>0){ logT-=dt; if(logT<=0) $('log').style.opacity=0.35; } if(rollT>0){ rollT-=dt; if(rollT<=0) $('roll').className=''; }
   // world simulation keeps running in the dungeon (Mori keeps building)
-  if(mode==='world'&&window.IDLEBUILD) IDLEBUILD.update(dt);
+  if(mode==='world'&&window.IDLEBUILD&&heavy.plan.build) IDLEBUILD.update(dt);
   if(mode==='world'&&window.TREASURY){ const r=TREASURY.tryRaid(dt); if(r) spawnBanditRaid(r); }
   updateMori(dt);
   nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; } } });
@@ -1055,17 +1113,18 @@ function step(dt){ mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // Mori
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
   updatePlayer(dt); GATHERING.update(dt); CLAN.update(dt); if(mode==='world'){ NPCS.update(dt); DREADLORD.update(dt); } npcWatch();
-  if(mode==='dungeon') updateDungeon(dt); else { SW.update(player.pos.x,player.pos.z); TF.update(dt,player.pos.x,player.pos.z); IMPOSTORS.update(); townT-=dt; if(townT<=0){ townT=1; setTownVisible(atGuild()); } }
+  if(mode==='dungeon') updateDungeon(dt); else { if(heavy.plan.world) SW.update(player.pos.x,player.pos.z, heavy.plan.chunk); if(heavy.plan.build) TF.update(dt,player.pos.x,player.pos.z); if(heavy.plan.world) IMPOSTORS.update(); townT-=dt; if(townT<=0){ townT=1; setTownVisible(atGuild()); } }
   // targets
   const tg=mode==='world'?worldTargets():dungeonTargets(); curTarget=null; let bd=1e9; tg.forEach(t=>{ const d=Math.hypot(t.x-player.pos.x,t.z-player.pos.z); if(d<t.r&&d<bd){ bd=d; curTarget=t; } });
   TS.pump(); // v3.4 two-speed: foreground jobs now, background jobs inside the frame budget
-  const bi=$('bInteract'); bi.textContent=curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'; bi.classList.toggle('hot',!!curTarget);
+  const bi=$('bInteract'); bi.textContent=document.body.classList.contains('phone')?'E':(curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'); bi.classList.toggle('hot',!!curTarget);
 }
 function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   if(crOpen){ renderCreator(); return; }
   if(globeOpen){ [lblD,lblM,lblDoll,lblT].forEach(e=>e.style.display='none'); obeliskAnim(); SW.globe.render(renderer); return; }
   const tgt=new T.Vector3(player.pos.x, player.pos.y+1.5, player.pos.z);
-  const pitch=mode==='dungeon'?Math.max(camPitch,0.95):camPitch, dist=mode==='dungeon'?Math.min(camDist,7):camDist;
+  let pitch=mode==='dungeon'?Math.max(camPitch,0.95):camPitch, dist=mode==='dungeon'?Math.min(camDist,7):camDist;
+  if(mode==='world'&&window.DREADLORD&&DREADLORD.camera){ const dc=DREADLORD.camera(); if(dc){ dist=Math.max(dist, dc.dist); pitch=dc.pitch; } }
   camera.position.set(tgt.x+Math.sin(camYaw)*Math.cos(pitch)*dist, tgt.y+Math.sin(pitch)*dist, tgt.z+Math.cos(camYaw)*Math.cos(pitch)*dist);
   if(mode==='world'){ const gy=W.height(camera.position.x,camera.position.z)+0.6; if(camera.position.y<gy) camera.position.y=gy; }
   camera.lookAt(tgt);
@@ -1128,5 +1187,5 @@ window.__g={ castSpellFx, placeStructure, get PLOTS(){return PLOTS;}, get guildR
   step:(sec,dt)=>{ dt=dt||0.05; for(let t=0;t<sec;t+=dt){ updateSky(dt); step(dt); } hud(); render(dayNow); }, queueJob, acceptSuggestion, openCreator, closeCreator, selectChar, enterDungeon, leaveDungeon, attack, openChest, benchUI, craftItem, lootRoll, rarity, charLevel, dollShop, outpostShop, goBlue, wakeMori,
   setCam:(y,p,d)=>{ camYaw=y; camPitch=p; camDist=d; }, setCr:(y,p,d,f)=>{ crYaw=y; crPitch=p; crDist=d; crFocus=f; }, teleport:(x,z)=>{ player.pos.set(x,0,z); }, CRAFT, save,
   SW, PL, get guildId(){ return guildId; }, stageOf, travelTo, openGlobe, closeGlobe, applySeed, advanceRegion, seedCandidate, programmedCount, renderSeedPanel, cityModal, get globeOpen(){ return globeOpen; }, makeSuggestion, delroth, TF, PERF, QUAL, applyQuality, perfLine, queueTF, tfSuggestion, sendChat:(v)=>{ $('chatIn').value=v; sendChat(); }, renderJobs, restAtCamp, startNow:(kind,what)=>{ if(curJob&&!curJob.plan){ if(curJob.target&&curJob.target.claimed){ curJob.target.ready=true; curJob.target.claimed=false; } curJob=null; mori.path=[]; } startJob({kind,what,id:S.nid++}); return curJob; }, dunRoomAt, armorInfo, get dunName(){ return dunName; }, renderer, scene, GA:GATHERING, IMP:IMPOSTORS, CLAN, TS, killMob, foeAttack, drink, renderBag, missing, spend, BREWS, FORGES, queueCleanse, get curRegion(){ return curRegion(); }, get dayNow(){ return dayNow; },
-  NPCS, QUESTS, MORICHAT, MEMORY, LORE, DREADLORD, IDLEBUILD, TREASURY, HERBAL, STATIONS, openNpc, npcSay, endNpc, openMoriChat, get chatNpc(){ return chatNpc; }, get benchCfg(){ return benchCfg; }, set benchCfg(v){ benchCfg=v; }, benchFit, benchOrder, crafterCL, worldStats, VOICE, moriCtx, npcCoupon, chatSend:(v)=>sendChat(v), DAY, addItem, renderQuests, renderLore, renderMemory, renderPersona, playerPersona, chatEdit, chatRegen, chatPin, charLevelQ:()=>charLevel() };
+  NPCS, QUESTS, MORICHAT, MEMORY, LORE, DREADLORD, IDLEBUILD, TREASURY, HERBAL, STATIONS, openNpc, npcSay, endNpc, openMoriChat, get chatNpc(){ return chatNpc; }, get benchCfg(){ return benchCfg; }, set benchCfg(v){ benchCfg=v; }, benchFit, benchOrder, crafterCL, worldStats, VOICE, moriCtx, npcCoupon, chatSend:(v)=>sendChat(v), DAY, addItem, renderQuests, renderLore, renderMemory, renderPersona, playerPersona, chatEdit, chatRegen, chatPin, charLevelQ:()=>charLevel(), noteCivic, civicProfileFor, civicHTML };
 })();

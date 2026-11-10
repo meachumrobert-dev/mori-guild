@@ -90,10 +90,14 @@ function placeTrees(px,pz,force){ if(!pine||!cur) return; if(px==null&&lastTreeA
 const fr01=(x,z)=>{ const v=Math.sin(x*12.9898+z*78.233)*43758.5453; return v-Math.floor(v); };
 function natPatch(ci,cj){ if(!window.FLORA) return []; const key=ci+','+cj; let p=natCache.get(key); if(p) return p; p=[]; const F=SW.F, G=44;
   const h=hash(((ci*73856093)^(cj*19349663)^(F.id*83492791))>>>0); const cx=(ci+0.2+hash(Math.floor(h*1e9)+1)*0.6)*G, cz=(cj+0.2+hash(Math.floor(h*1e9)+2)*0.6)*G;
-  if(F.stage>=1&&!SW.isVoidAt(cx,cz)){ const B=SW.biomeAt(cx,cz); const pr=(FLORA.BIOME_P[B]||0); const town=F.guild&&Math.hypot(cx,cz)<75;
-    if(h<pr&&!town){ const sp=FLORA.BIOME_SP[B]||FLORA.BIOME_SP.grass, n=14+Math.floor(hash(Math.floor(h*1e9)+3)*26), R=5+hash(Math.floor(h*1e9)+4)*7, a=sp[Math.floor(hash(Math.floor(h*1e9)+5)*sp.length)], b=sp[Math.floor(hash(Math.floor(h*1e9)+6)*sp.length)];
-      for(let q=0;q<n;q++){ const u=hash(Math.floor(h*1e9)+10+q), w=hash(Math.floor(h*1e9)+200+q), ang=u*Math.PI*2, d=Math.sqrt(w)*R; const x=cx+Math.cos(ang)*d, z=cz+Math.sin(ang)*d; if(!floraOK(x,z)) continue;
-        const s=hash(Math.floor(h*1e9)+400+q); p.push([x,null,z,s<0.65?a:b,s<0.5?0:1,0.75+s*0.5,fr01(x,z)]); } } }
+  if(F.stage>=1&&!SW.isVoidAt(cx,cz)&&window.GROUNDED){ const town=F.guild&&Math.hypot(cx,cz)<75;
+    const P=window.PLANET; const ctx={seed:P.seed, regionId:F.id, guild:!!F.guild, rng:P.rngFor, biomeAt:(x,z)=>SW.biomeAt(x,z)};
+    const hit=GROUNDED.flowerWeight(cx,cz,ctx);
+    if(hit&&hit.d<=hit.node.radius&&!town){ const n=Math.min(28, Math.round(6+hit.w*22)); let qi=0;
+      const rnd=()=>hash(Math.floor(h*1e9)+800+(qi++));
+      GROUNDED.clusterPoints(hit.node, n, rnd, (x,z)=>Math.floor(x/G)===ci&&Math.floor(z/G)===cj&&floraOK(x,z)).forEach(pt=>{
+        const code=FLORA.code?FLORA.code(pt.species):-1; const sp=code>=0?code:(FLORA.BIOME_SP[hit.node.biome]||FLORA.BIOME_SP.grass)[0];
+        p.push([pt.x,null,pt.z,sp,pt.r%1<0.5?0:1,0.75+(pt.suit||0.4)*0.5,fr01(pt.x,pt.z)]); }); } }
   if(F.guild&&ci===0&&cj===0) guildMeadow(p); // the Herb Meadow behind the Guild (north of the fence)
   natCache.set(key,p); if(natCache.size>300){ natCache.delete(natCache.keys().next().value); } return p; }
 function guildMeadow(p){ for(let q=0;q<380;q++){ const x=-23+hash(9001+q)*46, z=27.5+hash(9501+q*7)*23; const sp=FLORA.BIOME_SP.guild, k=sp[Math.floor(hash(9901+q)*sp.length)]; if(SW.F.roads.length&&SW.roadDist(x,z)<2.5) continue;
