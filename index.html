@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0e0b16">
 <title>Mori Guild 3D — The Retired Bard</title>
 <style>
@@ -95,6 +95,41 @@ body.globe #seedP{left:12px; right:auto; width:min(400px,40vw)}
 .glabel span{color:#d9d9e6; font-size:10px}
 #sRegion{max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 @media (max-width:760px){ body.globe #seedP{left:6px; right:6px; width:auto; top:auto; bottom:6px; max-height:44vh} body.globe #bottom, body.globe #log{display:none} #sRegion{max-width:92vw} }
+/* Phone layout — Galaxy S21 Ultra is about 412×915 CSS px. Desktop is unchanged unless body.phone. */
+#dpad{display:none}
+#padMode{display:none}
+#chatFold{display:none}
+body.phone{touch-action:none}
+body.phone #joy{display:block;left:max(12px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));width:128px;height:128px;z-index:6}
+body.phone #joy i{width:52px;height:52px;left:38px;top:38px}
+body.phone.land #joy{width:112px;height:112px}
+body.phone.land #joy i{width:48px;height:48px;left:32px;top:32px}
+body.phone.pad #joy{display:none}
+#dpad{position:fixed;z-index:6;width:156px;height:156px;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px 48px;gap:6px;left:max(12px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));touch-action:none}
+#dpad [data-pad="n"]{grid-column:2;grid-row:1}#dpad [data-pad="w"]{grid-column:1;grid-row:2}#dpad [data-pad="e"]{grid-column:3;grid-row:2}#dpad [data-pad="s"]{grid-column:2;grid-row:3}
+#dpad button{min-width:48px;min-height:48px;width:48px;height:48px;padding:0;font-size:18px;border-radius:12px}
+body.phone.pad #dpad{display:grid}
+#padMode{position:fixed;z-index:6;min-width:48px;min-height:48px;width:48px;height:48px;padding:0;border-radius:12px;left:max(148px,calc(env(safe-area-inset-left) + 136px));bottom:max(16px,env(safe-area-inset-bottom))}
+body.phone #padMode{display:block}
+body.phone #ctx{right:max(10px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));display:grid;grid-template-columns:56px 64px;gap:8px;align-items:end}
+body.phone #ctx button{min-width:48px;min-height:48px;padding:0 6px;font-size:16px;line-height:1.05;display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.phone #ctx #bAttack{grid-column:2;grid-row:1 / span 2;min-width:64px;min-height:64px;font-size:26px}
+body.phone #ctx #bInteract{display:flex;opacity:.45}
+body.phone #ctx #bInteract.hot{opacity:1}
+#phoneMenu{display:none}
+body.phone #phoneMenu{display:flex;position:fixed;z-index:8;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:48px;min-height:48px;width:48px;height:48px;padding:0;align-items:center;justify-content:center;font-size:22px}
+body.phone #bottom{display:none}
+body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:max(64px,calc(env(safe-area-inset-top) + 56px));left:8px;right:8px;bottom:auto;max-height:46vh;overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
+body.phone.menu #bottom button{min-width:48px;min-height:48px}
+body.phone #log{top:max(52px,env(safe-area-inset-top));bottom:auto}
+body.phone #talkP{left:12px;top:max(64px,env(safe-area-inset-top));right:auto;bottom:auto;width:min(360px,calc(100vw - 24px));height:min(440px,52vh);max-height:52vh;font-size:16px}
+body.phone #talkP h3{min-height:48px;touch-action:none;cursor:grab}
+body.phone #chatFold{display:inline-flex;min-width:48px;min-height:36px;align-items:center;justify-content:center}
+body.phone #chatLog{font-size:16px;line-height:1.4;min-height:96px}
+body.phone #chatIn,#chatSend{min-height:48px;font-size:16px}
+body.phone #talkP.collapsed{height:52px;max-height:52px;overflow:hidden}
+body.phone #talkP.collapsed .body{display:none}
+body.phone #moriLine{max-width:min(280px,70vw);font-size:14px}
 </style>
 </head>
 <body>
@@ -117,6 +152,9 @@ body.globe #seedP{left:12px; right:auto; width:min(400px,40vw)}
 <div id="log">Welcome to the Guild. Mori is planning the town.</div>
 <div id="roll"><span class="die" id="rollDie">20</span><span id="rollText"></span></div>
 <div id="joy"><i></i></div>
+<div id="dpad" aria-label="Move"><button type="button" data-pad="n" aria-label="Forward">▲</button><button type="button" data-pad="w" aria-label="Left">◀</button><button type="button" data-pad="e" aria-label="Right">▶</button><button type="button" data-pad="s" aria-label="Back">▼</button></div>
+<button type="button" id="padMode" aria-label="Switch between joystick and D-pad">✥</button>
+<button type="button" id="phoneMenu" aria-label="Open the menu">☰</button>
 <div id="ctx"><button id="bInteract">E · Interact</button><button id="bBandage">🩹 Bandage</button><button id="bSalve">🧴 Salve</button><button id="bPotion">🧪 Potion</button><button id="bAttack">⚔ Attack</button></div>
 <div id="bottom">
   <button id="bHero">🧬 HeroLock</button><button id="bJobs">🔨 Mori's Jobs</button><button id="bBag">🎒 Bag &amp; Painter</button>
@@ -130,7 +168,7 @@ body.globe #seedP{left:12px; right:auto; width:min(400px,40vw)}
 <div class="panel" id="personaP"><h3>🪪 Persona <button data-close="personaP">✕</button></h3><div class="body" id="personaBody"></div></div>
 <div class="panel" id="jobsP"><h3>Mori's job queue <button data-close="jobsP">✕</button></h3><div class="body" id="jobsBody"></div></div>
 <div class="panel" id="bagP"><h3>Bag · Template Painter <button data-close="bagP">✕</button></h3><div class="body" id="bagBody"></div></div>
-<div class="panel" id="talkP"><h3><span id="talkTitle">Talk to Mori</span> <button data-close="talkP">✕</button></h3><div class="body">
+<div class="panel" id="talkP"><h3 id="talkHead"><span id="talkTitle">Talk to Mori</span> <span><button type="button" id="chatFold" aria-label="Collapse chat">–</button> <button data-close="talkP">✕</button></span></h3><div class="body">
   <div id="npcBar" class="row" style="display:none;align-items:center"><span id="npcWho" class="small" style="flex:1"></span><button id="npcShop" style="display:none"></button><button id="npcBack">↩ Mori</button></div>
   <div id="chatLog"></div><div class="small" id="chatHint">Chat controls on each bubble: ✏️ Edit · 🔄 Regenerate · 📌 Pin (saved to Memory).</div>
   <div class="row" id="chatBar"><button id="chatMic" title="Speak (Web Speech API)">🎤</button><input type="text" id="chatIn" placeholder="say something… (try: build a house)" style="flex:1"><button class="pri" id="chatSend">Send</button></div>
@@ -182,6 +220,7 @@ body.globe #seedP{left:12px; right:auto; width:min(400px,40vw)}
 <script src="js/stations.js"></script>
 <script src="js/idlebuild.js"></script>
 <script src="js/power.js"></script>
+<script src="js/phone.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

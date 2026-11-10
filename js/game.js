@@ -14,7 +14,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, IS_TOUCH?1.25:1.75))
 renderer.shadowMap.enabled=!IS_TOUCH; renderer.shadowMap.type=T.PCFSoftShadowMap;
 renderer.outputColorSpace=T.SRGBColorSpace;
 const camera=new T.PerspectiveCamera(55,1,0.1,900);
-function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(crCam){ crCam.aspect=w/h; crCam.updateProjectionMatrix(); } }
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(crCam){ crCam.aspect=w/h; crCam.updateProjectionMatrix(); } if(window.PHONE&&typeof refreshPhone==='function') refreshPhone(); }
 
 /* ---------- state ---------- */
 const DYES=[{name:'Gothic Rose',hex:'#ff4d6d'},{name:'Holo Pink',hex:'#ff8af0'},{name:'Obsidian Black',hex:'#1a1a1f'},{name:'Legion Cyan',hex:'#22d3ee'},{name:'Void Purple',hex:'#8b5cf6'},{name:'Mori Lime',hex:'#a3ff12'},{name:'Guild Gold',hex:'#facc15'},{name:'Ectoplasm',hex:'#7fffd4'},{name:'Starter White',hex:'#efe6d2'},{name:'Starter Brown',hex:'#6b4a2b'}];
@@ -550,8 +550,10 @@ function drink(it){
   else if(f.heal){ const n=SRD.dice(f.heal); S.hp=Math.min(stats().maxHp,S.hp+n); showRoll(n,it.name+': healed '+f.heal+' = '+n,''); }
   save(); renderHotbar(); }
 function useHotbar(slot){ const it=HERBAL.pickHotbar(slot); if(!it){ log(slot==='bandage'?'No bandages — craft linen bandages at the alchemy table.':slot==='salve'?'No salves — brew a lavender or yarrow blend.':'No potions.'); return; } drink(it); }
-function renderHotbar(){ const h=HERBAL.hotbarHTML(); const b=$('bBandage'), s=$('bSalve'), p=$('bPotion');
-  if(b) b.textContent='🩹 Bandage ('+h.bandage+')'; if(s) s.textContent='🧴 Salve ('+h.salve+')'; if(p) p.textContent='🧪 Potion ('+h.potion+')'+(h.green?' 💚'+h.green:'')+(h.grey?' ⚪'+h.grey:''); }
+function renderHotbar(){ const h=HERBAL.hotbarHTML(); const phone=document.body.classList.contains('phone'); const b=$('bBandage'), s=$('bSalve'), p=$('bPotion');
+  if(b){ b.textContent=phone?'🩹 '+h.bandage:'🩹 Bandage ('+h.bandage+')'; b.title='Bandage ('+h.bandage+')'; }
+  if(s){ s.textContent=phone?'🧴 '+h.salve:'🧴 Salve ('+h.salve+')'; s.title='Salve ('+h.salve+')'; }
+  if(p){ p.textContent=phone?'🧪 '+h.potion:'🧪 Potion ('+h.potion+')'+(h.green?' 💚'+h.green:'')+(h.grey?' ⚪'+h.grey:''); p.title='Potion ('+h.potion+')'; } }
 
 /* ---------- Talk / Beat / Blue room ---------- */
 let chatHist=[], chatAlt=0, lastUser='', lastReply=null;
@@ -727,7 +729,7 @@ const joy={id:null, x:0, y:0, cx:0, cy:0}; const pts=new Map(); let pinch0=0;
 let gDown=null;
 canvas.addEventListener('pointerdown',e=>{ canvas.setPointerCapture(e.pointerId);
   if(globeOpen){ pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pts.size===2){ const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); } gDown={x:e.clientX,y:e.clientY,m:0}; return; }
-  if(e.pointerType!=='mouse'&&e.clientX<innerWidth*0.42&&e.clientY>innerHeight*0.45&&joy.id===null&&!crOpen){ joy.id=e.pointerId; joy.cx=e.clientX; joy.cy=e.clientY; const j=$('joy'); j.style.left=(e.clientX-55)+'px'; j.style.top=(e.clientY-55)+'px'; j.style.bottom='auto'; j.classList.add('on'); return; }
+  if(!document.body.classList.contains('phone')&&e.pointerType!=='mouse'&&e.clientX<innerWidth*0.42&&e.clientY>innerHeight*0.45&&joy.id===null&&!crOpen){ joy.id=e.pointerId; joy.cx=e.clientX; joy.cy=e.clientY; const j=$('joy'); j.style.left=(e.clientX-55)+'px'; j.style.top=(e.clientY-55)+'px'; j.style.bottom='auto'; j.classList.add('on'); return; }
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pts.size===2){ const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); } });
 canvas.addEventListener('pointermove',e=>{
   if(e.pointerId===joy.id){ let dx=e.clientX-joy.cx, dy=e.clientY-joy.cy; const d=Math.hypot(dx,dy), m=45; if(d>m){ dx=dx/d*m; dy=dy/d*m; } joy.x=dx/m; joy.y=dy/m; $('joy').firstElementChild.style.transform='translate('+dx+'px,'+dy+'px)'; return; }
@@ -737,7 +739,32 @@ canvas.addEventListener('pointermove',e=>{
   if(pts.size===2){ p.x=e.clientX; p.y=e.clientY; const [a,b]=[...pts.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if(pinch0){ const k=pinch0/d; if(crOpen) crDist=Math.max(0.8,Math.min(5,crDist*k)); else camDist=Math.max(3.5,Math.min(22,camDist*k)); } pinch0=d; return; }
   const dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY;
   if(crOpen){ crYaw-=dx*0.01; crPitch=Math.max(-0.8,Math.min(0.8,crPitch+dy*0.005)); } else { camYaw-=dx*0.006; camPitch=Math.max(0.05,Math.min(1.35,camPitch+dy*0.004)); } });
-const endPtr=e=>{ if(globeOpen&&gDown&&gDown.m<8&&e.type==='pointerup'&&pts.size===1){ const id=SW.globe.pick(e.clientX,e.clientY); if(id>=0){ SW.globe.select(id); renderSeedPanel(); } } if(globeOpen) gDown=null; if(e.pointerId===joy.id){ joy.id=null; joy.x=joy.y=0; $('joy').classList.remove('on'); $('joy').firstElementChild.style.transform=''; } pts.delete(e.pointerId); if(pts.size<2) pinch0=0; };
+const endPtr=e=>{ if(globeOpen&&gDown&&gDown.m<8&&e.type==='pointerup'&&pts.size===1){ const id=SW.globe.pick(e.clientX,e.clientY); if(id>=0){ SW.globe.select(id); renderSeedPanel(); } } if(globeOpen) gDown=null; if(e.pointerId===joy.id){ joy.id=null; if(!padHeld()){ joy.x=joy.y=0; } if(!document.body.classList.contains('phone')){ $('joy').classList.remove('on'); $('joy').style.left=''; $('joy').style.top=''; $('joy').style.bottom=''; } $('joy').firstElementChild.style.transform=''; } pts.delete(e.pointerId); if(pts.size<2) pinch0=0; };
+function stickMove(e){ if(e.pointerId!==joy.id) return; const r=$('joy').getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+r.height/2; const v=PHONE.stickVector(e.clientX-cx, e.clientY-cy, r.width*0.42); joy.x=v.x; joy.y=v.y; const n=$('joy').firstElementChild; n.style.transform='translate('+(v.x*r.width*0.32)+'px,'+(v.y*r.height*0.32)+'px)'; }
+if($('joy')){ $('joy').addEventListener('pointerdown',e=>{ if(!document.body.classList.contains('phone')||document.body.classList.contains('pad')) return; e.preventDefault(); e.stopPropagation(); joy.id=e.pointerId; $('joy').setPointerCapture(e.pointerId); stickMove(e); }); $('joy').addEventListener('pointermove',stickMove); $('joy').addEventListener('pointerup',endPtr); $('joy').addEventListener('pointercancel',endPtr); }
+const pad={n:0,s:0,e:0,w:0}; const padHeld=()=>pad.n||pad.s||pad.e||pad.w;
+function applyPad(){ if(!padHeld()){ if(joy.id==null) joy.x=joy.y=0; return; } const v=PHONE.padVector(pad); joy.x=v.x; joy.y=v.y; }
+document.querySelectorAll('[data-pad]').forEach(b=>{ const dir=b.dataset.pad; const down=ev=>{ ev.preventDefault(); pad[dir]=1; applyPad(); }; const up=()=>{ pad[dir]=0; applyPad(); }; b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); });
+if($('padMode')) $('padMode').onclick=()=>{ PHONE.setControl(PHONE.getControl()==='pad'?'stick':'pad'); refreshPhone(); };
+function refreshPhone(){ if(!window.PHONE) return; let saved=null; try{ saved=localStorage.getItem('mori.phone'); }catch(e){}
+  const on=PHONE.shouldPhone({touch:IS_TOUCH, coarse:matchMedia('(pointer:coarse)').matches, w:innerWidth, h:innerHeight, query:QS.get('phone'), saved});
+  document.body.classList.toggle('phone', on); document.body.classList.toggle('land', innerWidth>innerHeight); document.body.classList.toggle('pad', on&&PHONE.getControl()==='pad');
+  const pm=$('padMode'); if(pm) pm.textContent=PHONE.getControl()==='pad'?'◉':'✥';
+  if($('bAttack')) $('bAttack').textContent=on?'⚔':'⚔ Attack';
+  if($('bBandage')) $('bBandage').textContent=on?'🩹':'🩹 Bandage';
+  if($('bSalve')) $('bSalve').textContent=on?'🧴':'🧴 Salve';
+  if($('bPotion')) $('bPotion').textContent=on?'🧪':'🧪 Potion';
+  if(!on) document.body.classList.remove('menu'); }
+if($('phoneMenu')) $('phoneMenu').onclick=()=>document.body.classList.toggle('menu');
+addEventListener('resize', refreshPhone); refreshPhone();
+document.addEventListener('gesturestart', e=>{ if(document.body.classList.contains('phone')) e.preventDefault(); });
+document.addEventListener('touchmove', e=>{ if(!document.body.classList.contains('phone')) return; if(e.touches.length>1 && !e.target.closest('#chatLog,.panel .body,.modal .card,#bottom')) e.preventDefault(); }, {passive:false});
+(function bindChat(){ const head=$('talkHead'); if(!head) return; let drag=null;
+  head.addEventListener('pointerdown', e=>{ if(!document.body.classList.contains('phone')||e.target.closest('button')) return; const box=$('talkP').getBoundingClientRect(); drag={id:e.pointerId,x:e.clientX,y:e.clientY,l:box.left,t:box.top,w:box.width,h:box.height}; head.setPointerCapture(e.pointerId); });
+  head.addEventListener('pointermove', e=>{ if(!drag||e.pointerId!==drag.id) return; const p=PHONE.placeChat({left:drag.l,top:drag.t,w:drag.w,h:drag.h}, e.clientX-drag.x, e.clientY-drag.y, {w:innerWidth,h:innerHeight}); const el=$('talkP'); el.style.left=p.left+'px'; el.style.top=p.top+'px'; el.style.right='auto'; el.style.bottom='auto'; });
+  head.addEventListener('pointerup', ()=>{ drag=null; });
+  if($('chatFold')) $('chatFold').onclick=()=>{ const el=$('talkP'); el.classList.toggle('collapsed'); $('chatFold').textContent=el.classList.contains('collapsed')?'+':'–'; }; }
+)();
 canvas.addEventListener('pointerup',endPtr); canvas.addEventListener('pointercancel',endPtr);
 canvas.addEventListener('wheel',e=>{ e.preventDefault(); if(globeOpen){ SW.globe.zoom(1+e.deltaY*0.001); return; } if(crOpen) crDist=Math.max(0.8,Math.min(5,crDist*(1+e.deltaY*0.001))); else camDist=Math.max(3.5,Math.min(22,camDist*(1+e.deltaY*0.001))); },{passive:false});
 $('bInteract').onclick=()=>interact(); $('bAttack').onclick=()=>attack(); $('bPotion').onclick=()=>useHotbar('potion'); if($('bBandage')) $('bBandage').onclick=()=>useHotbar('bandage'); if($('bSalve')) $('bSalve').onclick=()=>useHotbar('salve');
@@ -991,7 +1018,7 @@ function hud(){ const st=stats(); $('sHp').textContent=S.hp+'/'+st.maxHp; $('hpb
   $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=S.ore; $('sTimber').textContent=S.timber;
   { const id=curRegion(), inf=PL.regionInfo(id), st=stageOf(id); $('sRegion').textContent=mode==='dungeon'&&dun?'🕳 '+dunName+' · '+(dunRoomName()||'passage')+' · treasure level '+dunLvl+' · under '+inf.name:'🌍 '+(atGuild()?'The Guild · ':'')+inf.name+' · '+(st?PL.BIOMES[inf.biome].name:'void')+' · '+STAGES[st];
   if($('sWorld')&&window.IDLEBUILD) $('sWorld').textContent=IDLEBUILD.progressChip(); }
-  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=mode==='dungeon'?'':'none'; }
+  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none'; }
 
 /* ---------- World Seed: travel, globe map, seed panel (v3) ---------- */
 function setTownVisible(v){ const skip=new Set([hemi,sun,sun.target,stars,player.model].concat(comps.map(c=>c.model)));
@@ -1046,10 +1073,12 @@ function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.glo
   h+='<div class="sec">Legend</div><div class="small"><span style="color:#9aa3b5">▦ gray wireframe = void</span> · <span style="color:#a3ff12">— lime edge = programming frontier</span> · colored borders = city-state claims · <span style="color:#3dff7a">— ally</span> · <span style="color:#ff3b3b">— rival</span> · <span style="color:#ffd23b">- - vassal</span> · ⚪ explored</div>';
   if(window.IDLEBUILD) h+=IDLEBUILD.settingsHTML();
   if(window.POWER) h+=POWER.settingsHTML();
+  if(window.PHONE) h+=PHONE.settingsHTML(document.body.classList.contains('phone'));
   h+='<div class="row"><button id="seedHome">🏛 Return to the Guild</button><button id="seedClose">✕ Close globe</button></div>';
   b.innerHTML=h;
   if(window.IDLEBUILD) IDLEBUILD.bindSettings(b);
   const pm=$('powerMode'); if(pm) pm.onchange=()=>{ POWER.setMode(pm.value); PERF.auto=pm.value==='auto'; applyQuality(POWER.framePlan(0).qualityMax, 'power '+pm.value); renderSeedPanel(); };
+  const ph=$('phoneOn'); if(ph) ph.onchange=()=>{ try{ localStorage.setItem('mori.phone', ph.checked?'on':'off'); }catch(e){} refreshPhone(); };
   $('seedApply').onclick=()=>applySeed($('seedIn').value); $('seedRand').onclick=()=>applySeed(PL.randomSeed());
   if($('seedQ')) $('seedQ').onclick=()=>{ queueJob('seed',sel); log('Queued for Mori: '+jobLabel({kind:'seed',what:sel})); renderSeedPanel(); };
   if($('seedGo')) $('seedGo').onclick=()=>travelTo(sel); if($('seedCity')) $('seedCity').onclick=()=>cityModal(sel);
@@ -1088,7 +1117,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   // targets
   const tg=mode==='world'?worldTargets():dungeonTargets(); curTarget=null; let bd=1e9; tg.forEach(t=>{ const d=Math.hypot(t.x-player.pos.x,t.z-player.pos.z); if(d<t.r&&d<bd){ bd=d; curTarget=t; } });
   TS.pump(); // v3.4 two-speed: foreground jobs now, background jobs inside the frame budget
-  const bi=$('bInteract'); bi.textContent=curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'; bi.classList.toggle('hot',!!curTarget);
+  const bi=$('bInteract'); bi.textContent=document.body.classList.contains('phone')?'E':(curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'); bi.classList.toggle('hot',!!curTarget);
 }
 function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   if(crOpen){ renderCreator(); return; }
