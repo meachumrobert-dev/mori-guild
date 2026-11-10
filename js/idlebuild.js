@@ -113,6 +113,12 @@ function beginCatchUp(){ const c=cfg(); const now=Date.now(); catchQ=[]; summary
   const elapsed=absenceMs(c.lastSeen, now);
   stampSeen(); const n=owedTicks(elapsed);
   if(n<=0||!enabled()) return {owed:0, elapsed, missing:false};
+  const p0=progress();
+  if(p0.built>=p0.total){
+    summary={ticks:0, terrain:0, roads:0, villages:0, cities:0, pois:0, ids:{}, names:{}, elapsed, owed:0, skipped:n, finished:true, built:p0.built, total:p0.total, told:true};
+    showSummary(summary, true); shownSummary=true;
+    return {owed:0, elapsed, missing:false, finished:true, skipped:n};
+  }
   summary={ticks:0, terrain:0, roads:0, villages:0, cities:0, pois:0, ids:{}, names:{}, elapsed, owed:n, told:false};
   for(let i=0;i<n;i++) catchQ.push(1);
   catchBudget=1; // one region step per beat — a long absence must not stampede the frame
@@ -128,7 +134,7 @@ function flushCatchUp(dt){ if(!catchQ.length) return false;
   const gap=pace.gap||0.4;
   if(catchAcc>=gap){
     const bite=Math.min(per, catchQ.length);
-    while(catchQ.length&&n<bite){ catchQ.pop(); tick(true,true); n++; }
+    while(catchQ.length&&n<bite){ catchQ.pop(); const step=tick(true,true); if(!step){ catchQ.length=0; break; } n++; }
     catchAcc=0;
   }
   if(!catchQ.length&&summary&&!summary.told){ summary.told=true; const line=moriVoice(summary); X.addChat&&X.addChat('mo', line); X.log&&X.log('🌱 Mori finished the work she queued while you were away.'); }
@@ -148,15 +154,17 @@ function moriVoice(s){ const bits=[];
   const p=progress(); line+=' the world is '+p.built+' of '+p.total+' regions real now ('+p.pct+'%). want to walk that way with me?';
   return line; }
 
-function showSummary(s, atLogin){ const line=atLogin
-    ?('i was away about '+(Math.round((s.elapsed/3600000)*10)/10)+' hours. i queued '+s.owed+' small build steps and i will work through them slowly, one at a time. the world will not jump ahead all at once.')
-    :moriVoice(s);
+function showSummary(s, atLogin){ const hrs=Math.round((s.elapsed/3600000)*10)/10;
+  const line=s.finished
+    ?('the world was already finished — '+s.built+' of '+s.total+' regions. i did not spend the '+s.skipped+' away ticks. there was nothing left to build.')
+    :(atLogin
+    ?('i was away about '+hrs+' hours. i queued '+s.owed+' small build steps and i will work through them slowly, one at a time. the world will not jump ahead all at once.')
+    :moriVoice(s));
   X.addChat&&X.addChat('mo', line);
-  X.log&&X.log('🌱 While you were away, Mori built…');
-  const hrs=Math.round((s.elapsed/3600000)*10)/10;
-  const card='<h3>🌱 While you were away, Mori built…</h3>'+
+  X.log&&X.log(s.finished?'🌱 The world was already finished. Mori did not spend the away ticks.':'🌱 While you were away, Mori built…');
+  const card='<h3>'+(s.finished?'🌱 The world was already finished':'🌱 While you were away, Mori built…')+'</h3>'+
     '<div class="quote">"'+line+'"</div>'+
-    '<div class="sec">Away for ~'+hrs+' h · '+s.owed+' work ticks (cap 24 h)</div>'+
+    '<div class="sec">'+(s.finished?('Away for ~'+hrs+' h · 0 work ticks spent ('+s.skipped+' skipped, the planet is done)'):('Away for ~'+hrs+' h · '+s.owed+' work ticks (cap 24 h)'))+'</div>'+
     '<div class="row"><span class="chip">Terrain '+s.terrain+'</span><span class="chip">Roads '+s.roads+'</span><span class="chip">Villages '+s.villages+'</span><span class="chip">Cities '+s.cities+'</span><span class="chip">POIs '+s.pois+'</span></div>'+
     '<div class="small">Idle building stays free — no energy timers, no paywalls. Toggle it in World Seed / settings. My #1 rule is still behave.</div>'+
     '<div class="row"><button class="pri" id="idleSumOk">Thanks, Mori</button></div>';

@@ -269,6 +269,20 @@ function targets(){ const out=[]; if(!X||X.mode()==='globe') return out; const p
 const DIRS=['north','north-east','east','south-east','south','south-west','west','north-west'];
 function dirTo(dx,dz){ const a=Math.atan2(dx,-dz); return DIRS[(Math.round(a/(Math.PI/4))+8)%8]; }
 function famOf(word){ return /herb|flower|plant|petal|leaf|root|thorn/.test(word)?'herb':/ore|metal|iron|copper|silver|mithral|adamant/.test(word)?'ore':/stone|rock|granite|marble|obsidian/.test(word)?'stone':/wood|log|timber|tree|branch/.test(word)?'wood':null; }
+function reagentMention(word){ const t=String(word||'').toLowerCase(); let best=null;
+  for(const id in R){ const name=R[id].name.toLowerCase(), spaced=id.replace(/_/g,' ');
+    if(t.includes(name)||t.includes(spaced)){ if(!best||name.length>best.name.length) best=R[id]; } }
+  return best; }
+function biomesFor(id){ const fam=R[id]&&R[id].fam; const table=fam==='herb'?HERBS:fam==='ore'?ORES:fam==='stone'?STONES:fam==='wood'?WOODS:null; const out=[];
+  if(!table) return out; for(const b in table) if(b!=='_'&&table[b].indexOf(id)>=0) out.push(b==='guild'?'the guild meadow':b); return out; }
+function whereNamed(word){ const r=reagentMention(word); if(!r) return null;
+  const nodeType=['herb','ore','stone','wood'].includes(r.fam)?r.fam:null;
+  const bios=biomesFor(r.id); const whereBio=bios.length?bios.slice(0,4).join(', '):'the right ground';
+  if(!nodeType) return r.name.toLowerCase()+' is not something you pick off the ground.';
+  if(!X||X.mode()!=='world') return 'we are not on the surface. '+r.name.toLowerCase()+' shows up in '+whereBio+'.';
+  const p=X.player.pos; const ls=nodes.filter(n=>n.type===nodeType&&n.rid===r.id&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
+  if(!ls.length) return 'i don\'t see '+r.name.toLowerCase()+' in this spot. it grows in '+whereBio+'.';
+  return r.name.toLowerCase()+' is '+Math.round(ls[0].d)+' m '+dirTo(ls[0].n.x-p.x,ls[0].n.z-p.z)+'. it also shows up in '+whereBio+'.'; }
 function where(word){ const t=famOf(word); if(!t) return null; const p=X.player.pos; if(X.mode()!=='world') return 'we are underground. i can only smell rocks. go outside first!';
   const ls=nodes.filter(n=>n.type===t&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
   if(!ls.length) return 'i don\'t see any '+(t==='herb'?'herbs':t)+' near here. try another region — '+(t==='ore'?'mountains have the good ore.':t==='herb'?'grass and jungle have lots of flowers.':'forests have logs.');
@@ -301,7 +315,7 @@ function sell(id){ const s=X.S(); const n=s.reag[id]||0; if(!n) return 0; const 
 
 window.GATHERING={ R, TIER, REQ, RESPAWN, SKILLS, PARTS, CELL, HERBS, ORES, WOODS,
   init(o){ X=o; G(); buildMeshes(); registerWarm(); },
-  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, iconURL, skillLv, level, xpFor,
+  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, reagentMention, biomesFor, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, iconURL, skillLv, level, xpFor,
   spawnHostile(kind,x,z){ try{ const m=SRD.makeMonster(kind); const g=critMesh(m); g.position.set(x,X.SW.heightAt(x,z),z); g.name='raid_'+kind; g.userData.sw=true; X.scene.add(g);
       const c={key:'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), kind, m, g, x, z, hx:x, hz:z, alive:true, ag:true, cd:0.8, hit:0, wt:0, tx:x, tz:z, critter:true, room:-1, raid:true}; crit.push(c); return c; }catch(e){ return null; } },
   get nodes(){ return nodes; }, get crit(){ return crit; }, get carc(){ return carc; }, get act(){ return act; }, get run(){ return run; }, stats, ready, toolMesh,

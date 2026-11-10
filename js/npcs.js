@@ -164,12 +164,21 @@ function npcReply(npc, text, state){ const P=npc.P, m=Object.assign({met:0,talks
   if(state.pins&&state.pins.length&&t===''&&bondTier>=1){ say('I still hold what you pinned: "'+state.pins[0].text+'".'); }
   (state.chain||[]).forEach(q=>{ if(P.chain&&P.chain[q]) { say(P.chain[q]); out.intent='chain'; } });
   const ready=state.ready||[], active=state.active||[];
-  if(ready.length&&(t===''||has('greet')||has('quest')||has('yes')||has('thanks'))){ intent('turnIn'); out.actions.push({type:'turnIn', id:ready[0].id}); say(ready[0].thanks); return out; }
-  if(t===''){ intent('open'); if(!m.met||m.met<=1&&m.talks<=1) say(pick(P.greet,n)); else say(pick(P.again,n));
+  const roomTalk=/\b(cleared (?:a |the )?(?:room|undercroft)|clear(?:ed)? (?:a |the )?room|swept|every foe)\b/.test(t);
+  const askTurn=/\b(turn in|i'?m done|finished the quest|brought it|here you go|here it is)\b/.test(t);
+  const doneWith=(state.world&&state.world.doneWith)||[];
+  if(ready.length&&(askTurn||roomTalk||(has('yes')&&m.pendingTurnIn===ready[0].id))){ intent('turnIn'); delete m.pendingTurnIn; out.actions.push({type:'turnIn', id:ready[0].id}); say(ready[0].thanks); return out; }
+  if(!ready.length&&(askTurn||roomTalk)){ intent('quest');
+    if(doneWith.length) say('"'+doneWith[doneWith.length-1]+'" is already in the ledger, and it is paid. Ask me for work if you want another line.');
+    else if(active.length) say('"'+active[0].title+'": '+active[0].prog+'. It is not ready to turn in yet.');
+    else say('Nothing of yours is waiting in the ledger.');
+    return out; }
+  if(t===''){ intent('open'); if(ready.length) m.pendingTurnIn=ready[0].id; if(!m.met||m.met<=1&&m.talks<=1) say(pick(P.greet,n)); else say(pick(P.again,n));
     if(bondTier>=1&&persona.name&&persona.name!=='friend'){ say(bondTier>=2?('Good to see you, '+persona.name+(persona.cls?' the '+persona.cls:'')+'.'):('Ah — '+persona.name+', yes?')); }
     if(bondTier>=3&&P.trusted) say(pick(P.trusted,n));
     if(state.world&&state.world.mantleBound&&(npc.home==='haven'||npc.home==='clan')&&!m.saidMantle){ m.saidMantle=1; say('You\'re the one who bound the Pale Wolf\'s Mantle. Thank you.'); }
-    if(state.offer&&!m.offered){ m.offered=state.offer.id; m.offer=state.offer.id; say(state.offer.offer+' (say "yes" to accept)'); } else if(active.length) say('How goes "'+active[0].title+'"? '+active[0].prog+'.');
+    if(ready.length) say('"'+ready[0].title+'" is ready. Say yes, or "turn in", and I will pay the ledger.');
+    else if(state.offer&&!m.offered){ m.offered=state.offer.id; m.offer=state.offer.id; say(state.offer.offer+' (say "yes" to accept)'); } else if(active.length) say('How goes "'+active[0].title+'"? '+active[0].prog+'.');
     out.alts=(P.again||P.greet||[]).slice(); return out; }
   // v3.6: keyword-offer a talk-objective quest (overrides a pending non-talk offer so Diplomacy/etc. stay reachable)
   if(state.openTalk&&state.openTalk.length&&t){ for(const tq of state.openTalk){ if(tq.keywords&&tq.keywords.test(t)){ intent('offerTalk'); m.offer=tq.id; say(tq.offer+' (say "yes" to accept)'); return out; } } }
