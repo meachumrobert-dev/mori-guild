@@ -127,7 +127,7 @@ function okSpot(x,z){ const SW=window.SEEDWORLD||X.SW, F=SW.F; if(SW.isVoidAt&&S
   if(F.guild&&Math.abs(x)<X.fence+14&&Math.abs(z)<X.fence+14) return false; if(F.flats.some(f=>Math.hypot(x-f.x,z-f.z)<f.r0*0.95)) return false; if(F.roads.length&&SW.roadDist(x,z)<4.5) return false;
   if(F.colliders.circles.some(c=>Math.hypot(x-c.x,z-c.z)<c.r+1.6)) return false; if(window.CLAN&&CLAN.blocks&&CLAN.blocks(x,z)) return false; return true; }
 function genCell(ci,cj){ const SW=X.SW, F=SW.F, rnd=P().rngFor(P().seed,'gath',F.id,ci,cj), out=[]; if(F.stage<1) return out;
-  for(let k=0;k<2;k++){ const x=(ci+0.12+rnd()*0.76)*CELL, z=(cj+0.12+rnd()*0.76)*CELL, roll=rnd(), roll2=rnd(), rot=rnd()*6.283, s=0.8+rnd()*0.45; const b=F.guild&&Math.hypot(x,z)<200?'guild':SW.biomeAt(x,z);
+  for(let k=0;k<2;k++){ let x=(ci+0.12+rnd()*0.76)*CELL, z=(cj+0.12+rnd()*0.76)*CELL; const roll=rnd(), roll2=rnd(), rot=rnd()*6.283, s=0.8+rnd()*0.45; const b=F.guild&&Math.hypot(x,z)<200?'guild':SW.biomeAt(x,z);
     const B=b==='guild'?'grass':b; const dens=(DENS[b]||0.4)*(k?0.45:1)*(X.mobile?0.8:1); if(roll>dens) continue; if(!okSpot(x,z)) continue;
     const tw=TYPEW[B]||TYPEW.grass; const type=pickW(()=>roll2,['herb','ore','stone','wood'],t=>tw[['herb','ore','stone','wood'].indexOf(t)]); if(type==='wood'&&!(tw[3]>0)) continue;
     const list=(type==='herb'?HERBS[B]||HERBS.grass:type==='ore'?ORES[B]||ORES._:type==='stone'?STONES[B]||STONES._:WOODS[B]||WOODS._);

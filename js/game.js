@@ -186,7 +186,8 @@ const potions=()=>S.inv.filter(i=>i.kind==='potion');
 
 /* ---------- UI helpers ---------- */
 let logT=0; function log(msg){ const l=$('log'); l.textContent=msg; l.style.opacity=1; logT=5; }
-let rollT=0; function showRoll(die, text, cls){ const r=$('roll'); $('rollDie').textContent=die; $('rollText').innerHTML=text; r.className='show '+(cls||''); rollT=2.2; }
+let rollT=0; function showRoll(die, text, cls){ const r=$('roll'); $('rollDie').textContent=die; $('rollText').innerHTML=text; r.className='show '+(cls||''); r.dataset.where=mode; rollT=2.2; }
+function dismissRoll(){ rollT=0; const r=$('roll'); if(r){ r.className=''; r.dataset.where=''; } }
 function speak(t,v){ if(!$('ttsOn').checked||!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(t); u.pitch=v?v.pitch:1.4; u.rate=v?v.rate:1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){} }
 const reagName=k=>k.startsWith('r:')?(GATHERING.R[k.slice(2)]||{name:k}).name:k.startsWith('f:')?'any '+k.slice(2):k;
 const fmt=o=>Object.entries(o).map(([k,v])=>v+' '+reagName(k)).join(', ');
@@ -450,7 +451,7 @@ function benchUI(){
   h+='<div class="row"><label>Crafter <select id="bCrafter">'+Object.keys(C.CRAFTERS).map(k=>'<option value="'+k+'" '+(k===(benchCfg.crafter||'mori')?'selected':'')+'>'+crafterName(k)+' · CL '+crafterCL(k)+'</option>').join('')+'</select></label></div>';
   h+='<div class="row"><label>Base <select id="bBase">'+benchOrder(ccl).map(k=>{ const b=C.BASES[k], f=C.FEATS[b.feat], lk=baseLock(k,ccl); return '<option value="'+k+'" '+(k===benchCfg.base?'selected':'')+'>'+(lk?'🔒 ':'')+b.name+(b.price?' ('+b.price+' gp)':'')+(lk?' — '+lk:(f?' · '+f.name+' CL'+f.cl:''))+'</option>'; }).join('')+'</select></label>'+(C.BASES[benchCfg.base].use?'<span class="small">'+C.USES[p.use].name+'</span>':'<label>Use <select id="bUse">'+Object.keys(C.USES).filter(k=>!C.USES[k].fixed).map(k=>'<option value="'+k+'" '+(k===p.use?'selected':'')+'>'+C.USES[k].name+'</option>').join('')+'</select></label>')+(p.use==='charges'?'<label>Charges/day <select id="bCh">'+[1,2,3,4,5].map(n=>'<option '+(n==benchCfg.charges?'selected':'')+'>'+n+'</option>').join('')+'</select></label>':'')+'</div>';
   if(p.base.kind==='armor'||p.base.kind==='weapon') h+='<div class="row"><label>Enhancement bonus <select id="bEnh">'+Array.from({length:p.enhMax+1},(_,n)=>'<option value="'+n+'" '+(n==Math.min(benchCfg.enh||0,p.enhMax)?'selected':'')+'>+'+n+'</option>').join('')+'</select></label><span class="small">max +'+p.enhMax+(HR.maxEnh5?' (house rule)':' (house rule off)')+'</span></div>';
-  h+='<div class="sec">SRD spells</div><div class="row">'+Object.keys(C.SPELLS).map(k=>{ const s=C.SPELLS[k]; return '<label class="chip"><input type="checkbox" data-sp="'+k+'" '+(benchCfg.spells.includes(k)?'checked':'')+'> '+s.name+' <span class="small">'+s.lvl+'</span></label>'; }).join('')+'</div>';
+  h+='<div class="sec">SRD spells</div><div class="row">'+Object.keys(C.SPELLS).map(k=>{ const s=C.SPELLS[k], on=benchCfg.spells.includes(k); return '<button type="button" class="chip'+(on?' on':'')+'" data-sp="'+k+'">'+s.name+' <span class="small">'+s.lvl+'</span></button>'; }).join('')+'</div>';
   h+='<div class="sec">Metamagic on the item\'s spells</div>'+(metaOff?'<div class="lock">DM ruling is off: no metamagic on '+C.USES[p.use].name.toLowerCase()+' items.</div>':'')+'<div class="row">'+Object.keys(C.METAMAGIC).map(k=>'<label class="chip"><input type="checkbox" data-mm="'+k+'" '+(benchCfg.meta.includes(k)?'checked':'')+' '+(metaOff?'disabled':'')+'> '+C.METAMAGIC[k].name+' <span class="small">+'+C.METAMAGIC[k].up+'</span></label>').join('')+'</div>';
   h+='<div class="row"><label>Caster level above minimum: <input type="range" id="bCl" min="0" max="10" value="'+(benchCfg.clBonus||0)+'"> +'+(benchCfg.clBonus||0)+'</label></div>';
   // budget bar
@@ -478,7 +479,7 @@ function benchUI(){
     const en=c.querySelector('#bEnh'); if(en) en.onchange=e=>{ benchCfg.enh=+e.target.value; re(); };
     const rt=c.querySelector('#bRitual'); if(rt) rt.onchange=e=>{ benchCfg.ritual=e.target.checked; re(); };
     const ch=c.querySelector('#bCh'); if(ch) ch.onchange=e=>{ benchCfg.charges=+e.target.value; re(); };
-    c.querySelectorAll('[data-sp]').forEach(x=>x.onchange=()=>{ const k=x.dataset.sp; benchCfg.spells=x.checked?benchCfg.spells.concat(k):benchCfg.spells.filter(s=>s!==k); re(); });
+    c.querySelectorAll('[data-sp]').forEach(x=>x.onclick=()=>{ const k=x.dataset.sp; benchCfg.spells=benchCfg.spells.includes(k)?benchCfg.spells.filter(s=>s!==k):benchCfg.spells.concat(k); re(); });
     c.querySelectorAll('[data-mm]').forEach(x=>x.onchange=()=>{ const k=x.dataset.mm; benchCfg.meta=x.checked?benchCfg.meta.concat(k):benchCfg.meta.filter(s=>s!==k); re(); });
     c.querySelector('#bCl').onchange=e=>{ benchCfg.clBonus=+e.target.value; re(); };
     c.querySelector('#bCraft').onclick=()=>craftItem();
@@ -699,7 +700,7 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 /* ---------- panels ---------- */
 function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
-$('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ const n=mode==='world'&&NPCS.nearest(3.2); if(n){ openNpc(n.d.id); return; } if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
+$('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
 $('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
  '<li><b>Move</b>: WASD / arrows (phones: left-thumb joystick). <b>Look</b>: drag to orbit, wheel / pinch to zoom.</li>'+
@@ -826,14 +827,16 @@ function enterDungeon(o){ o=o&&o.ret?o:null;
   if(!renderer.shadowMap.enabled) dun.lights.forEach(l=>l.castShadow=false);
   log(dunName+' — '+dun.rooms.map(r=>r.name).join(' → ')+'. Templates: '+([...new Set(mobs.map(x=>x.m.tmpl).filter(t=>t!=='none'))].map(t=>SRD.TEMPLATES[t].name).join(', ')||'none this time'));
 }
-function leaveDungeon(msg){ if(mode!=='dungeon') return; dunSaveState(); GATHERING.clearDungeon(); mode='world'; dun.scene.remove(player.model); scene.add(player.model); comps.forEach((c,i)=>{ dun.scene.remove(c.model); scene.add(c.model); });
+function leaveDungeon(msg){ if(mode!=='dungeon') return; dunSaveState(); if(S.dun[dunName]) S.dun[dunName].rested=false; GATHERING.clearDungeon(); mode='world'; dismissRoll();
+  const card=$('modalCard'); if(card&&/Loot chest|Boss chest/.test(card.textContent||'')) closeModal();
+  dun.scene.remove(player.model); scene.add(player.model); comps.forEach((c,i)=>{ dun.scene.remove(c.model); scene.add(c.model); });
   const st=dunRet||{x:W.STATIONS.dungeon.x,z:W.STATIONS.dungeon.z+4}; player.pos.set(st.x,0,st.z); comps.forEach((c,i)=>c.pos.set(st.x-1+i,0,st.z+1.5)); camYaw=Math.PI; trail.length=0; dunRet=null;
   dun.scene.traverse(o=>{ if(o.geometry&&o.geometry.dispose) o.geometry.dispose(); }); dun=null; mobs=[]; chests=[]; if(msg) log(msg); save(); }
 function zeroReturn(){ const keep=S.inv.some(i=>i.equipped&&i.fx&&i.fx.zeroKeep); const lost=keep?0:Math.floor(S.gold*0.1); S.gold-=lost; S.hp=stats().maxHp;
   if(mode==='dungeon'){ leaveDungeon(); } if(!atGuild()) travelTo(guildId,true); const h=W.STATIONS.hall; player.pos.set(h.x,0,h.z+7); comps.forEach((c,i)=>c.pos.set(h.x-1+i,0,h.z+8.5));
   modal('<h3>⭕ Zero-Return</h3><div class="quote">Your HP hit zero. The Guild calls you home to re-center.</div><div>'+(keep?'Your Zero-Return Band glows — you keep all your gold.':'You dropped '+lost+' gold on the way back.')+'</div>'); save(); }
 function dungeonTargets(){ const t=GATHERING.targets(); chests.forEach(c=>{ if(!c.open) t.push({x:c.x,z:c.z,r:2.2,label:(c.big?'💎 Boss chest':'📦 Loot chest')+' — roll d%',act:()=>openChest(c)}); });
-  if(dun.camp) t.push({x:dun.camp.x,z:dun.camp.z,r:2.6,label:(S.dun[dunName]||{}).rested?'🔥 Campfire (used this dive)':'🔥 Rest at the campfire (full heal, once per dive)',act:restAtCamp});
+  if(dun.camp) t.push({x:dun.camp.x,z:dun.camp.z,r:2.6,label:(S.dun[dunName]||{}).rested?'🔥 Campfire (used this visit)':'🔥 Rest at the campfire (full heal, once this visit)',act:restAtCamp});
   t.push({x:dun.exitAt[0],z:dun.exitAt[1],r:2.6,label:dunRet?'🪜 Climb back out':'🪜 Climb back to the Guild',act:()=>leaveDungeon('You climb out of the Undercroft.')});
   if(!mobs.some(m=>m.alive&&m.m.boss)) t.push({x:dun.portalAt[0],z:dun.portalAt[1],r:2.4,label:'🌀 Portal home (cleared!)',act:()=>{ S.clears++; delete S.dun[dunName]; S.hp=stats().maxHp; leaveDungeon(dunName+' cleared! Level up: you are now level '+charLevel()+' ('+S.hp+' HP). Dungeons feel deeper next time (treasure level '+(S.clears+1)+').'); }});
   return t; }
@@ -868,10 +871,10 @@ function foeAttack(mb){ const st=stats(); if(S.buffs.halt>0&&mb.m.type==='undead
 function dunRoomAt(x,z){ if(!dun) return -1; const tx=Math.floor(x/2+13), ty=Math.floor(z/2+23); return dun.rooms.findIndex(r=>tx>=r.x0&&tx<=r.x1&&ty>=r.y0&&ty<=r.y1); }
 function dunRoomName(){ const i=dunRoomAt(player.pos.x,player.pos.z); return i>=0?dun.rooms[i].name:(dun&&dun.camp&&Math.hypot(player.pos.x-dun.camp.x,player.pos.z-dun.camp.z)<5?'campfire alcove':''); }
 function dunSaveState(){ const DS=S.dun[dunName]; if(!DS) return; DS.dead=mobs.filter(m=>!m.alive).map(m=>m.idx); DS.open=chests.filter(c=>c.open).map(c=>c.ci); DS.lvl=dunLvl; }
-function restAtCamp(){ const DS=S.dun[dunName]; if(DS&&DS.rested){ log('You already rested here this dive. The fire is embers now.'); return; }
-  if(mobs.some(m=>m.alive&&m.ag&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14)){ log('You can\'t rest with enemies hunting you!'); return; }
+function restAtCamp(){ const DS=S.dun[dunName]; if(DS&&DS.rested){ log('You already rested on this visit. Leave and come back if you need the fire again.'); return false; }
+  if(mobs.some(m=>m.alive&&m.ag&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14)){ log('You can\'t rest with enemies hunting you!'); return false; }
   const mx=stats().maxHp, got=mx-S.hp; S.hp=mx; if(DS) DS.rested=true; if(dun.camp){ dun.camp.light.intensity=1.5; dun.camp.flame.scale.setScalar(0.4); }
-  log('🔥 You rest at the campfire: +'+got+' HP (full). One rest per dive.'); save(); }
+  log('🔥 You rest at the campfire: +'+got+' HP (full). Once this visit — leaving the dungeon relights it.'); save(); return true; }
 function updateDungeon(dt){
   const st=stats(); const proom=dunRoomAt(player.pos.x,player.pos.z);
   mobs.forEach(mb=>{ if(!mb.alive||mode!=='dungeon') return; const dx=player.pos.x-mb.x, dz=player.pos.z-mb.z, d=Math.hypot(dx,dz); const reach=mb.m.size*0.5+0.9;

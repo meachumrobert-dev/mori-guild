@@ -99,27 +99,38 @@ function tick(quiet, force){ if(!force&&!enabled()) return null; const id=pickTa
   return {id, st, name:X.PL.regionInfo(id).name}; }
 
 function hash(n){ let h=n|0; h^=X.S().seed?X.S().seed.length*101:0; for(let i=0;i<String(X.S().seed||'mori').length;i++) h=(Math.imul(h^String(X.S().seed).charCodeAt(i),16777619))|0; return h>>>0; }
-function owedTicks(elapsedMs){ const sec=Math.min(elapsedMs,AWAY_CAP_MS)/1000; return Math.floor(sec/speed().tickSec); }
+/* A missing or junk stamp is "she is here now", never the 24 h cap.
+   Date.now()-0 is decades, and the cap would turn that into a finished planet. */
+function absenceMs(lastSeen, now){
+  if(typeof lastSeen!=='number' || !isFinite(lastSeen) || lastSeen<=0) return 0;
+  return Math.max(0, Math.min(AWAY_CAP_MS, now-lastSeen));
+}
+function owedTicks(elapsedMs){ const sec=Math.min(Math.max(0,elapsedMs)||0, AWAY_CAP_MS)/1000; return Math.floor(sec/speed().tickSec); }
 
-function beginCatchUp(){ const c=cfg(); const now=Date.now(); const last=c.lastSeen||now; const elapsed=Math.max(0,Math.min(AWAY_CAP_MS, now-last));
-  stampSeen(); const n=owedTicks(elapsed); catchQ=[]; shownSummary=false; summary=null;
-  if(n<=0||!enabled()) return {owed:0, elapsed};
-  summary={ticks:0, terrain:0, roads:0, villages:0, cities:0, pois:0, ids:{}, names:{}, elapsed, owed:n};
-  // Deterministic sequence: push n nulls; each tick() picks by current state (seed-deterministic-ish via region graph)
+function beginCatchUp(){ const c=cfg(); const now=Date.now(); catchQ=[]; summary=null; shownSummary=false;
+  const missing=!(typeof c.lastSeen==='number' && isFinite(c.lastSeen) && c.lastSeen>0);
+  if(missing){ c.lastSeen=now; return {owed:0, elapsed:0, missing:true}; }
+  const elapsed=absenceMs(c.lastSeen, now);
+  stampSeen(); const n=owedTicks(elapsed);
+  if(n<=0||!enabled()) return {owed:0, elapsed, missing:false};
+  summary={ticks:0, terrain:0, roads:0, villages:0, cities:0, pois:0, ids:{}, names:{}, elapsed, owed:n, told:false};
   for(let i=0;i<n;i++) catchQ.push(1);
-  catchBudget=Math.max(1, Math.ceil(n/60)); // finish within ~60s at 1s cadence; also apply a few per frame
+  catchBudget=1; // one region step per beat — a long absence must not stampede the frame
   catchAcc=0;
-  return {owed:n, elapsed}; }
+  showSummary(summary, true); // the card is part of login, not a popup after the queue drains
+  shownSummary=true;
+  return {owed:n, elapsed, missing:false}; }
 
 function flushCatchUp(dt){ if(!catchQ.length) return false;
-  catchAcc+=dt; const per=Math.max(1, catchBudget);
+  catchAcc+=dt; const per=Math.max(1, catchBudget|0);
   let n=0;
-  if(catchAcc>=0.05){ // every ~3 frames at 60fps apply a small bite so load doesn't hitch
-    const bite=Math.min(per, Math.max(1, Math.ceil(per/10)), catchQ.length);
+  const gap=per>1?0.2:0.4; // default is one step every 0.4 s, not a burst on the render clock
+  if(catchAcc>=gap){
+    const bite=Math.min(per, catchQ.length);
     while(catchQ.length&&n<bite){ catchQ.pop(); tick(true,true); n++; }
     catchAcc=0;
   }
-  if(!catchQ.length&&summary&&!shownSummary){ shownSummary=true; showSummary(summary); return true; }
+  if(!catchQ.length&&summary&&!summary.told){ summary.told=true; const line=moriVoice(summary); X.addChat&&X.addChat('mo', line); X.log&&X.log('🌱 Mori finished the work she queued while you were away.'); }
   return !!n; }
 
 function moriVoice(s){ const bits=[];
@@ -136,7 +147,9 @@ function moriVoice(s){ const bits=[];
   const p=progress(); line+=' the world is '+p.built+' of '+p.total+' regions real now ('+p.pct+'%). want to walk that way with me?';
   return line; }
 
-function showSummary(s){ const line=moriVoice(s);
+function showSummary(s, atLogin){ const line=atLogin
+    ?('i was away about '+(Math.round((s.elapsed/3600000)*10)/10)+' hours. i queued '+s.owed+' small build steps and i will work through them slowly, one at a time. the world will not jump ahead all at once.')
+    :moriVoice(s);
   X.addChat&&X.addChat('mo', line);
   X.log&&X.log('🌱 While you were away, Mori built…');
   const hrs=Math.round((s.elapsed/3600000)*10)/10;
@@ -172,7 +185,7 @@ function bindSettings(root){ if(!root) return;
 function progressChip(){ const p=progress(); return '🌍 '+p.built+'/'+p.total+' · '+p.pct+'%'; }
 
 window.IDLEBUILD={
-  SPEEDS, AWAY_CAP_MS, init(o){ X=o; hookBattery(); const r=beginCatchUp(); return r; },
+  SPEEDS, AWAY_CAP_MS, absenceMs, init(o){ X=o; hookBattery(); const r=beginCatchUp(); return r; },
   update, tick, pickTarget, progress, progressChip, settingsHTML, bindSettings, pauseReason, stampSeen, beginCatchUp,
   get summary(){ return summary; }, get catchLeft(){ return catchQ.length; }, get heading(){ return heading; },
   setEnabled(v){ cfg().on=!!v; }, setSpeed(v){ cfg().speed=(v==='slow'?'slow':'normal'); }, cfg, owedTicks, moriVoice, enabled, speed
