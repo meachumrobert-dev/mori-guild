@@ -15,3 +15,5 @@ The hosts below stay as they are. A finger does not replace `window.GATHERING`, 
 `FINGERS.apply`, `FINGERS.restore`, and `FINGERS.reapply` are the only router. `TABLET.validatePatch` rejects anything that is not those fields, and rejects strings that look like code. `TABLET.check` runs the cases in a Web Worker that is given the patch and the cases and nothing else. If the worker cannot start, the same pure check runs and still cannot touch the save.
 
 `ENGLISH` (articles, plurals, Oxford comma) and `FURNITURE.proportions` are fixed. A finger cannot resize a seat or rewrite Behave.
+
+Tinker Gearwhistle is not a new finger kind. The tablet wears that voice by approving a pack of the vocab, intent, and template fingers above, then toggling whether that pack is in the active list. The lines are flavor. They do not claim a mind.

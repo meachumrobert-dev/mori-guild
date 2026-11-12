@@ -712,7 +712,7 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
-$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
+$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
 let tabletDraft=null, tabletResult=null;
 function tabletSlots(){ const h=hereCity(); return {ruler:h.ruler||'The Guild Charter (Seedkeeper Mori)', name:h.name||'Guildhold', motto:h.motto||'', gov:h.govName||'Guild Charter', race:h.race||'', region:h.region||'', arts:''}; }
@@ -721,13 +721,20 @@ function moriDraft(){ return {note:'one vocab finger', fingers:[
   {kind:'intent', id:'ruler', any:['who is the sovereign'], template:'ruler'},
   {kind:'template', id:'ruler', text:'{ruler} rules {name}. the motto is "{motto}".'}
 ]}; }
-function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.tablet&&S.tablet.approved||[]).length; const face=tabletResult?(tabletResult.pass?'The runes hold. Every check passed.':'The runes reject this. '+((tabletResult.fails||[]).slice(0,3).join('; '))):(tabletDraft?'A draft is waiting. It has not been applied.':'The glass is dark. Ask Mori for one small change.');
-  el.innerHTML='<div id="tabletFace">'+face+'</div><div class="small">Approved fingers: '+n+'. A finger is one vocab pack, one intent, one template, one furniture note, or one recipe note. Nothing runs in the live game until you tap Approve.</div>'+
-    '<div class="row"><button type="button" id="tabDraft">Ask Mori</button><button type="button" id="tabRun">Run checks</button><button type="button" class="pri" id="tabYes"'+(tabletResult&&tabletResult.pass?'':' disabled')+'>Approve</button><button type="button" id="tabNo">Revert</button></div>';
+function tinkerPack(){ return JSON.parse(JSON.stringify(window.TINKER_PACK)); }
+function wornPatches(){ const all=(S.tablet&&S.tablet.approved)||[]; if(S.tablet&&S.tablet.wear==='tinker') return all; return all.filter(p=>p.note!=='tinker persona'); }
+function applyWorn(){ if(window.FINGERS) FINGERS.reapply(wornPatches()); if(window.FURNITURE) FURNITURE.build(scene); }
+function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.tablet&&S.tablet.approved||[]).length; const wear=S.tablet&&S.tablet.wear==='tinker'; const face=tabletResult?(tabletResult.pass?'The runes hold. Every check passed.':'The runes reject this. '+((tabletResult.fails||[]).slice(0,3).join('; '))):(tabletDraft?'A draft is waiting. It has not been applied.':'The glass is dark. Ask Mori for one small change.');
+  el.innerHTML='<div id="tabletFace">'+face+'</div><div class="small">Approved fingers: '+n+'. Wearing: '+(wear?'Tinker Gearwhistle (flavor, not a mind)':'Mori')+'. A finger is data. Nothing runs until you tap Approve.</div>'+
+    '<div class="row"><button type="button" id="tabMori"'+(wear?'':' class="pri"')+'>Mori</button><button type="button" id="tabTinker"'+(wear?' class="pri"':'')+'>Tinker</button></div>'+
+    '<div class="row"><button type="button" id="tabDraft">Ask Mori</button><button type="button" id="tabTinkerDraft">Tinker persona</button><button type="button" id="tabRun">Run checks</button><button type="button" class="pri" id="tabYes"'+(tabletResult&&tabletResult.pass?'':' disabled')+'>Approve</button><button type="button" id="tabNo">Revert</button></div>';
+  $('tabMori').onclick=()=>{ S.tablet.wear='mori'; applyWorn(); save(); renderTablet(); };
+  $('tabTinker').onclick=()=>{ const has=(S.tablet.approved||[]).some(p=>p.note==='tinker persona'); if(!has){ tabletDraft=tinkerPack(); tabletResult=null; log('Run checks, then Approve, before Tinker can be worn.'); renderTablet(); return; } S.tablet.wear='tinker'; applyWorn(); save(); renderTablet(); };
   $('tabDraft').onclick=()=>{ tabletDraft=moriDraft(); tabletResult=null; renderTablet(); };
-  $('tabRun').onclick=()=>{ if(!tabletDraft){ tabletDraft=moriDraft(); } const slots=tabletSlots(); const cases=[{text:'who is the sovereign', intent:'ruler', includes:[slots.ruler, slots.name], slots}]; TABLET.check(TABLET.normalize?TABLET.normalize(tabletDraft):tabletDraft, cases).then(r=>{ tabletResult=r; renderTablet(); }); };
-  $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(window.FINGERS) FINGERS.reapply(S.tablet.approved); if(window.FURNITURE) FURNITURE.build(scene); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
-  $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length) S.tablet.approved.pop(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
+  $('tabTinkerDraft').onclick=()=>{ tabletDraft=tinkerPack(); tabletResult=null; renderTablet(); };
+  $('tabRun').onclick=()=>{ if(!tabletDraft){ tabletDraft=moriDraft(); } const slots=tabletSlots(); const tinker=tabletDraft.note==='tinker persona'; const cases=tinker?[{text:'hi', intent:'tinkerhi', includes:['tinker','gnome'], slots:{}},{text:'who rules here', intent:'ruler', includes:[slots.ruler, slots.name], slots}]:[{text:'who is the sovereign', intent:'ruler', includes:[slots.ruler, slots.name], slots}]; TABLET.check(tabletDraft, cases).then(r=>{ tabletResult=r; renderTablet(); }); };
+  $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(tabletDraft.note==='tinker persona') S.tablet.wear='tinker'; applyWorn(); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
+  $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length){ const gone=S.tablet.approved.pop(); if(gone&&gone.note==='tinker persona') S.tablet.wear='mori'; } applyWorn(); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
 }
 function openTablet(){ ensureTablet(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
@@ -1155,6 +1162,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   TS.pump(); // v3.4 two-speed: foreground jobs now, background jobs inside the frame budget
   const bi=$('bInteract'); bi.textContent=document.body.classList.contains('phone')?'E':(curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'); bi.classList.toggle('hot',!!curTarget);
 }
+function renderWorld(which){ if(!window.OCCLUSION){ renderer.render(which, camera); return; } const cx=camera.position.x, cz=camera.position.z; OCCLUSION.beginView(which, camera, player.pos.x, player.pos.z); renderer.render(which, camera); camera.position.x=cx; camera.position.z=cz; OCCLUSION.endView(which); }
 function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   if(crOpen){ renderCreator(); return; }
   if(globeOpen){ [lblD,lblM,lblDoll,lblT].forEach(e=>e.style.display='none'); obeliskAnim(); SW.globe.render(renderer); return; }
@@ -1164,8 +1172,9 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   camera.position.set(tgt.x+Math.sin(camYaw)*Math.cos(pitch)*dist, tgt.y+Math.sin(pitch)*dist, tgt.z+Math.cos(camYaw)*Math.cos(pitch)*dist);
   if(mode==='world'){ const gy=W.height(camera.position.x,camera.position.z)+0.6; if(camera.position.y<gy) camera.position.y=gy; }
   camera.lookAt(tgt);
+  if(window.OCCLUSION&&mode==='world'){ OCCLUSION.update(scene, camera, {heightAt:(x,z)=>W.height(x,z), far:IS_TOUCH?120:200, budget:IS_TOUCH?12:20}); const rd=$('occRead'); if(rd){ rd.style.display=OCCLUSION.stats.debug?'block':'none'; if(OCCLUSION.stats.debug) rd.textContent='cull tested '+OCCLUSION.stats.tested+' · hidden '+OCCLUSION.stats.hidden+' · hill '+OCCLUSION.stats.hill+' · box '+OCCLUSION.stats.box+' · far '+OCCLUSION.stats.far; } }
   if(mode==='world'&&TF.shake>0){ const k=TF.shake*0.35; camera.position.x+=(Math.random()-0.5)*k; camera.position.y+=(Math.random()-0.5)*k; camera.position.z+=(Math.random()-0.5)*k; } // earth rumble
-  if(mode==='world'&&!atGuild()){ [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); SW.animate(clockT); renderer.render(scene,camera); }
+  if(mode==='world'&&!atGuild()){ [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); SW.animate(clockT); renderWorld(scene); }
   else if(mode==='world'){
     // tavern: roof hides when inside; neon lights drift
     const inT=tav.userData.inside(player.pos.x,player.pos.z)||tav.userData.inside(camera.position.x,camera.position.z); tav.userData.roof.visible=!inT;
@@ -1181,8 +1190,8 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
     if(dd<16){ delroth.t+=1/60; if(delroth.t>7){ delroth.t=0; delroth.line=(delroth.line+1)%DELROTH_LINES.length; } project(dP,2.4*1.0,lblD,'<b>Delroth</b> <span class="small">Undead Catfolk Dread Necromancer · Lv 60 (epic)</span><br>“'+DELROTH_LINES[delroth.line]+'”'); } else lblD.style.display='none';
     project(mori.pos,2.1,lblM, S.blue?'💤 zzz…':'<b>Mori</b>'+(curJob&&!curJob.idle?' · '+jobLabel(curJob):''));
     const dl=W.STATIONS.doll; if(Math.hypot(dl.x-player.pos.x,dl.z-player.pos.z)<7) project(new T.Vector3(dl.x,0,dl.z),2.2,lblDoll,'🪆 “'+DOLL_LINES[Math.floor(clockT/6)%DOLL_LINES.length]+'”'); else lblDoll.style.display='none';
-    renderer.render(scene,camera);
-  } else { [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); renderer.render(dun.scene,camera); }
+    renderWorld(scene);
+  } else { [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); renderWorld(dun.scene); }
   if(curTarget){ project(new T.Vector3(curTarget.x,mode==='world'?W.height(curTarget.x,curTarget.z):0,curTarget.z),1.0,lblT,curTarget.label); } else lblT.style.display='none';
 }
 function obeliskAnim(){ const u=obelisk.userData; u.orb.rotation.y=clockT*0.4; u.core.rotation.y=-clockT*0.3; u.ring.position.y=2.6+Math.sin(clockT*1.5)*0.6; const f=Math.min(1,programmedCount()/40); u.core.scale.setScalar(0.6+f*0.75); }
@@ -1208,7 +1217,7 @@ IDLEBUILD.init({
   clearIdleJob:()=>{ if(curJob&&curJob.idle) curJob=null; },
   renderSeedPanel:()=>renderSeedPanel()
 });
-ensureTablet(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene);
+ensureTablet(); applyWorn(); if(window.FURNITURE) FURNITURE.build(scene); if(player.model) player.model.userData.noCull=true;
 setTimeout(()=>{ if(window.DICT&&DICT.load) DICT.load().catch(()=>{}); }, 600);
 voiceSetup(); $('npcBack').onclick=()=>{ endNpc(); openMoriChat(); };
 if(CLAN.site) refreshFrame(); // the first frame was built before the Clan / NPCs knew the player (no-op otherwise)

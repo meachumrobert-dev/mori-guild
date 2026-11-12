@@ -54,7 +54,7 @@ function splitGreeting(t){ const m=/^(?:hi|hello|hey|hiya|howdy|yo|greetings|goo
 function grounded(t, c){
   if(/\bwho (?:rules|leads|governs|runs)\b|\bruler of\b|\bin charge\b/.test(t) || (window.LEXICON&&(LEXICON.hasPhrase(t,'ruler')||(/\b(who|what)\b/.test(t)&&LEXICON.hasLemma(t,'ruler.n'))))){ c.intent='ruler'; return rulerLine(c); }
   if((/\bcity-states?\b|\bcity states?\b/.test(t) || (window.LEXICON&&(LEXICON.hasPhrase(t,'cities')||LEXICON.hasLemma(t,'city.n')))) && /\b(tell|about|what|which|list|the|any)\b/.test(t)){ c.intent='cities'; return citiesLine(c); }
-  for(const f of extra){ if(f.kind==='intent' && (f.any||[]).some(p=>t.indexOf(String(p).toLowerCase())>=0)){ c.intent=f.id; const tpl=templates[f.template||f.id]; if(tpl&&window.ENGLISH) return ENGLISH.fill(tpl, slotsOf(c)); return rulerLine(c); } }
+  for(const f of extra){ if(f.kind==='intent' && (f.any||[]).some(p=>{ p=String(p).toLowerCase(); return p.length<4?new RegExp('\\b'+p+'\\b').test(t):t.indexOf(p)>=0; })){ c.intent=f.id; const tpl=templates[f.template||f.id]; if(tpl&&window.ENGLISH) return ENGLISH.fill(tpl, slotsOf(c)); return rulerLine(c); } }
   return null;
 }
 function answerOne(t, c, raw){ const g=grounded(t,c); if(g) return g; for(const it of I){ if(it.rx.test(t)&&(!it.test||it.test(t,c))){ c.intent=it.id; return it.f(c,t,raw); } } return null; }
