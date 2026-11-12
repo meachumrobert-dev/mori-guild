@@ -130,7 +130,8 @@ body.phone #ctx button{min-width:48px;min-height:48px;padding:0 6px;font-size:16
 body.phone #ctx #bAttack{grid-column:2;grid-row:1 / span 2;min-width:64px;min-height:64px;font-size:26px}
 body.phone #ctx #bInteract{display:flex;opacity:.45}
 body.phone #ctx #bInteract.hot{opacity:1}
-#phoneMenu{display:none}
+#roadFade{position:fixed;inset:0;background:#0e0b16;opacity:0;pointer-events:none;transition:opacity .35s;z-index:40}
+#roadFade.on{opacity:1}
 body.phone #phoneMenu{display:flex;position:fixed;z-index:8;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:48px;min-height:48px;width:48px;height:48px;padding:0;align-items:center;justify-content:center;font-size:22px}
 body.phone #bottom{display:none}
 body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:calc(var(--hud-top, 96px) + 8px);left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - var(--chrome-bottom, 212px));overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
@@ -246,6 +247,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 
 <div class="modal" id="modal"><div class="card" id="modalCard"></div></div>
 
+<div id="roadFade"></div>
 <div id="creator">
   <div id="crTitle"><div style="font-size:20px;font-weight:800" id="crName">Hero</div><div class="small" id="crSub"></div></div>
   <div id="crLeft"></div>
@@ -273,6 +275,11 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <script src="js/tithe.js"></script>
 <script src="js/workshop.js"></script>
 <script src="js/village.js"></script>
+<script src="js/portals.js"></script>
+<script src="js/roads.js"></script>
+<script src="js/trolls.js"></script>
+<script src="js/recipes.js"></script>
+<script src="js/legend.js"></script>
 <script src="js/grounded.js"></script>
 <script src="js/world.js"></script>
 <script src="js/seedworld.js"></script>

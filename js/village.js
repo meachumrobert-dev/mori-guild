@@ -78,7 +78,9 @@ function onDay(save, id, hasHall){
 function answer(save, id, hasHall){
   migrate(save);
   const t=town(save, id);
-  return E().say(t, {hasHall:!!hasHall});
+  let line=E().say(t, {hasHall:!!hasHall});
+  if(root.LEGEND){ const extra=root.LEGEND.mention(save); if(extra) line+=' '+extra; }
+  return line;
 }
 function elderHTML(save, id, hasHall){
   migrate(save);
@@ -87,7 +89,9 @@ function elderHTML(save, id, hasHall){
   const o=E().offer(t);
   const steps=E().nextSteps(t, {hasHall});
   const adv=E().adventurer(hasHall);
+  const rumor=root.LEGEND?root.LEGEND.mention(save):'';
   let h='<p><b>'+who+'</b></p><p>'+o.text+'</p>';
+  if(rumor) h+='<p>'+rumor+'</p>';
   if(adv) h+='<p>'+adv.text+'</p>';
   h+='<div class="sec">What next</div><ul>'+steps.map(s=>'<li>'+s+'</li>').join('')+'</ul>';
   h+='<div class="sec">Sell into the stockpile</div>';
@@ -100,6 +104,7 @@ function elderHTML(save, id, hasHall){
     if(!r.cap) h+='<button type="button" data-craft="'+r.id+'">Make</button>';
     h+='</div>';
   });
+  if(root.RECIPES&&root.RECIPES.panel) h+=root.RECIPES.panel(save);
   return h;
 }
 function boardHTML(save, id, hasHall){
