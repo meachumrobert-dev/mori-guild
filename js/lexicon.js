@@ -10,7 +10,8 @@ const SYNSETS=[
   {id:'city.n', lemmas:['city-state','city-states','city state','cities','city']},
   {id:'find.v', lemmas:['where','find','locate','look for','seek']},
   {id:'quest.n', lemmas:['quest','quests','mission','missions','task','tasks','any work']},
-  {id:'herb.n', lemmas:['herb','herbs','flower','flowers','plant','plants']}
+  {id:'herb.n', lemmas:['herb','herbs','flower','flowers','plant','plants']},
+  {id:'tech.n', lemmas:['technology','tech','information','info','equipment','gear','ammunition','ammo']}
 ];
 const PHRASES={
   ruler:['who rules','who rules here','who is in charge','who\'s in charge','whos in charge','ruler of','who leads','who governs','who runs this','in charge here'],

@@ -33,6 +33,7 @@ const RDEF={
   fiend_ichor:['Fiendish Ichor','ichor',3,15,0.2,20], celestial_ichor:['Celestial Ichor','ichor',3,15,0.2,20], fiend_horn:['Half-Fiend Horn','fang',3,20,0.5,10]
 };
 const R={}; for(const id in RDEF){ const d=RDEF[id]; R[id]=Object.assign({id, name:d[0], fam:d[1], tier:d[2], gp:d[3], wt:d[4], stack:d[5]}, d[6]||{}); }
+if(window.LUMBER) LUMBER.reagents().forEach(r=>{ if(!R[r.id]) R[r.id]=r; });
 const SKILL_OF={herb:'herbalism', ore:'mining', stone:'mining', wood:'woodcutting', part:'skinning'};
 const TOOL_OF={herbalism:'sickle', mining:'pick', woodcutting:'axe', skinning:'knife'};
 const SND_OF={sickle:'sickle', pick:'pick', axe:'axe', knife:'knife'};
@@ -47,7 +48,7 @@ const HERBS={grass:['vinca_leaf','marigold','zinnia','sunflower_seed','squash_bl
   mountain:['vinca_leaf','gloomrose_thorn','yarrow','sage','frankincense','rosemary'],desert:['squash_blossom','sunflower_seed','frankincense','aloe','myrrh'],tundra:['vinca_leaf','yarrow'],beach:['vinca_leaf','marigold','rosemary','mint'],guild:['mint','lavender','chamomile','calendula','sage']};
 const ORES={mountain:['iron_ore','copper_ore','silver_ore','zinc_ore','mithral_ore','adamantine_ore'], _:['iron_ore','copper_ore','zinc_ore','silver_ore']};
 const STONES={mountain:['fieldstone','granite','marble','obsidian'],desert:['fieldstone','obsidian','marble'],taiga:['fieldstone','granite'],tundra:['fieldstone','granite'],_:['fieldstone','granite','marble']};
-const WOODS={forest:['deadfall','oak_log','yew_bough','darkwood_log','ironwood_log'],jungle:['deadfall','yew_bough','darkwood_log','ironwood_log'],swamp:['deadfall','oak_log','darkwood_log'],taiga:['deadfall','yew_bough'],_:['deadfall','oak_log','ironwood_log']};
+const WOODS=window.LUMBER?LUMBER.woods():{forest:['deadfall','oak_log','yew_bough','darkwood_log','ironwood_log'],jungle:['deadfall','yew_bough','darkwood_log','ironwood_log'],swamp:['deadfall','oak_log','darkwood_log'],taiga:['deadfall','yew_bough'],_:['deadfall','oak_log','ironwood_log']};
 const TW=[1,0.55,0.2,0.06,0.02];
 const CRIT={forest:'wolf',taiga:'wolf',grass:'wolf',steppe:'wolf',tundra:'wolf',jungle:'monitor',swamp:'monitor',savanna:'monitor',desert:'firebeetle',mountain:'firebeetle',beach:'monitor'};
 /* monster parts by SRD creature type (+ specific creature, + template) */
@@ -167,7 +168,7 @@ function stream(px,pz,face,force){ const RANGE=X.mobile?72:96; const F=X.SW.F; c
 function addCell(i,j){ const list=genCell(i,j); list.forEach(n=>nodes.push(n)); if(list.crit) spawnCrit(list.crit); dirty=true; return list; }
 function dropCell(list){ const s=new Set(list); nodes=nodes.filter(n=>!s.has(n)); if(list.crit){ const c=crit.find(q=>q.key===list.crit.key); if(c&&!carc.some(k=>k.mob===c)) removeCrit(c); } dirty=true; }
 function clearAll(){ cells.clear(); nodes=[]; crit.slice().forEach(c=>removeCrit(c)); crit=[]; for(let i=carc.length-1;i>=0;i--) if(!carc[i].inDun){ X.scene.remove(carc[i].g); carc.splice(i,1); } lastPC=null; dirty=true; beamsFor([]); }
-const ready=n=>{ const d=G().dep[n.key]; return !(d>G().t); };
+const ready=n=>{ if(!X||!n) return true; const d=G().dep[n.key]; return !(d>G().t); };
 function rebuild(){ if(!grp) return; dirty=false; const cnt={rock:0,crys:0,log:0,bush:0}; const fl=[];
   for(const n of nodes){ const rd=ready(n); const y=n.y;
     if(n.type==='ore'||n.type==='stone'){ const k=cnt.rock++; if(k>=CAP) continue; const s=n.s*(rd?1:0.5); dm.position.set(n.x,y-0.1,n.z); dm.rotation.set(0,n.rot,0); dm.scale.set(s,s*(rd?1:0.6),s); dm.updateMatrix(); IM.rock.setMatrixAt(k,dm.matrix);
@@ -211,10 +212,12 @@ function gather(n){ if(act) return; const sk=SKILL_OF[n.type]; const lv=skillLv(
   if(lv<n.req){ X.log('🔒 '+r.name+' needs '+cap(sk)+' '+n.req+' (you are '+lv+'). Gather '+TIER[Math.max(0,r.tier-1)].n.toLowerCase()+' nodes to level up.'); return; }
   begin({what:'node', n, skill:sk, rid:n.rid, x:n.x, z:n.z, dur:1.2+r.tier*0.3}); }
 function skin(c){ if(act||c.skinned) return; begin({what:'carcass', c, skill:'skinning', x:c.x, z:c.z, dur:1.0+(c.mob.m.boss?0.8:0)}); }
+function extraTrees(){ const a=window.SEEDWORLD&&SEEDWORLD.treeChops?SEEDWORLD.treeChops():[]; const b=window.TERRAFORM&&TERRAFORM.treeChops?TERRAFORM.treeChops():[]; return a.concat(b); }
 function finish(){ const a=act; endTool(); act=null; const g=G(); const sk=a.skill; const lv0=skillLv(sk); let gained=[];
   if(a.what==='node'){ const n=a.n, r=R[n.rid]; let q=1+Math.floor((lv0-1)/3)+(Math.random()<0.12+0.04*lv0?1:0)+(n.type==='herb'&&X.S().buffs&&X.S().buffs.weedwake>0?1:0);
     addReag(n.rid,q); gained.push([n.rid,q]); if(n.type==='herb'&&window.HERBAL) HERBAL.onGather(n.rid); if(n.type==='ore'&&Math.random()<0.3){ addReag('fieldstone',1); gained.push(['fieldstone',1]); }
-    g.dep[n.key]=g.t+RESPAWN[n.tier]; g.skills[sk]+=8+n.tier*14; dirty=true; burst(n.x,n.y+0.5,n.z,r.col||'#6fbf3a'); }
+    g.dep[n.key]=g.t+RESPAWN[n.tier]; g.skills[sk]+=8+n.tier*14; dirty=true; burst(n.x,n.y+0.5,n.z,r.col||'#6fbf3a');
+    if(n.tree){ if(window.SEEDWORLD&&SEEDWORLD.refreshTrees) SEEDWORLD.refreshTrees(); if(window.TERRAFORM&&TERRAFORM.refreshTrees) TERRAFORM.refreshTrees(); } }
   else { const c=a.c, m=c.mob.m; c.skinned=true; c.life=Math.min(c.life,2.5); let ruined=[];
     partsFor(m).forEach(([id,q])=>{ const r=R[id]; if(lv0<REQ[r.tier]){ ruined.push(r.name); return; } q+=Math.floor((lv0-1)/4); addReag(id,q); gained.push([id,q]); });
     g.skills.skinning+=6+(m.xp||1)*5; if(ruined.length) X.log('🔪 You ruin the '+ruined.join(', ')+' — needs higher Skinning.'); stats.drops.push({mob:m.name, parts:gained.map(x=>x.join('×'))}); burst(c.x,(c.inDun?0:X.SW.heightAt(c.x,c.z))+0.4,c.z,'#8a1a1a'); }
@@ -230,7 +233,7 @@ function burst(x,y,z,c){ for(let i=0;i<10;i++) chips.userData.p.push({x,y,z,vx:(
 function popIcon(rid,x,z,i){ const ic=icon(rid); const s=new T.Sprite(ic.mat); const y=(X.mode()==='dungeon'?0:X.SW.heightAt(x,z)); s.position.set(x+(i-0.5)*0.7,y+1.6,z); s.scale.set(0.8,0.8,1); s.renderOrder=10; s.userData.sw=true; X.cur().add(s); pops.push({s,t:0,y0:y+1.6,par:X.cur()}); }
 /* ---------- predictive warm-up: what you face or approach gets its tool, sound and icons ready ---------- */
 function warmScan(){ const p=X.player.pos, fx=Math.sin(X.player.face), fz=Math.cos(X.player.face);
-  const cand=[]; nodes.forEach(n=>{ const d=Math.hypot(n.x-p.x,n.z-p.z); if(d<40) cand.push({d,x:n.x,z:n.z,keys:['tool:'+TOOL_OF[SKILL_OF[n.type]],'icon:'+n.rid]}); });
+  const cand=[]; nodes.concat(extraTrees()).forEach(n=>{ const d=Math.hypot(n.x-p.x,n.z-p.z); if(d<40) cand.push({d,x:n.x,z:n.z,keys:['tool:'+TOOL_OF[SKILL_OF[n.type]],'icon:'+n.rid]}); });
   crit.forEach(c=>{ const d=Math.hypot(c.x-p.x,c.z-p.z); if(d<40) cand.push({d,x:c.x,z:c.z,keys:['crit:'+c.kind,'tool:knife'].concat(partsFor(c.m).map(q=>'icon:'+q[0]))}); });
   carc.forEach(c=>{ const d=Math.hypot(c.x-p.x,c.z-p.z); if(d<40) cand.push({d,x:c.x,z:c.z,keys:['tool:knife'].concat((PARTS[c.mob.m.kind]||[]).map(q=>'icon:'+q[0]))}); });
   (X.extraWarm?X.extraWarm():[]).forEach(e=>{ const d=Math.hypot(e.x-p.x,e.z-p.z); if(d<40) cand.push({d,x:e.x,z:e.z,keys:e.keys}); });
@@ -261,7 +264,7 @@ function update(dt){ if(!X) return; const g=G(); g.t+=dt; const mode=X.mode();
 }
 /* targets offered to game.js (E / tap) */
 function targets(){ const out=[]; if(!X||X.mode()==='globe') return out; const p=X.player.pos;
-  if(X.mode()==='world') nodes.forEach(n=>{ const d=Math.abs(n.x-p.x)+Math.abs(n.z-p.z); if(d>6) return; const r=R[n.rid], sk=SKILL_OF[n.type], lv=skillLv(sk), rd=ready(n);
+  if(X.mode()==='world') nodes.concat(extraTrees()).forEach(n=>{ const d=Math.abs(n.x-p.x)+Math.abs(n.z-p.z); if(d>6) return; const r=R[n.rid], sk=SKILL_OF[n.type], lv=skillLv(sk), rd=ready(n); if(!r) return;
     const verb={herb:'🌿 Pick',ore:'⛏ Mine',stone:'⛏ Quarry',wood:'🪓 Chop'}[n.type];
     out.push({x:n.x,z:n.z,r:2.4,gnode:n,label:!rd?'⏳ '+r.name+' (regrows in '+Math.ceil(G().dep[n.key]-G().t)+'s)':lv<n.req?'🔒 '+r.name+' — '+cap(sk)+' '+n.req+' (you '+lv+')':verb+' '+r.name+' · '+TIER[r.tier].n,act:()=>gather(n)}); });
   carc.forEach(c=>{ if(c.skinned) return; if(Math.abs(c.x-p.x)+Math.abs(c.z-p.z)>6) return; if(c.inDun!==(X.mode()==='dungeon')) return; out.push({x:c.x,z:c.z,r:2.3,label:'🔪 Skin the '+c.mob.m.name+' (Skinning '+skillLv('skinning')+')',act:()=>skin(c)}); });
@@ -288,7 +291,7 @@ function whereNamed(word){ const r=reagentMention(word); if(!r) return null;
   return r.name.toLowerCase()+' is '+Math.round(ls[0].d)+' m '+dirTo(ls[0].n.x-p.x,ls[0].n.z-p.z)+'. the gather list also allows it in '+whereBio+'.'+meadowBit; }
 function where(word){ const t=famOf(word); if(!t) return null; const p=X.player.pos; if(X.mode()!=='world') return 'we are underground. i can only smell rocks. go outside first!';
   const ls=nodes.filter(n=>n.type===t&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
-  if(!ls.length) return 'i don\'t see any '+(t==='herb'?'herbs':t)+' near here. try another region — '+(t==='ore'?'mountains have the good ore.':t==='herb'?'grass and jungle have lots of flowers.':'forests have logs.');
+  if(!ls.length) return 'i don\'t see any '+(t==='herb'?'herbs':t)+' near here. try another region — '+(t==='ore'?'mountains have the good ore.':t==='herb'?'grass and jungle have lots of flowers.':'forests have trees you can chop.');
   const sk=SKILL_OF[t], lv=skillLv(sk); const ok=ls.find(q=>q.n.req<=lv), best=ls.slice().sort((a,b)=>b.n.tier-a.n.tier)[0];
   let s=ok?'there is '+R[ok.n.rid].name.toLowerCase()+' '+Math.round(ok.d)+' m '+dirTo(ok.n.x-p.x,ok.n.z-p.z)+' of you.':'';
   if(best&&best.n.tier>(ok?ok.n.tier:-1)) s+=' and '+R[best.n.rid].name.toLowerCase()+' ('+TIER[best.n.tier].n.toLowerCase()+') '+Math.round(best.d)+' m '+dirTo(best.n.x-p.x,best.n.z-p.z)+(best.n.req>lv?' — you need '+sk+' '+best.n.req+', you are '+lv+'.':'!');
@@ -301,7 +304,7 @@ function planRun(word){ const t=famOf(word||'')||null; if(X.mode()!=='world') re
   return 'gather run! '+pick.map(n=>R[n.rid].name.toLowerCase()).join(' → ')+'. about '+Math.round(tot)+' m. follow the green lights.'; }
 function beamsFor(list){ if(!beams) return; beams.count=0; list.forEach((n,i)=>{ dm.position.set(n.x,n.y+14,n.z); dm.rotation.set(0,0,0); dm.scale.setScalar(1); dm.updateMatrix(); beams.setMatrixAt(i,dm.matrix); beams.count=i+1; }); beams.instanceMatrix.needsUpdate=true; }
 function suggest(){ if(!X||X.mode()!=='world'||!nodes.length) return null; const c={}; nodes.forEach(n=>{ if(ready(n)) c[n.type]=(c[n.type]||0)+1; }); const top=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]; if(!top) return null;
-  return 'this place has '+c[top]+' '+({herb:'herb patches',ore:'ore veins',stone:'stone outcrops',wood:'fallen logs'})[top]+' nearby. want a '+({herb:'herb',ore:'mining',stone:'quarry',wood:'wood'})[top]+' run? say "gather run".'; }
+  return 'this place has '+c[top]+' '+({herb:'herb patches',ore:'ore veins',stone:'stone outcrops',wood:'trees'})[top]+' nearby. want a '+({herb:'herb',ore:'mining',stone:'quarry',wood:'wood'})[top]+' run? say "gather run".'; }
 /* ---------- crafting hooks: reagents as required/optional components ---------- */
 function count(key){ const s=X.S(); if(key.startsWith('r:')) return s.reag[key.slice(2)]||0; if(key.startsWith('f:')){ const f=key.slice(2); let n=0; for(const id in s.reag) if(R[id]&&R[id].fam===f) n+=s.reag[id]; return n; } return 0; }
 function stand(k){ let n=0; const s=X.S(); for(const id in s.reag){ const r=R[id]; if(r&&famGeneric[r.fam]===k) n+=s.reag[id]; } return n; } // reagents that can stand in for a generic counter
@@ -315,10 +318,11 @@ function bagHTML(){ const s=X.S(); const ids=Object.keys(s.reag).filter(id=>s.re
   return h; }
 function fmtGp(g){ return g>=1?(Math.round(g*10)/10)+' gp':g>=0.1?Math.round(g*10)+' sp':Math.max(1,Math.round(g*100))+' cp'; }
 function sell(id){ const s=X.S(); const n=s.reag[id]||0; if(!n) return 0; const g=Math.round(R[id].gp*n); delete s.reag[id]; s.gold+=g; return g; }
+function mill(inputId){ if(!window.LUMBER) return {ok:false, why:'no lumber table'}; const g=G(); const skill=skillLv('woodcutting'); const tech=skill>=4?['saw']:[]; const plan=LUMBER.work(inputId, {skill, tech}); if(!plan.ok) return plan; if((X.S().reag[inputId]||0)<1) return {ok:false, why:'you have no '+inputId.replace(/_/g,' ')}; spendKey('r:'+inputId,1); addReag(plan.out,1); g.skills.woodcutting+=6+plan.labor*4; clean(); return plan; }
 
 window.GATHERING={ R, TIER, REQ, RESPAWN, SKILLS, PARTS, CELL, HERBS, ORES, WOODS,
-  init(o){ X=o; G(); buildMeshes(); registerWarm(); },
-  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, iconURL, skillLv, level, xpFor,
+  init(o){ X=o; G(); buildMeshes(); registerWarm(); if(window.SEEDWORLD&&SEEDWORLD.setTreeGate) SEEDWORLD.setTreeGate(key=>{ const d=G().dep[key]; return !!(d>G().t); }); },
+  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, mill, iconURL, skillLv, level, xpFor,
   spawnHostile(kind,x,z){ try{ const m=SRD.makeMonster(kind); const g=critMesh(m); g.position.set(x,X.SW.heightAt(x,z),z); g.name='raid_'+kind; g.userData.sw=true; X.scene.add(g);
       const c={key:'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), kind, m, g, x, z, hx:x, hz:z, alive:true, ag:true, cd:0.8, hit:0, wt:0, tx:x, tz:z, critter:true, room:-1, raid:true}; crit.push(c); return c; }catch(e){ return null; } },
   get nodes(){ return nodes; }, get crit(){ return crit; }, get carc(){ return carc; }, get act(){ return act; }, get run(){ return run; }, stats, ready, toolMesh,

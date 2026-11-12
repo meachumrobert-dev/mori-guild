@@ -107,12 +107,20 @@ function study(id, stageFn){ if(stageFn||!opt) opt={stage:stageFn||(()=>1), mobi
 function roadDist(x,z){ let best=1e9; for(const s of F.roads){ const [x1,z1,x2,z2]=s; const vx=x2-x1, vz=z2-z1, L=vx*vx+vz*vz; let t=((x-x1)*vx+(z-z1)*vz)/L; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(x-(x1+vx*t),z-(z1+vz*t)); if(d<best) best=d; } return best; }
 
 /* ---------- chunks ---------- */
-let matLand, matVoid, matVoidLine, voidPlaneG, voidLineG, treeG, trunkG, treeM, trunkM;
+let matLand, matVoid, matVoidLine, voidPlaneG, voidLineG, treeG, trunkG, treeM, trunkM, CROWNS;
 function mats(){ matLand=new T.MeshLambertMaterial({vertexColors:true});
   matVoid=new T.MeshBasicMaterial({color:'#2c2f36'}); matVoidLine=new T.LineBasicMaterial({color:'#9aa0aa', transparent:true, opacity:0.55});
   voidPlaneG=new T.PlaneGeometry(CH,CH,1,1); voidPlaneG.rotateX(-Math.PI/2); voidPlaneG.translate(CH/2,-0.02,CH/2);
   const pts=[]; const n=8; for(let i=0;i<=n;i++){ const t=i/n*CH; pts.push(t,0,0, t,0,CH, 0,0,t, CH,0,t); } voidLineG=new T.BufferGeometry(); voidLineG.setAttribute('position',new T.Float32BufferAttribute(pts,3));
   treeG=new T.ConeGeometry(1.6,4.6,6); treeG.translate(0,4.2,0); trunkG=new T.CylinderGeometry(0.25,0.32,2.2,5); trunkG.translate(0,1.1,0);
+  const soft=treeG, softTrunk=trunkG;
+  const hard=new T.IcosahedronGeometry(1.7,1); hard.translate(0,3.4,0); hard.scale(1.15,0.72,1.15);
+  const hardTrunk=new T.CylinderGeometry(0.38,0.48,2.4,6); hardTrunk.translate(0,1.2,0);
+  const yew=new T.ConeGeometry(0.7,5.4,7); yew.translate(0,4.6,0);
+  const yewTrunk=new T.CylinderGeometry(0.18,0.24,2.6,5); yewTrunk.translate(0,1.3,0);
+  const iron=new T.OctahedronGeometry(1.15,0); iron.translate(0,3.1,0); iron.scale(1.2,0.7,1.2);
+  const ironTrunk=new T.CylinderGeometry(0.42,0.55,1.8,6); ironTrunk.translate(0,0.9,0);
+  CROWNS={soft:{crown:soft,trunk:softTrunk,color:'#2f6a38'}, hard:{crown:hard,trunk:hardTrunk,color:'#4a6a28'}, yew:{crown:yew,trunk:yewTrunk,color:'#1c3428'}, iron:{crown:iron,trunk:ironTrunk,color:'#1a2820'}};
   treeM=new T.MeshLambertMaterial({color:'#ffffff'}); trunkM=new T.MeshLambertMaterial({color:'#5a3d24'}); }
 const Q={R:5, near:1, refreshCap:2, refreshMs:2.5, poolMax:12}; // set by the game's frame-time governor
 function lodFor(d){ return d<=Q.near?16:d<=3?8:4; }
@@ -128,11 +136,18 @@ const stat={refreshed:0, refreshTotal:0, built:0, builtTotal:0, pooled:0, reused
 const dummy=new T.Object3D();
 function treeBlocked(x,z,h){ return (F.seaY!=null&&h<F.seaY+1)||(opt.tf&&opt.tf.blocks(x,z,h)); }
 const CUT={x:0,z:0,r:1e9};
-function placeChunkTrees(c,keepH){ const t=c.tl; if(!t) return; if(!t.h||!keepH){ t.h=new Float32Array(t.list.length); t.bl=new Uint8Array(t.list.length); t.list.forEach(([x,z],i)=>{ const h=heightAt(x,z); t.h[i]=h; t.bl[i]=treeBlocked(x,z,h)?1:0; }); }
-  t.cut=CUT.r; t.cx=CUT.x; t.cz=CUT.z; let shown=0;
-  t.list.forEach(([x,z,s],i)=>{ const h=t.h[i]; const bl=t.bl[i]||Math.hypot(x-CUT.x,z-CUT.z)>CUT.r; if(!bl) shown++;
-    dummy.position.set(x-c.ix*CH,h-0.3,z-c.iz*CH); const k=bl?0.0001:s; dummy.scale.set(k,k*(t.taiga?1.4:1),k); dummy.rotation.set(0,i,0); dummy.updateMatrix(); t.cr.setMatrixAt(i,dummy.matrix); t.tr.setMatrixAt(i,dummy.matrix); });
-  t.shown=shown; t.cr.instanceMatrix.needsUpdate=true; t.tr.instanceMatrix.needsUpdate=true; t.cr.computeBoundingSphere&&t.cr.computeBoundingSphere(); }
+let treeGate=null;
+function setTreeGate(fn){ treeGate=fn; }
+function placeChunkTrees(c,keepH){ const t=c.tl; if(!t||!t.crowns) return; if(!t.h||!keepH){ t.h=new Float32Array(t.list.length); t.bl=new Uint8Array(t.list.length); t.list.forEach((row,i)=>{ const h=heightAt(row[0],row[1]); t.h[i]=h; t.bl[i]=treeBlocked(row[0],row[1],h)?1:0; }); }
+  t.cut=CUT.r; t.cx=CUT.x; t.cz=CUT.z; const counts={}; Object.keys(t.crowns).forEach(sh=>{ counts[sh]=0; }); let shown=0;
+  t.list.forEach((row,i)=>{ const x=row[0], z=row[1], s=row[2], sp=row[3]||'pine', key=row[4]; const h=t.h[i];
+    const sh=window.LUMBER?LUMBER.shapeOf(sp):'soft'; const pair=t.crowns[sh]||t.crowns.soft; if(!pair) return;
+    const far=t.bl[i]||Math.hypot(x-CUT.x,z-CUT.z)>CUT.r; const stump=key&&treeGate&&treeGate(key); if(!far) shown++;
+    dummy.position.set(x-c.ix*CH,h-0.3,z-c.iz*CH); const k=far?0.0001:(stump?s*0.18:s); const tall=sh==='yew'?1.35:sh==='iron'?0.8:sh==='soft'?1.25:1;
+    dummy.scale.set(k,k*tall,k); dummy.rotation.set(0,i,0); dummy.updateMatrix();
+    const n=counts[sh]||0; counts[sh]=n+1; pair.cr.setMatrixAt(n,dummy.matrix); pair.tr.setMatrixAt(n,dummy.matrix);
+    const colr=window.LUMBER&&LUMBER.species(sp)?LUMBER.species(sp).color:pair.color; pair.cr.setColorAt(n,tmpC.set(colr).offsetHSL(0,0,(i%3-1)*0.03)); });
+  t.shown=shown; Object.keys(t.crowns).forEach(sh=>{ const pair=t.crowns[sh]; pair.cr.count=counts[sh]||0; pair.tr.count=counts[sh]||0; pair.cr.instanceMatrix.needsUpdate=true; pair.tr.instanceMatrix.needsUpdate=true; if(pair.cr.instanceColor) pair.cr.instanceColor.needsUpdate=true; }); }
 /* v3.4: 3D trees only inside the card distance; beyond it the impostor layer draws them (re-placed only when the cut moves 6 m) */
 function cutTrees(px,pz,r){ CUT.x=px; CUT.z=pz; CUT.r=r; let n=0; for(const [,c] of chunks){ if(!c.tl) continue; const dx=(c.ix+0.5)*CH-px, dz=(c.iz+0.5)*CH-pz, dd=Math.hypot(dx,dz);
     const inside=dd+CH*0.72<r, outside=dd-CH*0.72>r; if(inside&&c.tl.mode==='in'&&c.tl.shown!=null) continue; if(outside&&c.tl.mode==='out') continue;
@@ -143,13 +158,21 @@ const tlCache=new Map();
 function treeList(ix,iz){ const key=F.id+':'+ix+','+iz; let r=tlCache.get(key); if(r) return r; const cc=cornerAt(ix,iz); const B=P.BIOMES[cc.biome]; const cnt=chunkVoid(ix,iz)?0:Math.round((B.trees||0)*(opt.mobile?0.6:1)); const list=[];
   if(cnt>0){ const rnd=P.rngFor(P.seed,'tree',F.id,ix,iz);
     for(let t=0;t<cnt*2&&list.length<cnt;t++){ const x=ix*CH+rnd()*CH, z=iz*CH+rnd()*CH; const h=baseHeightAt(x,z); const s=0.7+rnd()*0.7;
-      if(F.seaY!=null&&h<F.seaY+1) continue; if(F.flats.some(f=>Math.hypot(x-f.x,z-f.z)<f.r1*0.9)) continue; if(F.guild&&Math.hypot(x,z)<70) continue; if(F.roads.length&&roadDist(x,z)<5) continue; list.push([x,z,s]); } }
+      if(F.seaY!=null&&h<F.seaY+1) continue; if(F.flats.some(f=>Math.hypot(x-f.x,z-f.z)<f.r1*0.9)) continue; if(F.guild&&Math.hypot(x,z)<70) continue; if(F.roads.length&&roadDist(x,z)<5) continue;
+      const sp=window.LUMBER?LUMBER.pick(cc.biome, rnd):'pine'; const tk=window.LUMBER?LUMBER.key(P.seed,F.id,ix,iz,list.length):('tree|'+ix+','+iz+'|'+list.length);
+      list.push([x,z,s,sp,tk]); } }
   r={list, biome:cc.biome}; tlCache.set(key,r); if(tlCache.size>900) tlCache.delete(tlCache.keys().next().value); return r; }
 function addTrees(rec){ if(!rec.near||rec.tl||!rec.land) return; const cc=cornerAt(rec.ix,rec.iz); const list=treeList(rec.ix,rec.iz).list; if(!list.length) return;
-  const cr=new T.InstancedMesh(treeG,treeM,list.length), tr=new T.InstancedMesh(trunkG,trunkM,list.length);
-  const tc=cc.biome==='taiga'?'#2f4f3a':cc.biome==='jungle'?'#2f7d2a':cc.biome==='savanna'?'#7d8a3a':cc.biome==='swamp'?'#3d5230':cc.biome==='mountain'?'#4a5e48':'#3b6b2c';
-  list.forEach((_,i)=>cr.setColorAt(i,tmpC.set(tc).offsetHSL(0,0,(i%3-1)*0.03)));
-  rec.tl={list, cr, tr, taiga:cc.biome==='taiga'}; placeChunkTrees(rec); cr.castShadow=!opt.mobile; rec.obj.add(cr); rec.obj.add(tr); }
+  const crowns={}; const shapes={};
+  list.forEach(row=>{ const sh=window.LUMBER?LUMBER.shapeOf(row[3]):'soft'; shapes[sh]=1; });
+  Object.keys(shapes).forEach(sh=>{ const spec=CROWNS[sh]||CROWNS.soft; const cr=new T.InstancedMesh(spec.crown,treeM,list.length), tr=new T.InstancedMesh(spec.trunk,trunkM,list.length);
+    cr.castShadow=!opt.mobile; cr.count=0; tr.count=0; rec.obj.add(cr); rec.obj.add(tr); crowns[sh]={cr,tr,color:spec.color}; });
+  rec.tl={list, crowns, taiga:cc.biome==='taiga'}; placeChunkTrees(rec); }
+function treeChops(){ const out=[]; if(!window.LUMBER) return out;
+  for(const [,c] of chunks){ if(!c.tl||!c.tl.list) continue; c.tl.list.forEach(row=>{ const sp=LUMBER.species(row[3])||LUMBER.species('pine'); const x=row[0], z=row[1];
+    out.push({key:row[4], x, z, y:heightAt(x,z), type:'wood', rid:sp.log, tier:sp.tier, req:LUMBER.req(sp.tier), tree:true}); }); }
+  return out; }
+function refreshTrees(){ for(const [,c] of chunks) if(c.tl) placeChunkTrees(c,true); }
 function writeNormals(arr,ix,iz,seg){ const n=seg+1;
   for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const N=normalAt(ix*CH+i/seg*CH, iz*CH+j/seg*CH), k=(j*n+i)*3; arr[k]=N[0]; arr[k+1]=N[1]; arr[k+2]=N[2]; } }
 function skirtGeo(seg){ const n=seg+1, verts=4*n*2, pos=new Float32Array(verts*3), col=new Float32Array(verts*3), nor=new Float32Array(verts*3), idx=[];
@@ -459,7 +482,7 @@ window.SEEDWORLD={ CH, F, Q, stat, markDirty, baseHeightAt, roadDist, treeList, 
   biomeAt(x,z){ return cornerAt(Math.floor(x/CH),Math.floor(z/CH)).biome; },
   isVoidAt(x,z){ return chunkVoid(Math.floor(x/CH),Math.floor(z/CH)); }, setQuality(o){ Object.assign(Q,o); lastPC=null; },
   init(o){ opt=o; scene=o.scene; mats(); root=new T.Group(); root.userData.sw=true; scene.add(root); chunkRoot=new T.Group(); siteRoot=new T.Group(); root.add(chunkRoot); root.add(siteRoot); },
-  setFrame, heightAt, update, landing, clearChunks, get chunkCount(){ return chunks.size; }, toDir, regionAtLocal, study, seam, slopeGap, colorAt,
+  setFrame, heightAt, update, landing, clearChunks, get chunkCount(){ return chunks.size; }, toDir, regionAtLocal, study, seam, slopeGap, colorAt, treeChops, refreshTrees, setTreeGate,
   animate(t){ const dt=lastAnim==null?0:Math.min(0.1,Math.max(0,t-lastAnim)); lastAnim=t; settle(dt); if(F.waystone) F.waystone.userData.rune.rotation.y=t*1.5; if(F.flag) F.flag.rotation.y=Math.sin(t*1.6)*0.25; },
   globe:{ G, build:buildGlobe, refresh:refreshGlobe, render:renderGlobe, pick, focus, hideLabels, select(id){ G.sel=id; selLines(); }, drag(dx,dy){ G.grp.rotation.y+=dx*0.005; G.grp.rotation.x=Math.max(-1.45,Math.min(1.45,G.grp.rotation.x+dy*0.005)); }, zoom(k){ G.dist=Math.max(1.55,Math.min(5,G.dist*k)); }, owners, relation } };
 })();
