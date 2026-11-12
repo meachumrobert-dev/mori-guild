@@ -382,6 +382,7 @@ const TECH_LIST=[
   {id:'roof_tile', name:'Roof tiles', needs:['kiln'], inputs:['clay','fuel'], shifts:8, days:4},
   {id:'clay_pipe', name:'Clay pipe', needs:['kiln'], inputs:['clay','fuel'], shifts:8, days:5},
   {id:'timber_join', name:'Pegged joints', needs:[], inputs:['timber'], shifts:4, days:2},
+  {id:'saw', name:'Frame saw', needs:['timber_join'], inputs:['timber','iron'], shifts:8, days:6},
   {id:'mill', name:'Mill', needs:['masonry','timber_join'], inputs:['fieldstone','timber'], shifts:20, days:12},
   {id:'charcoal', name:'Charcoal mound', needs:[], inputs:['wood'], shifts:4, days:6},
   {id:'prospecting', name:'Prospecting', needs:[], inputs:[], shifts:3, days:2, trade:true},

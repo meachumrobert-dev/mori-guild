@@ -12,6 +12,7 @@ let opt=null, scene=null, root=null, chunkRoot=null, siteRoot=null, water=null;
 const F={ id:-1, guild:false, O:[0,0,1], E:[1,0,0], Nn:[0,1,0], e0:0, stage:0, seaY:null, A:{x:0,z:0}, L:{x:0,z:8}, roads:[], flats:[], targets:[], colliders:{segs:[],circles:[]}, info:null };
 const corner=new Map(); // "ix,iz" -> {e, rough, col:[r,g,b], reg}
 const chunks=new Map(); // key -> {lod, obj, reg}
+const settling=[]; // chunks fading or geomorphing toward their final surface
 const tmpC=new T.Color();
 const BCOL={}; for(const k in P.BIOMES) BCOL[k]=new T.Color(P.BIOMES[k].c);
 
@@ -23,28 +24,103 @@ function cornerAt(ix,iz){ const k=ix+','+iz; let c=corner.get(k); if(c) return c
   const d=toDir(ix*CH,iz*CH); const s=P.sample(d[0],d[1],d[2]); const reg=P.regionOf(d[0],d[1],d[2]);
   const col=BCOL[s.biome]; c={e:s.e, rough:P.BIOMES[s.biome].rough, r:col.r, g:col.g, b:col.b, reg, biome:s.biome}; corner.set(k,c); return c; }
 function regionAtLocal(x,z){ const d=toDir(x,z); return P.regionOf(d[0],d[1],d[2]); }
-function chunkVoid(ix,iz){ const c=cornerAt(ix,iz); return stageOf(regionAtLocal((ix+0.5)*CH,(iz+0.5)*CH))===0; }
-function rawH(x,z){ const ix=Math.floor(x/CH), iz=Math.floor(z/CH); if(chunkVoid(ix,iz)) return {h:0, v:true};
-  const fx=x/CH-ix, fz=z/CH-iz; const a=cornerAt(ix,iz), b=cornerAt(ix+1,iz), c=cornerAt(ix,iz+1), d=cornerAt(ix+1,iz+1);
-  const e=(a.e*(1-fx)+b.e*fx)*(1-fz)+(c.e*(1-fx)+d.e*fx)*fz, ro=(a.rough*(1-fx)+b.rough*fx)*(1-fz)+(c.rough*(1-fx)+d.rough*fx)*fz;
-  const R=P.R; const px=F.O[0]*R+F.E[0]*x-F.Nn[0]*z, py=F.O[1]*R+F.E[1]*x-F.Nn[1]*z, pz=F.O[2]*R+F.E[2]*x-F.Nn[2]*z;
-  let h=(e-F.e0)+P.detail(px,py,pz,ro)-F.d0; return {h, e, ro, fx, fz, a, b, c, d, v:false}; }
+function chunkVoid(ix,iz){
+  if(stageOf(regionAtLocal((ix+0.5)*CH,(iz+0.5)*CH))!==0) return false;
+  // a tile that still touches programmed land keeps a mesh, so the border can ramp down instead of a cliff
+  for(let a=0;a<=1;a++) for(let b=0;b<=1;b++) if(stageOf(regionAtLocal((ix+a)*CH,(iz+b)*CH))!==0) return false;
+  return true; }
+/* One height function of world metres. Two chunks that share an edge vertex both call it at that
+   same (x, z), so the sample matches. Elevation is the planet noise at the vertex. Biome color and
+   roughness sit on a global 32 m lattice and smoothstep across it, so a cell edge does not crease.
+   Within BAND metres of a cube-sphere region border those parameters blend with the neighbour
+   region. A void neighbour ramps the height onto the void plane, flat at both ends of the band. */
+const BAND=96, LATTICE=32, SKIRT=3.5, FADE_S=0.5, MORPH_S=0.55, NORM_E=4;
+const reliefCache=new Map(), latticeCache=new Map(), regLook=new Map();
+function clearField(){ reliefCache.clear(); latticeCache.clear(); regLook.clear(); }
+function worldMetres(x,z){ const R=P.R; return [F.O[0]*R+F.E[0]*x-F.Nn[0]*z, F.O[1]*R+F.E[1]*x-F.Nn[1]*z, F.O[2]*R+F.E[2]*x-F.Nn[2]*z]; }
+function lerp4(a,b,c,d,sx,sz){ return (a*(1-sx)+b*sx)*(1-sz)+(c*(1-sx)+d*sx)*sz; }
+function regionLook(id){ let p=regLook.get(id); if(p) return p;
+  const c=P.regionCenter(id), s=P.sample(c[0],c[1],c[2]), col=BCOL[s.biome]||BCOL.grass, bio=P.BIOMES[s.biome]||P.BIOMES.grass;
+  p={rough:bio.rough, r:col.r, g:col.g, b:col.b, biome:s.biome}; regLook.set(id,p); return p; }
+function borderHit(x,z,reg){ let best=null;
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1],[0.707,0.707],[0.707,-0.707],[-0.707,0.707],[-0.707,-0.707]];
+  for(let q=0;q<dirs.length;q++){ const dx=dirs[q][0], dz=dirs[q][1];
+    if(regionAtLocal(x+dx*BAND,z+dz*BAND)===reg) continue;
+    let lo=0, hi=BAND, nb=reg;
+    for(let i=0;i<8;i++){ const mid=(lo+hi)*0.5, id=regionAtLocal(x+dx*mid,z+dz*mid); if(id!==reg){ hi=mid; nb=id; } else lo=mid; }
+    if(nb!==reg && (!best||hi<best.dist)) best={dist:hi, reg:nb}; }
+  return best; }
+function latticeAt(x0,z0){ const k=x0+','+z0; let p=latticeCache.get(k); if(p) return p;
+  const d=toDir(x0,z0), s=P.sample(d[0],d[1],d[2]), reg=P.regionOf(d[0],d[1],d[2]);
+  const col=BCOL[s.biome]||BCOL.grass, bio=P.BIOMES[s.biome]||P.BIOMES.grass;
+  let rough=bio.rough, r=col.r, g=col.g, b=col.b;
+  const hit=borderHit(x0,z0,reg);
+  if(hit&&hit.dist<BAND){ const w=smooth(0,BAND,hit.dist), kHere=0.5+0.5*w; const mine=regionLook(reg), o=regionLook(hit.reg);
+    const rr=o.rough*(1-kHere)+mine.rough*kHere, cr=o.r*(1-kHere)+mine.r*kHere, cg=o.g*(1-kHere)+mine.g*kHere, cb=o.b*(1-kHere)+mine.b*kHere;
+    rough=rr*(1-w)+rough*w; r=cr*(1-w)+r*w; g=cg*(1-w)+g*w; b=cb*(1-w)+b*w; }
+  p={rough,r,g,b}; latticeCache.set(k,p); if(latticeCache.size>20000) latticeCache.clear(); return p; }
+function fieldRaw(x,z){ const k=Math.round(x*100)+','+Math.round(z*100); let c=reliefCache.get(k); if(c) return c;
+  const d=toDir(x,z), e=P.elevation(d[0],d[1],d[2]), reg=P.regionOf(d[0],d[1],d[2]);
+  const x0=Math.floor(x/LATTICE)*LATTICE, z0=Math.floor(z/LATTICE)*LATTICE;
+  const tx=(x-x0)/LATTICE, tz=(z-z0)/LATTICE, sx=tx*tx*(3-2*tx), sz=tz*tz*(3-2*tz);
+  const a=latticeAt(x0,z0), bp=latticeAt(x0+LATTICE,z0), cn=latticeAt(x0,z0+LATTICE), dl=latticeAt(x0+LATTICE,z0+LATTICE);
+  const rough=lerp4(a.rough,bp.rough,cn.rough,dl.rough,sx,sz);
+  const r=lerp4(a.r,bp.r,cn.r,dl.r,sx,sz), g=lerp4(a.g,bp.g,cn.g,dl.g,sx,sz), bb=lerp4(a.b,bp.b,cn.b,dl.b,sx,sz);
+  let voidK=stageOf(reg)===0?1:0;
+  if(voidK<1){ const hit=borderHit(x,z,reg); if(hit&&hit.dist<BAND&&stageOf(hit.reg)===0) voidK=1-smooth(0,BAND,hit.dist); }
+  const wm=worldMetres(x,z); const pre=(e-F.e0)+P.detail(wm[0],wm[1],wm[2],rough);
+  c={pre,voidK,r,g,b:bb,rough}; reliefCache.set(k,c); if(reliefCache.size>70000) reliefCache.clear(); return c; }
+function rawH(x,z){ const f=fieldRaw(x,z); let h=f.pre-F.d0; if(f.voidK>0) h*=(1-f.voidK); if(f.voidK>=1) h=0;
+  return {h, v:f.voidK>=1, r:f.r, g:f.g, b:f.b, ro:f.rough}; }
 /* terraform hook (v3.2): TFD(x,z) = Mori's height delta for the current region (sparse grid, see terraform.js) */
 let TFD=null;
+function sampleGround(x,z){ const r=rawH(x,z); let h=r.v?0:r.h;
+  if(!r.v){ for(const f of F.flats){ const k=1-smooth(f.r0,f.r1,Math.hypot(x-f.x,z-f.z)); if(k>0) h=h*(1-k)+f.h*k; }
+    if(F.guild&&opt&&opt.v2height){ const k=smooth(110,200,Math.hypot(x,z)); h=opt.v2height(x,z)*(1-k)+h*k; } }
+  return {h, r:r.r, g:r.g, b:r.b, v:!!r.v}; }
 function heightAt(x,z){ const h=baseHeightAt(x,z); return TFD?h+TFD(x,z):h; }
-function baseHeightAt(x,z){ const r=rawH(x,z); if(r.v) return 0; let h=r.h;
-  for(const f of F.flats){ const k=1-smooth(f.r0,f.r1,Math.hypot(x-f.x,z-f.z)); if(k>0) h=h*(1-k)+f.h*k; }
-  if(F.guild&&opt.v2height){ const k=smooth(110,200,Math.hypot(x,z)); h=opt.v2height(x,z)*(1-k)+h*k; }
-  return h; }
+function baseHeightAt(x,z){ return sampleGround(x,z).h; }
+function colorAt(x,z){ const g=sampleGround(x,z); return [g.r, g.g, g.b]; }
+function normalAt(x,z){ const hL=heightAt(x-NORM_E,z), hR=heightAt(x+NORM_E,z), hD=heightAt(x,z-NORM_E), hU=heightAt(x,z+NORM_E);
+  const nx=-(hR-hL), ny=2*NORM_E, nz=-(hU-hD), l=Math.hypot(nx,ny,nz)||1; return [nx/l, ny/l, nz/l]; }
+function stitchHeight(x,z,axis,step){ if(!(step>0)) return heightAt(x,z);
+  if(axis==='z'){ const z0=Math.floor((z+1e-5)/step)*step, t=(z-z0)/step; if(t<=1e-5||t>=1-1e-5) return heightAt(x,z); return heightAt(x,z0)*(1-t)+heightAt(x,z0+step)*t; }
+  const x0=Math.floor((x+1e-5)/step)*step, t=(x-x0)/step; if(t<=1e-5||t>=1-1e-5) return heightAt(x,z); return heightAt(x0,z)*(1-t)+heightAt(x0+step,z)*t; }
+function edgeFor(i,j,seg,seams){ let step=0, axis=null;
+  const consider=(on,nb,ax)=>{ if(!on||!(nb>0)||nb>=seg) return; const st=CH/nb; if(st>step){ step=st; axis=ax; } };
+  consider(i===seg, seams&&seams.e, 'z'); consider(i===0, seams&&seams.w, 'z'); consider(j===seg, seams&&seams.s, 'x'); consider(j===0, seams&&seams.n, 'x');
+  return step?{axis,step}:null; }
+function displayedHeight(x,z,edge){ return edge?stitchHeight(x,z,edge.axis,edge.step):heightAt(x,z); }
+/* Edge samples a built tile would use. side is e/w/n/s. neighborSeg is the neighbour's segment count
+   (smaller means coarser). Tests compare these without a WebGL context. */
+function seam(ix,iz,seg,side,neighborSeg){ const n=seg+1, seams={e:0,w:0,n:0,s:0}; seams[side]=neighborSeg||0; const out=[];
+  for(let i=0;i<n;i++){ const ii=(side==='e')?seg:(side==='w'?0:i), jj=(side==='s')?seg:(side==='n'?0:i);
+    const x=ix*CH+ii/seg*CH, z=iz*CH+jj/seg*CH, edge=edgeFor(ii,jj,seg,seams), h=displayedHeight(x,z,edge), N=normalAt(x,z);
+    out.push({x,z,h,nx:N[0],ny:N[1],nz:N[2]}); }
+  return out; }
+function slopeGap(x,z,dx,dz){ const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L; const e=2;
+  const h0=heightAt(x-dx*e,z-dz*e), h1=heightAt(x,z), h2=heightAt(x+dx*e,z+dz*e); return Math.abs((h2-h1)-(h1-h0))/e; }
+function study(id, stageFn){ if(stageFn||!opt) opt={stage:stageFn||(()=>1), mobile:false, guildId:()=>id, explored:()=>false, v2height:null, tf:null};
+  clearField(); corner.clear(); F.id=id; F.guild=false; F.stage=stageOf(id)||1; F.roads=[]; F.flats=[]; F.seaY=null; F.A={x:0,z:0}; F.L={x:0,z:8};
+  const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(E[0],E[1],E[2])<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
+  F.e0=P.elevation(O[0],O[1],O[2]); F.d0=0; F.d0=rawH(0,0).h; }
 function roadDist(x,z){ let best=1e9; for(const s of F.roads){ const [x1,z1,x2,z2]=s; const vx=x2-x1, vz=z2-z1, L=vx*vx+vz*vz; let t=((x-x1)*vx+(z-z1)*vz)/L; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(x-(x1+vx*t),z-(z1+vz*t)); if(d<best) best=d; } return best; }
 
 /* ---------- chunks ---------- */
-let matLand, matVoid, matVoidLine, voidPlaneG, voidLineG, treeG, trunkG, treeM, trunkM;
+let matLand, matVoid, matVoidLine, voidPlaneG, voidLineG, treeG, trunkG, treeM, trunkM, CROWNS;
 function mats(){ matLand=new T.MeshLambertMaterial({vertexColors:true});
   matVoid=new T.MeshBasicMaterial({color:'#2c2f36'}); matVoidLine=new T.LineBasicMaterial({color:'#9aa0aa', transparent:true, opacity:0.55});
   voidPlaneG=new T.PlaneGeometry(CH,CH,1,1); voidPlaneG.rotateX(-Math.PI/2); voidPlaneG.translate(CH/2,-0.02,CH/2);
   const pts=[]; const n=8; for(let i=0;i<=n;i++){ const t=i/n*CH; pts.push(t,0,0, t,0,CH, 0,0,t, CH,0,t); } voidLineG=new T.BufferGeometry(); voidLineG.setAttribute('position',new T.Float32BufferAttribute(pts,3));
   treeG=new T.ConeGeometry(1.6,4.6,6); treeG.translate(0,4.2,0); trunkG=new T.CylinderGeometry(0.25,0.32,2.2,5); trunkG.translate(0,1.1,0);
+  const soft=treeG, softTrunk=trunkG;
+  const hard=new T.IcosahedronGeometry(1.7,1); hard.translate(0,3.4,0); hard.scale(1.15,0.72,1.15);
+  const hardTrunk=new T.CylinderGeometry(0.38,0.48,2.4,6); hardTrunk.translate(0,1.2,0);
+  const yew=new T.ConeGeometry(0.7,5.4,7); yew.translate(0,4.6,0);
+  const yewTrunk=new T.CylinderGeometry(0.18,0.24,2.6,5); yewTrunk.translate(0,1.3,0);
+  const iron=new T.OctahedronGeometry(1.15,0); iron.translate(0,3.1,0); iron.scale(1.2,0.7,1.2);
+  const ironTrunk=new T.CylinderGeometry(0.42,0.55,1.8,6); ironTrunk.translate(0,0.9,0);
+  CROWNS={soft:{crown:soft,trunk:softTrunk,color:'#2f6a38'}, hard:{crown:hard,trunk:hardTrunk,color:'#4a6a28'}, yew:{crown:yew,trunk:yewTrunk,color:'#1c3428'}, iron:{crown:iron,trunk:ironTrunk,color:'#1a2820'}};
   treeM=new T.MeshLambertMaterial({color:'#ffffff'}); trunkM=new T.MeshLambertMaterial({color:'#5a3d24'}); }
 const Q={R:5, near:1, refreshCap:2, refreshMs:2.5, poolMax:12}; // set by the game's frame-time governor
 function lodFor(d){ return d<=Q.near?16:d<=3?8:4; }
@@ -60,11 +136,18 @@ const stat={refreshed:0, refreshTotal:0, built:0, builtTotal:0, pooled:0, reused
 const dummy=new T.Object3D();
 function treeBlocked(x,z,h){ return (F.seaY!=null&&h<F.seaY+1)||(opt.tf&&opt.tf.blocks(x,z,h)); }
 const CUT={x:0,z:0,r:1e9};
-function placeChunkTrees(c,keepH){ const t=c.tl; if(!t) return; if(!t.h||!keepH){ t.h=new Float32Array(t.list.length); t.bl=new Uint8Array(t.list.length); t.list.forEach(([x,z],i)=>{ const h=heightAt(x,z); t.h[i]=h; t.bl[i]=treeBlocked(x,z,h)?1:0; }); }
-  t.cut=CUT.r; t.cx=CUT.x; t.cz=CUT.z; let shown=0;
-  t.list.forEach(([x,z,s],i)=>{ const h=t.h[i]; const bl=t.bl[i]||Math.hypot(x-CUT.x,z-CUT.z)>CUT.r; if(!bl) shown++;
-    dummy.position.set(x-c.ix*CH,h-0.3,z-c.iz*CH); const k=bl?0.0001:s; dummy.scale.set(k,k*(t.taiga?1.4:1),k); dummy.rotation.set(0,i,0); dummy.updateMatrix(); t.cr.setMatrixAt(i,dummy.matrix); t.tr.setMatrixAt(i,dummy.matrix); });
-  t.shown=shown; t.cr.instanceMatrix.needsUpdate=true; t.tr.instanceMatrix.needsUpdate=true; t.cr.computeBoundingSphere&&t.cr.computeBoundingSphere(); }
+let treeGate=null;
+function setTreeGate(fn){ treeGate=fn; }
+function placeChunkTrees(c,keepH){ const t=c.tl; if(!t||!t.crowns) return; if(!t.h||!keepH){ t.h=new Float32Array(t.list.length); t.bl=new Uint8Array(t.list.length); t.list.forEach((row,i)=>{ const h=heightAt(row[0],row[1]); t.h[i]=h; t.bl[i]=treeBlocked(row[0],row[1],h)?1:0; }); }
+  t.cut=CUT.r; t.cx=CUT.x; t.cz=CUT.z; const counts={}; Object.keys(t.crowns).forEach(sh=>{ counts[sh]=0; }); let shown=0;
+  t.list.forEach((row,i)=>{ const x=row[0], z=row[1], s=row[2], sp=row[3]||'pine', key=row[4]; const h=t.h[i];
+    const sh=window.LUMBER?LUMBER.shapeOf(sp):'soft'; const pair=t.crowns[sh]||t.crowns.soft; if(!pair) return;
+    const far=t.bl[i]||Math.hypot(x-CUT.x,z-CUT.z)>CUT.r; const stump=key&&treeGate&&treeGate(key); if(!far) shown++;
+    dummy.position.set(x-c.ix*CH,h-0.3,z-c.iz*CH); const k=far?0.0001:(stump?s*0.18:s); const tall=sh==='yew'?1.35:sh==='iron'?0.8:sh==='soft'?1.25:1;
+    dummy.scale.set(k,k*tall,k); dummy.rotation.set(0,i,0); dummy.updateMatrix();
+    const n=counts[sh]||0; counts[sh]=n+1; pair.cr.setMatrixAt(n,dummy.matrix); pair.tr.setMatrixAt(n,dummy.matrix);
+    const colr=window.LUMBER&&LUMBER.species(sp)?LUMBER.species(sp).color:pair.color; pair.cr.setColorAt(n,tmpC.set(colr).offsetHSL(0,0,(i%3-1)*0.03)); });
+  t.shown=shown; Object.keys(t.crowns).forEach(sh=>{ const pair=t.crowns[sh]; pair.cr.count=counts[sh]||0; pair.tr.count=counts[sh]||0; pair.cr.instanceMatrix.needsUpdate=true; pair.tr.instanceMatrix.needsUpdate=true; if(pair.cr.instanceColor) pair.cr.instanceColor.needsUpdate=true; }); }
 /* v3.4: 3D trees only inside the card distance; beyond it the impostor layer draws them (re-placed only when the cut moves 6 m) */
 function cutTrees(px,pz,r){ CUT.x=px; CUT.z=pz; CUT.r=r; let n=0; for(const [,c] of chunks){ if(!c.tl) continue; const dx=(c.ix+0.5)*CH-px, dz=(c.iz+0.5)*CH-pz, dd=Math.hypot(dx,dz);
     const inside=dd+CH*0.72<r, outside=dd-CH*0.72>r; if(inside&&c.tl.mode==='in'&&c.tl.shown!=null) continue; if(outside&&c.tl.mode==='out') continue;
@@ -75,38 +158,80 @@ const tlCache=new Map();
 function treeList(ix,iz){ const key=F.id+':'+ix+','+iz; let r=tlCache.get(key); if(r) return r; const cc=cornerAt(ix,iz); const B=P.BIOMES[cc.biome]; const cnt=chunkVoid(ix,iz)?0:Math.round((B.trees||0)*(opt.mobile?0.6:1)); const list=[];
   if(cnt>0){ const rnd=P.rngFor(P.seed,'tree',F.id,ix,iz);
     for(let t=0;t<cnt*2&&list.length<cnt;t++){ const x=ix*CH+rnd()*CH, z=iz*CH+rnd()*CH; const h=baseHeightAt(x,z); const s=0.7+rnd()*0.7;
-      if(F.seaY!=null&&h<F.seaY+1) continue; if(F.flats.some(f=>Math.hypot(x-f.x,z-f.z)<f.r1*0.9)) continue; if(F.guild&&Math.hypot(x,z)<70) continue; if(F.roads.length&&roadDist(x,z)<5) continue; list.push([x,z,s]); } }
+      if(F.seaY!=null&&h<F.seaY+1) continue; if(F.flats.some(f=>Math.hypot(x-f.x,z-f.z)<f.r1*0.9)) continue; if(F.guild&&Math.hypot(x,z)<70) continue; if(F.roads.length&&roadDist(x,z)<5) continue;
+      const sp=window.LUMBER?LUMBER.pick(cc.biome, rnd):'pine'; const tk=window.LUMBER?LUMBER.key(P.seed,F.id,ix,iz,list.length):('tree|'+ix+','+iz+'|'+list.length);
+      list.push([x,z,s,sp,tk]); } }
   r={list, biome:cc.biome}; tlCache.set(key,r); if(tlCache.size>900) tlCache.delete(tlCache.keys().next().value); return r; }
-function buildChunk(ix,iz,seg,near){
-  const g=new T.Group(); g.position.set(ix*CH,0,iz*CH); const rec={lod:seg, near, obj:g, ix, iz, seg};
+function addTrees(rec){ if(!rec.near||rec.tl||!rec.land) return; const cc=cornerAt(rec.ix,rec.iz); const list=treeList(rec.ix,rec.iz).list; if(!list.length) return;
+  const crowns={}; const shapes={};
+  list.forEach(row=>{ const sh=window.LUMBER?LUMBER.shapeOf(row[3]):'soft'; shapes[sh]=1; });
+  Object.keys(shapes).forEach(sh=>{ const spec=CROWNS[sh]||CROWNS.soft; const cr=new T.InstancedMesh(spec.crown,treeM,list.length), tr=new T.InstancedMesh(spec.trunk,trunkM,list.length);
+    cr.castShadow=!opt.mobile; cr.count=0; tr.count=0; rec.obj.add(cr); rec.obj.add(tr); crowns[sh]={cr,tr,color:spec.color}; });
+  rec.tl={list, crowns, taiga:cc.biome==='taiga'}; placeChunkTrees(rec); }
+function treeChops(){ const out=[]; if(!window.LUMBER) return out;
+  for(const [,c] of chunks){ if(!c.tl||!c.tl.list) continue; c.tl.list.forEach(row=>{ const sp=LUMBER.species(row[3])||LUMBER.species('pine'); const x=row[0], z=row[1];
+    out.push({key:row[4], x, z, y:heightAt(x,z), type:'wood', rid:sp.log, tier:sp.tier, req:LUMBER.req(sp.tier), tree:true}); }); }
+  return out; }
+function refreshTrees(){ for(const [,c] of chunks) if(c.tl) placeChunkTrees(c,true); }
+function writeNormals(arr,ix,iz,seg){ const n=seg+1;
+  for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const N=normalAt(ix*CH+i/seg*CH, iz*CH+j/seg*CH), k=(j*n+i)*3; arr[k]=N[0]; arr[k+1]=N[1]; arr[k+2]=N[2]; } }
+function skirtGeo(seg){ const n=seg+1, verts=4*n*2, pos=new Float32Array(verts*3), col=new Float32Array(verts*3), nor=new Float32Array(verts*3), idx=[];
+  for(let e=0;e<4;e++){ const base=e*n*2; for(let k=0;k<n-1;k++){ const a=base+k*2, b=a+1, c=a+2, d=a+3; idx.push(a,b,c, b,d,c); } }
+  const g=new T.BufferGeometry(); g.setAttribute('position',new T.BufferAttribute(pos,3)); g.setAttribute('color',new T.BufferAttribute(col,3)); g.setAttribute('normal',new T.BufferAttribute(nor,3)); g.setIndex(idx); return g; }
+function writeSkirt(geo,landPos,landCol,seg){ const n=seg+1, pos=geo.attributes.position.array, col=geo.attributes.color.array, nor=geo.attributes.normal.array;
+  const edges=[{pick:k=>k*n,nx:-1,nz:0},{pick:k=>k*n+seg,nx:1,nz:0},{pick:k=>k,nx:0,nz:-1},{pick:k=>seg*n+k,nx:0,nz:1}];
+  edges.forEach((ed,e)=>{ const inv=1/Math.hypot(ed.nx,0.25,ed.nz), nx=ed.nx*inv, ny=0.25*inv, nz=ed.nz*inv;
+    for(let k=0;k<n;k++){ const src=ed.pick(k)*3, dst=(e*n*2+k*2)*3;
+      pos[dst]=landPos[src]; pos[dst+1]=landPos[src+1]; pos[dst+2]=landPos[src+2];
+      pos[dst+3]=landPos[src]; pos[dst+4]=landPos[src+1]-SKIRT; pos[dst+5]=landPos[src+2];
+      for(let t=0;t<2;t++){ col[dst+t*3]=landCol[src]; col[dst+t*3+1]=landCol[src+1]; col[dst+t*3+2]=landCol[src+2]; nor[dst+t*3]=nx; nor[dst+t*3+1]=ny; nor[dst+t*3+2]=nz; } } });
+  geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; geo.attributes.normal.needsUpdate=true; geo.computeBoundingSphere(); }
+function coarseY(x,z,step){ const x0=Math.floor((x+1e-6)/step)*step, z0=Math.floor((z+1e-6)/step)*step;
+  const tx=Math.max(0,Math.min(1,(x-x0)/step)), tz=Math.max(0,Math.min(1,(z-z0)/step));
+  const h00=heightAt(x0,z0), h10=heightAt(x0+step,z0), h01=heightAt(x0,z0+step), h11=heightAt(x0+step,z0+step);
+  return (h00*(1-tx)+h10*tx)*(1-tz)+(h01*(1-tx)+h11*tx)*tz; }
+function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
+  seams=seams||{e:0,w:0,n:0,s:0};
+  const g=new T.Group(); g.position.set(ix*CH,0,iz*CH); const rec={lod:seg, near, obj:g, ix, iz, seg, seams};
   if(chunkVoid(ix,iz)){ const p=new T.Mesh(voidPlaneG,matVoid); g.add(p); const l=new T.LineSegments(voidLineG,matVoidLine); g.add(l); g.userData.void=true; return rec; }
-  const n=seg+1; let geo=(pool[seg]||[]).pop(), pos, col; if(geo){ stat.reused++; pos=geo.attributes.position.array; col=geo.attributes.color.array; } else { pos=new Float32Array(n*n*3); col=new Float32Array(n*n*3); }
-  const base=new Float32Array(n*n), bcol=new Float32Array(n*n*3);
-  const a=cornerAt(ix,iz), b=cornerAt(ix+1,iz), c=cornerAt(ix,iz+1), d=cornerAt(ix+1,iz+1);
-  for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const lx=i/seg*CH, lz=j/seg*CH, x=ix*CH+lx, z=iz*CH+lz; const bh=baseHeightAt(x,z), dd=TFD?TFD(x,z):0, h=bh+dd; const v=j*n+i, k=v*3;
-    base[v]=bh; pos[k]=lx; pos[k+1]=h; pos[k+2]=lz;
-    const fx=lx/CH, fz=lz/CH;
-    let r=(a.r*(1-fx)+b.r*fx)*(1-fz)+(c.r*(1-fx)+d.r*fx)*fz, gg=(a.g*(1-fx)+b.g*fx)*(1-fz)+(c.g*(1-fx)+d.g*fx)*fz, bb=(a.b*(1-fx)+b.b*fx)*(1-fz)+(c.b*(1-fx)+d.b*fx)*fz;
+  const n=seg+1; let geo=(pool[seg]||[]).pop(), pos, col;
+  if(geo){ stat.reused++; pos=geo.attributes.position.array; col=geo.attributes.color.array; if(!geo.attributes.normal) geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); }
+  else { pos=new Float32Array(n*n*3); col=new Float32Array(n*n*3); }
+  const bcol=new Float32Array(n*n*3), target=new Float32Array(n*n), morph=new Float32Array(n*n);
+  let moving=false;
+  for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const lx=i/seg*CH, lz=j/seg*CH, x=ix*CH+lx, z=iz*CH+lz, v=j*n+i, k=v*3;
+    const gnd=sampleGround(x,z), edge=edgeFor(i,j,seg,seams), dd=TFD?TFD(x,z):0;
+    const h=edge?stitchHeight(x,z,edge.axis,edge.step):(gnd.h+dd);
+    const y0=morphFrom?morphFrom(lx,lz):h;
+    target[v]=h; morph[v]=y0; if(Math.abs(y0-h)>0.02) moving=true;
+    pos[k]=lx; pos[k+1]=y0; pos[k+2]=lz;
+    let r=gnd.r, gg=gnd.g, bb=gnd.b;
     const nz=(Math.sin(x*0.37)*Math.cos(z*0.29)+Math.sin(x*0.11+z*0.07))*0.03; r+=nz; gg+=nz; bb+=nz*0.5;
     if(F.guild&&Math.hypot(x,z)<120){ const t=1-smooth(60,120,Math.hypot(x,z)); r=r*(1-t)+0.33*t; gg=gg*(1-t)+0.5*t; bb=bb*(1-t)+0.24*t; }
     if(F.roads.length){ const rd=roadDist(x,z); if(rd<3.2){ const t=1-smooth(1.8,3.2,rd); r=r*(1-t)+0.5*t; gg=gg*(1-t)+0.4*t; bb=bb*(1-t)+0.27*t; } }
     bcol[k]=r; bcol[k+1]=gg; bcol[k+2]=bb; finishColor(col,k,bcol,dd,h); }
-  if(!geo){ geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(pos,3)); geo.setAttribute('color',new T.BufferAttribute(col,3)); geo.setIndex(new T.BufferAttribute(idxFor(seg),1)); geo.userData.seg=seg; }
+  if(!geo){ geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(pos,3)); geo.setAttribute('color',new T.BufferAttribute(col,3)); geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); geo.setIndex(new T.BufferAttribute(idxFor(seg),1)); geo.userData.seg=seg; }
   else { geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; }
-  geo.computeVertexNormals(); geo.computeBoundingSphere();
-  const m=new T.Mesh(geo,matLand); m.receiveShadow=!opt.mobile; g.add(m); rec.land=m; rec.base=base; rec.bcol=bcol;
-  if(near){ // biome trees (instanced, near chunks only)
-    const cc=a; const list=treeList(ix,iz).list; {
-      if(list.length){ const cr=new T.InstancedMesh(treeG,treeM,list.length), tr=new T.InstancedMesh(trunkG,trunkM,list.length);
-        const tc=cc.biome==='taiga'?'#2f4f3a':cc.biome==='jungle'?'#2f7d2a':cc.biome==='savanna'?'#7d8a3a':cc.biome==='swamp'?'#3d5230':cc.biome==='mountain'?'#4a5e48':'#3b6b2c';
-        list.forEach((_,i)=>cr.setColorAt(i,tmpC.set(tc).offsetHSL(0,0,(i%3-1)*0.03)));
-        rec.tl={list, cr, tr, taiga:cc.biome==='taiga'}; placeChunkTrees(rec);
-        cr.castShadow=!opt.mobile; g.add(cr); g.add(tr); } } }
+  writeNormals(geo.attributes.normal.array,ix,iz,seg); geo.attributes.normal.needsUpdate=true; geo.computeBoundingSphere();
+  const m=new T.Mesh(geo,matLand); m.receiveShadow=!opt.mobile; g.add(m); rec.land=m; rec.bcol=bcol; rec.target=target;
+  const skirt=new T.Mesh(skirtGeo(seg),matLand); skirt.receiveShadow=!opt.mobile; writeSkirt(skirt.geometry,pos,col,seg); g.add(skirt); rec.skirt=skirt;
+  if(moving){ rec.morph=morph; rec.morphT=0; let reach=SKIRT+1; for(let v=0;v<n*n;v++) reach=Math.max(reach, Math.abs(target[v]-morph[v])+SKIRT+1); if(geo.boundingSphere) geo.boundingSphere.radius+=reach; }
+  else if(geo.boundingSphere) geo.boundingSphere.radius+=SKIRT+1;
+  if(fadeIn){ const fm=matLand.clone(); fm.transparent=true; fm.opacity=0; fm.depthWrite=false; rec.fade=0; rec.fadeMat=fm; m.material=fm; skirt.material=fm; }
+  if(rec.fadeMat||rec.morph) settling.push(rec);
+  if(!rec.fadeMat&&near) addTrees(rec);
   return rec; }
-function refreshChunk(c){ const g=c.land.geometry, pos=g.attributes.position.array, col=g.attributes.color.array, n=c.seg+1, ox=c.ix*CH, oz=c.iz*CH;
-  for(let v=0;v<n*n;v++){ const k=v*3; const d=TFD?TFD(ox+pos[k],oz+pos[k+2]):0; const h=c.base[v]+d; pos[k+1]=h; finishColor(col,k,c.bcol,d,h); }
-  g.attributes.position.needsUpdate=true; g.attributes.color.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingSphere(); if(c.tl) placeChunkTrees(c); }
-function disposeChunk(c){ chunkRoot.remove(c.obj); c.obj.traverse(o=>{ if(o.isInstancedMesh){ o.dispose(); return; }
+function refreshChunk(c){ if(!c.land) return; const g=c.land.geometry, pos=g.attributes.position.array, col=g.attributes.color.array, n=c.seg+1, morphing=c.morph&&c.morphT<1;
+  for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const v=j*n+i, k=v*3, x=c.ix*CH+pos[k], z=c.iz*CH+pos[k+2];
+    const edge=edgeFor(i,j,c.seg,c.seams), dd=TFD?TFD(x,z):0, h=edge?stitchHeight(x,z,edge.axis,edge.step):heightAt(x,z);
+    c.target[v]=h; if(!morphing) pos[k+1]=h; finishColor(col,k,c.bcol,dd,h); }
+  writeNormals(g.attributes.normal.array,c.ix,c.iz,c.seg);
+  g.attributes.position.needsUpdate=true; g.attributes.color.needsUpdate=true; g.attributes.normal.needsUpdate=true; g.computeBoundingSphere();
+  if(!morphing&&c.skirt) writeSkirt(c.skirt.geometry,pos,col,c.seg); if(c.tl) placeChunkTrees(c); }
+function disposeChunk(c){ const si=settling.indexOf(c); if(si>=0) settling.splice(si,1); if(c.fadeMat){ c.fadeMat.dispose(); c.fadeMat=null; }
+  if(c.skirt){ c.obj.remove(c.skirt); c.skirt.geometry.dispose(); c.skirt=null; }
+  if(!c.obj.parent&&chunkRoot) chunkRoot.remove(c.obj); else if(c.obj.parent) c.obj.parent.remove(c.obj);
+  c.obj.traverse(o=>{ if(o.isInstancedMesh){ o.dispose(); return; }
     if(o===c.land){ const sg=o.geometry.userData.seg; const pl=pool[sg]||(pool[sg]=[]); if(pl.length<Q.poolMax){ pl.push(o.geometry); stat.pooled++; } else o.geometry.dispose(); return; }
     if(o.geometry&&o.geometry!==voidPlaneG&&o.geometry!==voidLineG&&o.geometry!==treeG&&o.geometry!==trunkG) o.geometry.dispose(); }); }
 const dirty=new Set();
@@ -115,18 +240,29 @@ function processDirty(){ stat.refreshed=0; if(!dirty.size) return 0; const t0=pe
   for(const k of dirty){ if(stat.refreshed>=Q.refreshCap||performance.now()-t0>Q.refreshMs) break; dirty.delete(k); const c=chunks.get(k); if(c&&c.land){ refreshChunk(c); stat.refreshed++; stat.refreshTotal++; } }
   return stat.refreshed; }
 let lastPC=null;
+function neighborSeg(ix,iz,cx,cz){ const dx=ix-cx, dz=iz-cz, d=Math.max(Math.abs(dx),Math.abs(dz)); if(Math.hypot(dx,dz)>Q.R+0.5) return 0; return lodFor(d); }
+function grabMorph(c){ if(!c||!c.land) return null; const pos=c.land.geometry.attributes.position.array, seg=c.seg, n=seg+1, copy=Float32Array.from(pos);
+  return function(lx,lz){ const fx=Math.max(0,Math.min(seg,lx/CH*seg)), fz=Math.max(0,Math.min(seg,lz/CH*seg));
+    const i0=Math.min(seg-1,Math.floor(fx)), j0=Math.min(seg-1,Math.floor(fz)), tx=fx-i0, tz=fz-j0;
+    const h=(i,j)=>copy[(j*n+i)*3+1]; return (h(i0,j0)*(1-tx)+h(i0+1,j0)*tx)*(1-tz)+(h(i0,j0+1)*(1-tx)+h(i0+1,j0+1)*tx)*tz; }; }
 function update(px,pz,budget){ if(F.id<0) return 0; const R=Q.R; const cx=Math.floor(px/CH), cz=Math.floor(pz/CH);
   const want=[]; for(let dz=-R;dz<=R;dz++) for(let dx=-R;dx<=R;dx++){ const d=Math.max(Math.abs(dx),Math.abs(dz)); if(Math.hypot(dx,dz)>R+0.5) continue; want.push([cx+dx,cz+dz,d]); }
   want.sort((a,b)=>a[2]-b[2]); const keep=new Set(); let built=0; budget=budget==null?(opt.mobile?2:4):budget;
   for(const [ix,iz,d] of want){ const k=ix+','+iz; keep.add(k); const lod=lodFor(d), near=d<=Q.near+1; const c=chunks.get(k);
-    if(c&&c.lod===lod&&c.near===near) continue; if(c&&c.obj.userData.void){ continue; }
-    if(built>=budget) continue; if(c){ disposeChunk(c); dirty.delete(k); } const rec=buildChunk(ix,iz,lod,near); chunkRoot.add(rec.obj); chunks.set(k,rec); built++; }
+    const seams={e:neighborSeg(ix+1,iz,cx,cz), w:neighborSeg(ix-1,iz,cx,cz), n:neighborSeg(ix,iz-1,cx,cz), s:neighborSeg(ix,iz+1,cx,cz)};
+    const sig=seams.e+','+seams.w+','+seams.n+','+seams.s;
+    if(c&&c.lod===lod&&c.near===near&&c.sig===sig) continue; if(c&&c.obj.userData.void){ continue; }
+    if(built>=budget) continue;
+    const prev=c&&c.land?grabMorph(c):null;
+    if(c){ disposeChunk(c); dirty.delete(k); }
+    const morphFrom=prev||function(lx,lz){ return coarseY(ix*CH+lx, iz*CH+lz, CH/Math.max(2,lod/2)); };
+    const rec=buildChunk(ix,iz,lod,near,seams,morphFrom,!prev); rec.sig=sig; chunkRoot.add(rec.obj); chunks.set(k,rec); built++; }
   for(const [k,c] of chunks){ if(!keep.has(k)){ disposeChunk(c); chunks.delete(k); dirty.delete(k); } }
   stat.built=built; stat.builtTotal+=built; processDirty();
   if(water){ water.position.x=Math.round(px/50)*50; water.position.z=Math.round(pz/50)*50; }
   if(corner.size>6000) corner.clear();
   return built; }
-function clearChunks(){ for(const [k,c] of chunks) disposeChunk(c); chunks.clear(); corner.clear(); dirty.clear(); }
+function clearChunks(){ settling.length=0; for(const [,c] of chunks) disposeChunk(c); chunks.clear(); corner.clear(); dirty.clear(); clearField(); }
 
 /* ---------- settlements ---------- */
 function bannerTex(cs){ const c=document.createElement('canvas'); c.width=128; c.height=192; const x=c.getContext('2d');
@@ -329,11 +465,24 @@ const ray=new T.Raycaster();
 function pick(cx,cy){ const w=innerWidth,h=innerHeight; ray.setFromCamera(new T.Vector2(cx/w*2-1,-(cy/h)*2+1),G.cam); const hit=ray.intersectObject(G.mesh,false)[0]; if(!hit) return -1;
   const p=G.grp.worldToLocal(hit.point.clone()).normalize(); return P.regionOf(p.x,p.y,p.z); }
 
+let lastAnim=null;
+function settle(dt){ if(!(dt>0)) return;
+  for(let i=settling.length-1;i>=0;i--){ const c=settling[i]; let live=false;
+    if(c.fadeMat&&c.fade<1){ c.fade=Math.min(1,c.fade+dt/FADE_S); c.fadeMat.opacity=c.fade;
+      if(c.fade>=1){ if(c.land) c.land.material=matLand; if(c.skirt) c.skirt.material=matLand; c.fadeMat.dispose(); c.fadeMat=null; if(c.near) addTrees(c); }
+      else live=true; }
+    if(c.morph&&c.morphT<1&&c.land){ c.morphT=Math.min(1,c.morphT+dt/MORPH_S); const u=c.morphT*c.morphT*(3-2*c.morphT);
+      const arr=c.land.geometry.attributes.position.array, tgt=c.target;
+      for(let v=0;v<tgt.length;v++) arr[v*3+1]=c.morph[v]*(1-u)+tgt[v]*u;
+      c.land.geometry.attributes.position.needsUpdate=true;
+      if(c.skirt) writeSkirt(c.skirt.geometry, arr, c.land.geometry.attributes.color.array, c.seg);
+      if(c.morphT<1) live=true; else c.morph=null; }
+    if(!live) settling.splice(i,1); } }
 window.SEEDWORLD={ CH, F, Q, stat, markDirty, baseHeightAt, roadDist, treeList, cutTrees, cutSites, get siteRoot(){ return siteRoot; }, get CUT(){ return CUT; }, get root(){ return root; }, get chunks(){ return chunks; }, get dirtyCount(){ return dirty.size; }, get poolSize(){ return Object.values(pool).reduce((a,p)=>a+p.length,0); },
   biomeAt(x,z){ return cornerAt(Math.floor(x/CH),Math.floor(z/CH)).biome; },
   isVoidAt(x,z){ return chunkVoid(Math.floor(x/CH),Math.floor(z/CH)); }, setQuality(o){ Object.assign(Q,o); lastPC=null; },
   init(o){ opt=o; scene=o.scene; mats(); root=new T.Group(); root.userData.sw=true; scene.add(root); chunkRoot=new T.Group(); siteRoot=new T.Group(); root.add(chunkRoot); root.add(siteRoot); },
-  setFrame, heightAt, update, landing, clearChunks, get chunkCount(){ return chunks.size; }, toDir, regionAtLocal,
-  animate(t){ if(F.waystone) F.waystone.userData.rune.rotation.y=t*1.5; if(F.flag) F.flag.rotation.y=Math.sin(t*1.6)*0.25; },
+  setFrame, heightAt, update, landing, clearChunks, get chunkCount(){ return chunks.size; }, toDir, regionAtLocal, study, seam, slopeGap, colorAt, treeChops, refreshTrees, setTreeGate,
+  animate(t){ const dt=lastAnim==null?0:Math.min(0.1,Math.max(0,t-lastAnim)); lastAnim=t; settle(dt); if(F.waystone) F.waystone.userData.rune.rotation.y=t*1.5; if(F.flag) F.flag.rotation.y=Math.sin(t*1.6)*0.25; },
   globe:{ G, build:buildGlobe, refresh:refreshGlobe, render:renderGlobe, pick, focus, hideLabels, select(id){ G.sel=id; selLines(); }, drag(dx,dy){ G.grp.rotation.y+=dx*0.005; G.grp.rotation.x=Math.max(-1.45,Math.min(1.45,G.grp.rotation.x+dy*0.005)); }, zoom(k){ G.dist=Math.max(1.55,Math.min(5,G.dist*k)); }, owners, relation } };
 })();

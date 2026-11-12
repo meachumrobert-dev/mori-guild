@@ -46,13 +46,35 @@ function overlapArea(a, b){
 function layout(w, h){
   const land=w>h;
   const joy=land?112:128;
-  return {land, min:MIN, joy, dpad:48, attack:land?56:64, s21:w===S21.w&&h===S21.h||w===S21.h&&h===S21.w};
+  return {land, min:MIN, joy, dpad:48, attack:land?56:64, wide:Math.min(w,h)>=600, s21:w===S21.w&&h===S21.h||w===S21.h&&h===S21.w};
+}
+/* Where the stick, the right-hand actions, and the 1–9 bar sit.
+   Narrow portrait keeps the bar above the thumbs. Landscape and tablets
+   set the bar in the gap between them. Insets are 0 here; the page adds
+   the device safe area on top of these numbers. */
+function frames(w, h, control){
+  const land=w>h, wide=Math.min(w,h)>=600, pad=control==='pad';
+  const joyS=land?112:128, padS=156;
+  const thumb=pad?padS:joyS;
+  const joy={x:12, y:h-16-joyS, w:joyS, h:joyS};
+  const ctxW=land?184:128, ctxH=land?112:104;
+  const atk={x:w-10-ctxW, y:h-16-ctxH, w:ctxW, h:ctxH};
+  const bh=52;
+  let bar;
+  if(!land && !wide){
+    bar={x:8, y:h-(16+thumb+8+bh), w:Math.max(48, w-16), h:bh};
+  } else {
+    const left=Math.max(12+thumb, 148+48)+8, right=(land?184:140)+10+8;
+    bar={x:left, y:h-16-bh, w:Math.max(48, w-left-right), h:bh};
+  }
+  const inside=bar.x>=0 && bar.y>=0 && bar.x+bar.w<=w+0.5 && bar.y+bar.h<=h+0.5;
+  return {land, wide, joy, atk, bar, inside};
 }
 function settingsHTML(on){
   return '<div class="sec">Phone layout</div><div class="small">For a phone about 412×915, like a Galaxy S21 Ultra. Joystick or D-pad on the left, actions on the right. Chat can be dragged and folded. Desktop bars stay as they are until this is on.</div>'+
     '<div class="row"><label><input type="checkbox" id="phoneOn" '+(on?'checked':'')+'> Phone controls</label></div>';
 }
-const api={MIN, S21, shouldPhone, stickVector, padVector, placeChat, overlapArea, layout, settingsHTML,
+const api={MIN, S21, shouldPhone, stickVector, padVector, placeChat, overlapArea, layout, frames, settingsHTML,
   getControl(){ return control; },
   setControl(c){ control=c==='pad'?'pad':'stick'; return control; }
 };

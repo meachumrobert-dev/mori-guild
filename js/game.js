@@ -30,6 +30,7 @@ if(!S.v32){ S.v32=1; // v3.2: SRD armor AC by type (no double-counted enhancemen
     if(i.crafted&&(i.kind==='armor'||i.kind==='weapon')){ const fx={}; (i.spells||[]).forEach(n=>{ const k=Object.keys(CRAFT.SPELLS).find(k=>CRAFT.SPELLS[k].name===n); const f=k?CRAFT.SPELLS[k].fx||{}:{}; for(const q in f) fx[q]=(fx[q]||0)+f[q]; }); i.fx=fx; if(i.kind==='armor'&&!i.armorType) i.armorType=/Leather/i.test(i.name)?'Leather':/Breastplate/i.test(i.name)?'Breastplate':'Chain Shirt'; if(i.kind==='weapon') i.mw=true; } }); }
 if(!S.dun) S.dun={};
 if(!S.v38){ S.v38=1; if(!S.craftSkills) S.craftSkills={alchemy:0,smithing:0,enchanting:0,heal:0,jewelry:0}; if(!S.stations) S.stations={pot:'clay',forge:'cast_iron',unlocked:['clay','cast_iron'],enchantForge:false,enchantCircle:false,zinc:false}; if(!S.hots) S.hots=[]; if(!S.hotbar) S.hotbar={bandage:true,potion:true,salve:true}; if(!S.inv.some(i=>i.kind==='bandage')) S.inv.unshift({id:'band_starter',name:'Linen Bandage',cat:'Bandage',kind:'bandage',value:1,fx:{hot:{pps:1,dur:8},healCheck:true}}); }
+if(window.HOTBAR) S.bars=HOTBAR.restore(S.bars);
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -509,8 +510,10 @@ function updateCrafting(dt){ const c=(S.crafting||[])[0]; if(!c) return; c.remai
 /* ---------- Bag & Template Painter ---------- */
 function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(CH.sel);
   let h='<div class="small">AC '+st.ac+' <span title="SRD: '+st.acNote+'">('+st.acNote+')</span> · Attack +'+st.atk+' · Damage 1d8+'+st.dmg+' · Speed +'+Math.round(st.speed*100)+'%'+(S.follower?' · <i>loyal follower of Delroth</i>':'')+'</div>';
-  h+='<div class="sec">Items ('+S.inv.length+')</div>'+(S.inv.length?S.inv.map(it=>'<div class="q"><span>'+(it.equipped?'✅ ':'')+rName(it)+' <span class="small">'+rarity(it).name+' · '+(it.cat||'')+(it.spells?' · '+it.spells.join(', ')+(it.meta&&it.meta.length?' ['+it.meta.join(', ')+']':'')+' · '+it.use+(it.craftNote?' · '+it.craftNote:''):'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+(it.durability!=null?' · dur '+it.durability+'/'+it.maxDur+' · life '+((it.lifetime||0)-(it.uses||0))+' left':'')+'</span></span>'+
-    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'<span class="small">quest item</span>':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+(it.value>1&&!it.equipped?'<button data-sell="'+it.id+'" title="SRD: items sell for half their market price">Sell '+Math.floor(it.value/2).toLocaleString()+'</button>':'')+(it.crafted&&!it.equipped?'<button data-treas="'+it.id+'">Treasury buys</button>':'')+'</div>').join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
+  h+='<div class="sec">Items ('+S.inv.length+')</div>';
+  h+='<div class="q barRow" data-bar-spell="1"><span class="barDrag" title="Spell. Not in the world yet."><b>Spell</b> <span class="small">Placeholder. Drag onto the 1–9 bar.</span></span></div>';
+  h+=(S.inv.length?S.inv.map(it=>{ const salve=it.kind==='salve'; const tip=salve?'Salve. Heals over time. No roll.':'Drag onto the action bar'; return '<div class="q barRow" data-bar-id="'+it.id+'"><span class="barDrag" title="'+tip+'">'+(it.equipped?'✅ ':'')+(salve&&!/salve/i.test(it.name)?'Salve: ':'')+rName(it)+' <span class="small">'+rarity(it).name+' · '+(it.cat||'')+(it.spells?' · '+it.spells.join(', ')+(it.meta&&it.meta.length?' ['+it.meta.join(', ')+']':'')+' · '+it.use+(it.craftNote?' · '+it.craftNote:''):'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+(it.durability!=null?' · dur '+it.durability+'/'+it.maxDur+' · life '+((it.lifetime||0)-(it.uses||0))+' left':'')+'</span></span>'+
+    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'<span class="small">quest item</span>':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+(it.value>1&&!it.equipped?'<button data-sell="'+it.id+'" title="SRD: items sell for half their market price">Sell '+Math.floor(it.value/2).toLocaleString()+'</button>':'')+(it.crafted&&!it.equipped?'<button data-treas="'+it.id+'">Treasury buys</button>':'')+'</div>'; }).join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
   h+=GATHERING.bagHTML();
   h+='<div class="sec">Template Painter — '+(ch.locked?'(locked preset: duplicate it in HeroLock to paint)':ch.name)+'</div>';
   h+='<div class="small">Templates owned: '+S.templates.join(', ')+'</div><div class="row">'+
@@ -536,7 +539,7 @@ function bindCraftStations(root){ if(!window.STATIONS||!root) return;
   root.querySelectorAll('[data-encf]').forEach(b=>b.onclick=()=>{ STATIONS.enableEnchantForge(); STATIONS.gain('enchanting',5); log('✦ Enchanting Forge ready — magic weapons & armor.'); save(); renderJobs(); });
   root.querySelectorAll('[data-encc]').forEach(b=>b.onclick=()=>{ STATIONS.enableEnchantCircle(); STATIONS.gain('enchanting',5); log('◯ Enchanting Circle ready — wondrous items.'); save(); renderJobs(); });
   root.querySelectorAll('[data-smith]').forEach(b=>b.onclick=()=>{ const r=STATIONS.smithSword({kind:b.dataset.smith}); if(!r.ok){ showRoll(r.roll.d,r.msg,'foe'); log(r.msg); return; } addItem(r.item); showRoll(r.roll.d,r.msg,'crit'); log(r.msg); save(); renderJobs(); renderBag(); });
-  root.querySelectorAll('[data-blend]').forEach(b=>b.onclick=()=>{ const r=HERBAL.brewBlend(b.dataset.blend,false); if(!r||!r.ok){ log('Missing reagents for that blend.'); return; } addItem(r.item); log('🧴 Brewed '+r.item.name); save(); renderJobs(); renderBag(); });
+  root.querySelectorAll('[data-blend]').forEach(b=>b.onclick=()=>{ const r=HERBAL.brewBlend(b.dataset.blend,false); if(!r||!r.ok){ log('Missing reagents for that blend.'); return; } addItem(r.item); log('Brewed '+r.item.name+(r.item.kind==='salve'?' — Salve. Heals over time. No roll.':'')); save(); renderJobs(); renderBag(); });
   root.querySelectorAll('[data-blendmyth]').forEach(b=>b.onclick=()=>{ if(!STATIONS.canGreen()){ log('Magic-tier blends need a brass+ pot.'); return; } const r=HERBAL.brewBlend(b.dataset.blendmyth,true); if(!r||!r.ok){ log('Missing reagents (incl. mythical).'); return; } addItem(r.item); log('💚 Magic blend: '+r.item.name); save(); renderJobs(); renderBag(); });
 }
 function drink(it){
@@ -552,11 +555,30 @@ function drink(it){
   else if(f.buff){ S.buffs[f.buff]=120; log(it.name+'! '+(f.buff==='weedwake'?'Gathering +1 for 2 min.':f.buff==='tokenbloom'?'Weeds give double Life for 2 min.':f.buff==='atk'?'+2 attack for 2 min.':f.buff==='antitoxin'?'+5 on saves against poison (SRD alchemical bonus).':f.buff==='repose'?'Carcasses you make keep four times as long for skinning.':f.buff==='halt'?'Undead will not attack you for 2 min.':f.buff==='ease'?'Aches ease for a while.':f.buff==='clarity'?'Mind feels clearer.':'+2 AC for 2 min.')); }
   else if(f.heal){ const n=SRD.dice(f.heal); S.hp=Math.min(stats().maxHp,S.hp+n); showRoll(n,it.name+': healed '+f.heal+' = '+n,''); }
   save(); renderHotbar(); }
-function useHotbar(slot){ const it=HERBAL.pickHotbar(slot); if(!it){ log(slot==='bandage'?'No bandages — craft linen bandages at the alchemy table.':slot==='salve'?'No salves — brew a lavender or yarrow blend.':'No potions.'); return; } drink(it); }
+function useHotbar(slot){ const it=HERBAL.pickHotbar(slot); if(!it){ log(slot==='bandage'?'No bandages — craft linen bandages at the alchemy table.':slot==='salve'?'No salves. A salve heals over time, with no roll. Brew a lavender or yarrow blend.':'No potions.'); return; } drink(it); }
 function renderHotbar(){ const h=HERBAL.hotbarHTML(); const phone=document.body.classList.contains('phone'); const b=$('bBandage'), s=$('bSalve'), p=$('bPotion');
-  if(b){ b.textContent=phone?'🩹 '+h.bandage:'🩹 Bandage ('+h.bandage+')'; b.title='Bandage ('+h.bandage+')'; }
-  if(s){ s.textContent=phone?'🧴 '+h.salve:'🧴 Salve ('+h.salve+')'; s.title='Salve ('+h.salve+')'; }
-  if(p){ p.textContent=phone?'🧪 '+h.potion:'🧪 Potion ('+h.potion+')'+(h.green?' 💚'+h.green:'')+(h.grey?' ⚪'+h.grey:''); p.title='Potion ('+h.potion+')'; } }
+  if(b){ b.textContent='Bandage'+(phone?'':' ('+h.bandage+')'); b.title='Bandage ('+h.bandage+'). Heal check, then healing over time.'; }
+  if(s){ s.textContent='Salve'+(phone?'':' ('+h.salve+')'); s.title='Salve ('+h.salve+'). Heals over time. No roll.'; s.setAttribute('aria-label','Salve. Heals over time. No roll.'); }
+  if(p){ p.textContent=phone?('🧪 '+h.potion):('🧪 Potion ('+h.potion+')'+(h.green?' 💚'+h.green:'')+(h.grey?' ⚪'+h.grey:'')); p.title='Potion ('+h.potion+')'; }
+  renderBar(); }
+function barCount(slot){ if(!slot||slot.type!=='item') return ''; if(slot.id&&S.inv.some(i=>i.id===slot.id)) return ''; const n=S.inv.filter(i=>slot.kind&&i.kind===slot.kind).length; return slot.kind?String(n):''; }
+function renderBar(){ if(!window.HOTBAR||!$('barSlots')) return; if(!S.bars) S.bars=HOTBAR.restore(null); const row=S.bars.pages[S.bars.page]||[];
+  const host=$('barSlots');
+  const sig=S.bars.page+'|'+row.map(s=>HOTBAR.label(s)+':'+(s&&(s.id||s.kind||s.type)||'')+':'+barCount(s)).join(',');
+  if(host.dataset.sig!==sig){ host.dataset.sig=sig;
+    host.innerHTML=row.map((slot,i)=>{ const name=HOTBAR.label(slot)||''; const n=barCount(slot); const tip=HOTBAR.tip(slot)+(n!==''?' ('+n+')':'');
+      return '<button type="button" class="barSlot'+(slot?'':' empty')+'" data-slot="'+i+'" title="'+tip.replace(/"/g,'')+'"><span class="k">'+(i+1)+'</span><span class="n">'+(name||'·')+'</span></button>'; }).join(''); }
+  if($('barPage')) $('barPage').textContent=(S.bars.page+1)+'/'+HOTBAR.PAGES; }
+function useSlot(i){ if(!S.bars) return; const slot=S.bars.pages[S.bars.page][i]; if(!slot){ log('That bar slot is empty. Drag an item from the bag.'); return; }
+  if(slot.type==='attack'){ attack(); return; }
+  if(slot.type==='spell'){ log('Spell. Not in the world yet. This slot is only a place holder.'); return; }
+  let it=slot.id?S.inv.find(x=>x.id===slot.id):null;
+  if(!it&&slot.kind) it=HERBAL.pickHotbar(slot.kind)||S.inv.find(x=>x.kind===slot.kind);
+  if(!it){ log(HOTBAR.label(slot)+' is not in the bag.'); return; }
+  if(it.kind==='bandage'||it.kind==='salve'||it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown') drink(it);
+  else log(it.name+' sits on the bar. Open the bag to equip it.');
+  renderBar(); }
+function turnBar(dir){ if(!window.HOTBAR) return; S.bars=HOTBAR.turn(S.bars, dir); save(); renderBar(); }
 
 /* ---------- Talk / Beat / Blue room ---------- */
 let chatHist=[], chatAlt=0, lastUser='', lastReply=null;
@@ -712,7 +734,7 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
-$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
+$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
 let tabletDraft=null, tabletResult=null;
 function tabletSlots(){ const h=hereCity(); return {ruler:h.ruler||'The Guild Charter (Seedkeeper Mori)', name:h.name||'Guildhold', motto:h.motto||'', gov:h.govName||'Guild Charter', race:h.race||'', region:h.region||'', arts:''}; }
@@ -721,19 +743,26 @@ function moriDraft(){ return {note:'one vocab finger', fingers:[
   {kind:'intent', id:'ruler', any:['who is the sovereign'], template:'ruler'},
   {kind:'template', id:'ruler', text:'{ruler} rules {name}. the motto is "{motto}".'}
 ]}; }
-function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.tablet&&S.tablet.approved||[]).length; const face=tabletResult?(tabletResult.pass?'The runes hold. Every check passed.':'The runes reject this. '+((tabletResult.fails||[]).slice(0,3).join('; '))):(tabletDraft?'A draft is waiting. It has not been applied.':'The glass is dark. Ask Mori for one small change.');
-  el.innerHTML='<div id="tabletFace">'+face+'</div><div class="small">Approved fingers: '+n+'. A finger is one vocab pack, one intent, one template, one furniture note, or one recipe note. Nothing runs in the live game until you tap Approve.</div>'+
-    '<div class="row"><button type="button" id="tabDraft">Ask Mori</button><button type="button" id="tabRun">Run checks</button><button type="button" class="pri" id="tabYes"'+(tabletResult&&tabletResult.pass?'':' disabled')+'>Approve</button><button type="button" id="tabNo">Revert</button></div>';
+function tinkerPack(){ return JSON.parse(JSON.stringify(window.TINKER_PACK)); }
+function wornPatches(){ const all=(S.tablet&&S.tablet.approved)||[]; if(S.tablet&&S.tablet.wear==='tinker') return all; return all.filter(p=>p.note!=='tinker persona'); }
+function applyWorn(){ if(window.FINGERS) FINGERS.reapply(wornPatches()); if(window.FURNITURE) FURNITURE.build(scene); }
+function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.tablet&&S.tablet.approved||[]).length; const wear=S.tablet&&S.tablet.wear==='tinker'; const face=tabletResult?(tabletResult.pass?'The runes hold. Every check passed.':'The runes reject this. '+((tabletResult.fails||[]).slice(0,3).join('; '))):(tabletDraft?'A draft is waiting. It has not been applied.':'The glass is dark. Ask Mori for one small change.');
+  el.innerHTML='<div id="tabletFace">'+face+'</div><div class="small">Approved fingers: '+n+'. Wearing: '+(wear?'Tinker Gearwhistle (flavor, not a mind)':'Mori')+'. A finger is data. Nothing runs until you tap Approve.</div>'+
+    '<div class="row"><button type="button" id="tabMori"'+(wear?'':' class="pri"')+'>Mori</button><button type="button" id="tabTinker"'+(wear?' class="pri"':'')+'>Tinker</button></div>'+
+    '<div class="row"><button type="button" id="tabDraft">Ask Mori</button><button type="button" id="tabTinkerDraft">Tinker persona</button><button type="button" id="tabRun">Run checks</button><button type="button" class="pri" id="tabYes"'+(tabletResult&&tabletResult.pass?'':' disabled')+'>Approve</button><button type="button" id="tabNo">Revert</button></div>';
+  $('tabMori').onclick=()=>{ S.tablet.wear='mori'; applyWorn(); save(); renderTablet(); };
+  $('tabTinker').onclick=()=>{ const has=(S.tablet.approved||[]).some(p=>p.note==='tinker persona'); if(!has){ tabletDraft=tinkerPack(); tabletResult=null; log('Run checks, then Approve, before Tinker can be worn.'); renderTablet(); return; } S.tablet.wear='tinker'; applyWorn(); save(); renderTablet(); };
   $('tabDraft').onclick=()=>{ tabletDraft=moriDraft(); tabletResult=null; renderTablet(); };
-  $('tabRun').onclick=()=>{ if(!tabletDraft){ tabletDraft=moriDraft(); } const slots=tabletSlots(); const cases=[{text:'who is the sovereign', intent:'ruler', includes:[slots.ruler, slots.name], slots}]; TABLET.check(TABLET.normalize?TABLET.normalize(tabletDraft):tabletDraft, cases).then(r=>{ tabletResult=r; renderTablet(); }); };
-  $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(window.FINGERS) FINGERS.reapply(S.tablet.approved); if(window.FURNITURE) FURNITURE.build(scene); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
-  $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length) S.tablet.approved.pop(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
+  $('tabTinkerDraft').onclick=()=>{ tabletDraft=tinkerPack(); tabletResult=null; renderTablet(); };
+  $('tabRun').onclick=()=>{ if(!tabletDraft){ tabletDraft=moriDraft(); } const slots=tabletSlots(); const tinker=tabletDraft.note==='tinker persona'; const cases=tinker?[{text:'hi', intent:'tinkerhi', includes:['tinker','gnome'], slots:{}},{text:'who rules here', intent:'ruler', includes:[slots.ruler, slots.name], slots}]:[{text:'who is the sovereign', intent:'ruler', includes:[slots.ruler, slots.name], slots}]; TABLET.check(tabletDraft, cases).then(r=>{ tabletResult=r; renderTablet(); }); };
+  $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(tabletDraft.note==='tinker persona') S.tablet.wear='tinker'; applyWorn(); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
+  $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length){ const gone=S.tablet.approved.pop(); if(gone&&gone.note==='tinker persona') S.tablet.wear='mori'; } applyWorn(); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
 }
 function openTablet(){ ensureTablet(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
  '<li><b>Move</b>: WASD / arrows (phones: left-thumb joystick). <b>Look</b>: drag to orbit, wheel / pinch to zoom.</li>'+
  '<li><b>Loot rarity:</b> '+RARITY.map(r=>'<span style="color:'+r.c+'">■ '+r.name+'</span>').join(' · ')+'. Magic gear starts dropping around character level 4–5 (level = 3 + full dungeon clears). A full clear is the boss portal home. Clearing one room does not raise it.</li>'+
- '<li><b>E / Interact</b> near stalls, forges, the bench, Enchanting Forge/Circle, Mori, chests and the dungeon door. <b>Space / ⚔</b> attacks. Healing ladder: <b>R</b> bandage (Heal check), <b>T</b> salve (HoT, auto), <b>Q</b> potion (grey HoT / green instant).</li>'+
+ '<li><b>E / Interact</b> near stalls, forges, the bench, Enchanting Forge/Circle, Mori, chests and the dungeon door. <b>Space / ⚔</b> attacks. The 1–9 bar holds items, Attack, and spell placeholders. <b>[ ]</b> or Shift+wheel changes page (4 pages). <b>R</b> bandage, <b>T</b> salve (heals over time, no roll), <b>Q</b> potion.</li>'+
  '<li><b>Mori builds the town</b> from her job queue: gather timber/ore/herbs, brew at the alchemy table, forge with Grizzik under the Dragon\'s Forge, then build houses, walls, lanterns, a market, a shrine… Approve her ideas or queue your own (🔨).</li>'+
  '<li><b>Life → LARPy 5:1</b> at the grumpy Mori Doll. LARPy buys Robert\'s Outpost items. Gold rolls SRD magic items and pays for crafting at the <b>Item Creation Bench</b>.</li>'+
  '<li><b>🧬 HeroLock</b>: sculpt a hero with sliders and 5 identity-lock angles. Locked presets (🔒 Delroth, Mori) can be duplicated to edit.</li>'+
@@ -745,6 +774,7 @@ function help(){ modal('<h3>How to play</h3><ul class="help">'+
 const keys={};
 addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return; keys[e.code]=true;
   if(e.code==='KeyE') interact(); if(e.code==='Space'){ e.preventDefault(); attack(); } if(e.code==='KeyQ') useHotbar('potion'); if(e.code==='KeyR') useHotbar('bandage'); if(e.code==='KeyT') useHotbar('salve');
+  if(window.HOTBAR){ const slot=HOTBAR.keyIndex(e.code); if(slot>=0){ e.preventDefault(); useSlot(slot); } const pg=HOTBAR.pageKey(e.code); if(pg){ e.preventDefault(); turnBar(pg); } }
   if(e.code==='KeyJ') togglePanel('jobsP'); if(e.code==='KeyL') togglePanel('questP'); if(e.code==='KeyB') togglePanel('bagP'); if(e.code==='KeyH') openCreator(); if(e.code==='KeyM'||e.code==='KeyG'){ globeOpen?closeGlobe():openGlobe(); } if(e.code==='Escape'){ closeModal(); if(crOpen) closeCreator(); closeGlobe(); } });
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 let camYaw=S.player.yaw||0, camPitch=0.42, camDist=9;
@@ -771,12 +801,15 @@ document.querySelectorAll('[data-pad]').forEach(b=>{ const dir=b.dataset.pad; co
 if($('padMode')) $('padMode').onclick=()=>{ PHONE.setControl(PHONE.getControl()==='pad'?'stick':'pad'); refreshPhone(); };
 function refreshPhone(){ if(!window.PHONE) return; let saved=null; try{ saved=localStorage.getItem('mori.phone'); }catch(e){}
   const on=PHONE.shouldPhone({touch:IS_TOUCH, coarse:matchMedia('(pointer:coarse)').matches, w:innerWidth, h:innerHeight, query:QS.get('phone'), saved});
-  document.body.classList.toggle('phone', on); document.body.classList.toggle('land', innerWidth>innerHeight); document.body.classList.toggle('pad', on&&PHONE.getControl()==='pad');
+  const wide=on&&Math.min(innerWidth,innerHeight)>=600;
+  document.body.classList.toggle('phone', on); document.body.classList.toggle('land', innerWidth>innerHeight); document.body.classList.toggle('wide', wide); document.body.classList.toggle('pad', on&&PHONE.getControl()==='pad');
+  const thumb=(PHONE.getControl()==='pad'?156:(innerWidth>innerHeight?112:128));
+  const chrome=on?(wide||innerWidth>innerHeight?16+52+24:16+thumb+8+52+16):0;
+  document.documentElement.style.setProperty('--chrome-bottom', chrome+'px');
   const pm=$('padMode'); if(pm) pm.textContent=PHONE.getControl()==='pad'?'◉':'✥';
   if($('bAttack')) $('bAttack').textContent=on?'⚔':'⚔ Attack';
-  if($('bBandage')) $('bBandage').textContent=on?'🩹':'🩹 Bandage';
-  if($('bSalve')) $('bSalve').textContent=on?'🧴':'🧴 Salve';
   if($('bPotion')) $('bPotion').textContent=on?'🧪':'🧪 Potion';
+  renderBar();
   if(!on){ document.body.classList.remove('menu'); document.body.classList.remove('stats'); }
   try{ if(sessionStorage.getItem('mori.stayport')==='1') document.body.classList.add('stayport'); }catch(e){}
   const sheet=$('statSheet'), top=$('top');
@@ -799,8 +832,43 @@ document.addEventListener('touchmove', e=>{ if(!document.body.classList.contains
   if($('chatFold')) $('chatFold').onclick=()=>{ const el=$('talkP'); el.classList.toggle('collapsed'); $('chatFold').textContent=el.classList.contains('collapsed')?'+':'–'; }; }
 )();
 canvas.addEventListener('pointerup',endPtr); canvas.addEventListener('pointercancel',endPtr);
-canvas.addEventListener('wheel',e=>{ e.preventDefault(); if(globeOpen){ SW.globe.zoom(1+e.deltaY*0.001); return; } if(crOpen) crDist=Math.max(0.8,Math.min(5,crDist*(1+e.deltaY*0.001))); else camDist=Math.max(3.5,Math.min(22,camDist*(1+e.deltaY*0.001))); },{passive:false});
+function barWheel(e){ if(!e.shiftKey||!window.HOTBAR) return false; e.preventDefault(); turnBar(e.deltaY>0?1:-1); return true; }
+canvas.addEventListener('wheel',e=>{ e.preventDefault(); if(barWheel(e)) return; if(globeOpen){ SW.globe.zoom(1+e.deltaY*0.001); return; } if(crOpen) crDist=Math.max(0.8,Math.min(5,crDist*(1+e.deltaY*0.001))); else camDist=Math.max(3.5,Math.min(22,camDist*(1+e.deltaY*0.001))); },{passive:false});
+addEventListener('wheel',e=>{ if(e.target===canvas) return; barWheel(e); },{passive:false});
 $('bInteract').onclick=()=>interact(); $('bAttack').onclick=()=>attack(); $('bPotion').onclick=()=>useHotbar('potion'); if($('bBandage')) $('bBandage').onclick=()=>useHotbar('bandage'); if($('bSalve')) $('bSalve').onclick=()=>useHotbar('salve');
+if($('barUp')) $('barUp').onclick=()=>turnBar(-1);
+if($('barDown')) $('barDown').onclick=()=>turnBar(1);
+let barDrag=null;
+document.addEventListener('pointerdown', e=>{
+  if(e.button>0) return;
+  const slotEl=e.target.closest&&e.target.closest('[data-slot]');
+  const dragEl=e.target.closest&&e.target.closest('.barDrag');
+  if(!slotEl&&!dragEl) return;
+  let entry=null, from=null;
+  if(slotEl){ from=+slotEl.dataset.slot; entry=S.bars&&S.bars.pages[S.bars.page][from]; }
+  else if(dragEl.closest('[data-bar-spell]')) entry={type:'spell', name:'Spell'};
+  else { const host=dragEl.closest('[data-bar-id]'); const it=host&&S.inv.find(i=>i.id===host.dataset.barId); if(!it) return; entry={type:'item', id:it.id, kind:it.kind, name:it.name}; }
+  barDrag={entry, from, x:e.clientX, y:e.clientY, moved:false, pid:e.pointerId};
+});
+document.addEventListener('pointermove', e=>{
+  if(!barDrag||e.pointerId!==barDrag.pid) return;
+  if(Math.hypot(e.clientX-barDrag.x, e.clientY-barDrag.y)<=8) return;
+  barDrag.moved=true; const g=$('barGhost'); if(!g) return; g.hidden=false; g.textContent=window.HOTBAR?HOTBAR.label(barDrag.entry)||'·':'·'; g.style.left=(e.clientX+12)+'px'; g.style.top=(e.clientY+12)+'px';
+});
+document.addEventListener('pointerup', e=>{
+  if(!barDrag||e.pointerId!==barDrag.pid) return;
+  const drag=barDrag; barDrag=null; const g=$('barGhost'); if(g) g.hidden=true;
+  const under=document.elementFromPoint(e.clientX, e.clientY);
+  const slot=under&&under.closest&&under.closest('[data-slot]');
+  const i=slot?+slot.dataset.slot:-1;
+  if(drag.moved&&i>=0&&drag.entry){
+    if(drag.from!=null&&drag.from!==i) S.bars=HOTBAR.swap(S.bars, drag.from, i);
+    else if(drag.from==null) S.bars=HOTBAR.assign(S.bars, S.bars.page, i, drag.entry);
+    save(); renderBar(); return; }
+  if(drag.moved&&drag.from!=null&&i<0){ S.bars=HOTBAR.clear(S.bars, S.bars.page, drag.from); save(); renderBar(); return; }
+  if(!drag.moved&&drag.from!=null) useSlot(drag.from);
+});
+document.addEventListener('contextmenu', e=>{ const slot=e.target.closest&&e.target.closest('[data-slot]'); if(!slot||!window.HOTBAR) return; e.preventDefault(); S.bars=HOTBAR.clear(S.bars, S.bars.page, +slot.dataset.slot); save(); renderBar(); });
 let brandTaps=0; $('brand').onclick=()=>{ if(++brandTaps>=5&&!S.hatEgg){ S.hatEgg=true; log('🎩 +5 HAT unlocked in HeroLock! Weirdness resistance 5.'); save(); } };
 
 /* ---------- interaction targets ---------- */
@@ -1155,6 +1223,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   TS.pump(); // v3.4 two-speed: foreground jobs now, background jobs inside the frame budget
   const bi=$('bInteract'); bi.textContent=document.body.classList.contains('phone')?'E':(curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'); bi.classList.toggle('hot',!!curTarget);
 }
+function renderWorld(which){ if(!window.OCCLUSION){ renderer.render(which, camera); return; } const cx=camera.position.x, cz=camera.position.z; OCCLUSION.beginView(which, camera, player.pos.x, player.pos.z); renderer.render(which, camera); camera.position.x=cx; camera.position.z=cz; OCCLUSION.endView(which); }
 function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   if(crOpen){ renderCreator(); return; }
   if(globeOpen){ [lblD,lblM,lblDoll,lblT].forEach(e=>e.style.display='none'); obeliskAnim(); SW.globe.render(renderer); return; }
@@ -1164,8 +1233,9 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
   camera.position.set(tgt.x+Math.sin(camYaw)*Math.cos(pitch)*dist, tgt.y+Math.sin(pitch)*dist, tgt.z+Math.cos(camYaw)*Math.cos(pitch)*dist);
   if(mode==='world'){ const gy=W.height(camera.position.x,camera.position.z)+0.6; if(camera.position.y<gy) camera.position.y=gy; }
   camera.lookAt(tgt);
+  if(window.OCCLUSION&&mode==='world'){ OCCLUSION.update(scene, camera, {heightAt:(x,z)=>W.height(x,z), far:IS_TOUCH?120:200, budget:IS_TOUCH?12:20}); const rd=$('occRead'); if(rd){ rd.style.display=OCCLUSION.stats.debug?'block':'none'; if(OCCLUSION.stats.debug) rd.textContent='cull tested '+OCCLUSION.stats.tested+' · hidden '+OCCLUSION.stats.hidden+' · hill '+OCCLUSION.stats.hill+' · box '+OCCLUSION.stats.box+' · far '+OCCLUSION.stats.far; } }
   if(mode==='world'&&TF.shake>0){ const k=TF.shake*0.35; camera.position.x+=(Math.random()-0.5)*k; camera.position.y+=(Math.random()-0.5)*k; camera.position.z+=(Math.random()-0.5)*k; } // earth rumble
-  if(mode==='world'&&!atGuild()){ [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); SW.animate(clockT); renderer.render(scene,camera); }
+  if(mode==='world'&&!atGuild()){ [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); SW.animate(clockT); renderWorld(scene); }
   else if(mode==='world'){
     // tavern: roof hides when inside; neon lights drift
     const inT=tav.userData.inside(player.pos.x,player.pos.z)||tav.userData.inside(camera.position.x,camera.position.z); tav.userData.roof.visible=!inT;
@@ -1181,8 +1251,8 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
     if(dd<16){ delroth.t+=1/60; if(delroth.t>7){ delroth.t=0; delroth.line=(delroth.line+1)%DELROTH_LINES.length; } project(dP,2.4*1.0,lblD,'<b>Delroth</b> <span class="small">Undead Catfolk Dread Necromancer · Lv 60 (epic)</span><br>“'+DELROTH_LINES[delroth.line]+'”'); } else lblD.style.display='none';
     project(mori.pos,2.1,lblM, S.blue?'💤 zzz…':'<b>Mori</b>'+(curJob&&!curJob.idle?' · '+jobLabel(curJob):''));
     const dl=W.STATIONS.doll; if(Math.hypot(dl.x-player.pos.x,dl.z-player.pos.z)<7) project(new T.Vector3(dl.x,0,dl.z),2.2,lblDoll,'🪆 “'+DOLL_LINES[Math.floor(clockT/6)%DOLL_LINES.length]+'”'); else lblDoll.style.display='none';
-    renderer.render(scene,camera);
-  } else { [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); renderer.render(dun.scene,camera); }
+    renderWorld(scene);
+  } else { [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); renderWorld(dun.scene); }
   if(curTarget){ project(new T.Vector3(curTarget.x,mode==='world'?W.height(curTarget.x,curTarget.z):0,curTarget.z),1.0,lblT,curTarget.label); } else lblT.style.display='none';
 }
 function obeliskAnim(){ const u=obelisk.userData; u.orb.rotation.y=clockT*0.4; u.core.rotation.y=-clockT*0.3; u.ring.position.y=2.6+Math.sin(clockT*1.5)*0.6; const f=Math.min(1,programmedCount()/40); u.core.scale.setScalar(0.6+f*0.75); }
@@ -1208,7 +1278,7 @@ IDLEBUILD.init({
   clearIdleJob:()=>{ if(curJob&&curJob.idle) curJob=null; },
   renderSeedPanel:()=>renderSeedPanel()
 });
-ensureTablet(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene);
+ensureTablet(); applyWorn(); if(window.FURNITURE) FURNITURE.build(scene); if(player.model) player.model.userData.noCull=true;
 setTimeout(()=>{ if(window.DICT&&DICT.load) DICT.load().catch(()=>{}); }, 600);
 voiceSetup(); $('npcBack').onclick=()=>{ endNpc(); openMoriChat(); };
 if(CLAN.site) refreshFrame(); // the first frame was built before the Clan / NPCs knew the player (no-op otherwise)
@@ -1222,7 +1292,7 @@ requestAnimationFrame(frame);
 
 /* test hook */
 window.__g={ castSpellFx, placeStructure, get PLOTS(){return PLOTS;}, get guildRoads(){return guildRoads;}, get S(){return S;}, get dun(){return dun;}, W, get target(){return curTarget&&curTarget.label;}, stats, get dl(){return DELROTH_LINES[delroth.line];}, get jobs(){return jobs;}, get cur(){return curJob;}, get mode(){return mode;}, get mobs(){return mobs;}, get chests(){return chests;}, built, player, mori, camera,
-  step:(sec,dt)=>{ dt=dt||0.05; for(let t=0;t<sec;t+=dt){ updateSky(dt); step(dt); } hud(); render(dayNow); }, queueJob, acceptSuggestion, openCreator, closeCreator, selectChar, enterDungeon, leaveDungeon, attack, openChest, benchUI, craftItem, lootRoll, rarity, charLevel, dollShop, outpostShop, goBlue, wakeMori,
+  step:(sec,dt)=>{ dt=dt||0.05; for(let t=0;t<sec;t+=dt){ updateSky(dt); step(dt); } hud(); render(dayNow); }, queueJob, acceptSuggestion, openCreator, closeCreator, selectChar, enterDungeon, leaveDungeon, attack, openChest, benchUI, craftItem, lootRoll, rarity, charLevel, dollShop, outpostShop, goBlue, wakeMori, renderBar, useSlot,
   setCam:(y,p,d)=>{ camYaw=y; camPitch=p; camDist=d; }, setCr:(y,p,d,f)=>{ crYaw=y; crPitch=p; crDist=d; crFocus=f; }, teleport:(x,z)=>{ player.pos.set(x,0,z); }, CRAFT, save,
   SW, PL, get guildId(){ return guildId; }, stageOf, travelTo, openGlobe, closeGlobe, applySeed, advanceRegion, seedCandidate, programmedCount, renderSeedPanel, cityModal, get globeOpen(){ return globeOpen; }, makeSuggestion, delroth, TF, PERF, QUAL, applyQuality, perfLine, queueTF, tfSuggestion, sendChat:(v)=>{ $('chatIn').value=v; sendChat(); }, renderJobs, restAtCamp, startNow:(kind,what)=>{ if(curJob&&!curJob.plan){ if(curJob.target&&curJob.target.claimed){ curJob.target.ready=true; curJob.target.claimed=false; } curJob=null; mori.path=[]; } startJob({kind,what,id:S.nid++}); return curJob; }, dunRoomAt, armorInfo, get dunName(){ return dunName; }, renderer, scene, GA:GATHERING, IMP:IMPOSTORS, CLAN, TS, killMob, foeAttack, drink, renderBag, missing, spend, BREWS, FORGES, queueCleanse, get curRegion(){ return curRegion(); }, get dayNow(){ return dayNow; },
   NPCS, QUESTS, MORICHAT, MEMORY, LORE, DREADLORD, IDLEBUILD, TREASURY, HERBAL, STATIONS, openNpc, npcSay, endNpc, openMoriChat, get chatNpc(){ return chatNpc; }, get benchCfg(){ return benchCfg; }, set benchCfg(v){ benchCfg=v; }, benchFit, benchOrder, crafterCL, worldStats, VOICE, moriCtx, npcCoupon, chatSend:(v)=>sendChat(v), DAY, addItem, renderQuests, renderLore, renderMemory, renderPersona, playerPersona, chatEdit, chatRegen, chatPin, charLevelQ:()=>charLevel(), noteCivic, noteRoomClear, civicProfileFor, civicHTML };

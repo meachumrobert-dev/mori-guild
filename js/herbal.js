@@ -149,7 +149,7 @@ function useHealItem(it){
     if(X.log) X.log('🩹 '+it.name+': '+r.heal+' HP + HoT. Heal ranks now '+healRanks(S)+'.');
     return {kind:'bandage', roll:r}; }
   if(f.heal){ const n=SRD.dice(f.heal); S.hp=Math.min(max,S.hp+n); if(X.showRoll) X.showRoll(n, it.name+': instant heal '+f.heal+' = '+n, 'crit'); if(X.log) X.log('💚 '+it.name+' (green / instant): +'+n+' HP'); return {kind:'green', n}; }
-  if(f.hot){ applyHot(f.hot, it.name); if(X.log) X.log((it.kind==='salve'?'🧴':'🧪')+' '+it.name+': healing over time ('+f.hot.pps+'/s for '+f.hot.dur+'s). No roll.'); return {kind:'hot'}; }
+  if(f.hot){ applyHot(f.hot, it.name); if(X.log) X.log((it.kind==='salve'?'Salve. ':'')+it.name+': healing over time ('+f.hot.pps+'/s for '+f.hot.dur+'s). No roll.'); return {kind:'hot'}; }
   if(f.buff){ S.buffs[f.buff]=90; if(X.log) X.log(it.name+' applied.'); return {kind:'buff'}; }
   return {kind:'other'};
 }
@@ -183,7 +183,7 @@ function panelBlends(potTier){
   Object.keys(BLENDS).forEach(k=>{ const b=BLENDS[k]; const need=Object.entries(b.need).map(([id,n])=>n+' '+(GATHERING.R[id.slice(2)]||{name:id}).name).join(', ');
     h+='<div class="q"><span><b>'+b.label+'</b><br><span class="small">'+need+' → '+b.item.name+' ('+(b.item.fx.hot?'HoT salve/tonic':b.item.fx.heal?'instant':'buff')+')</span></span>'+
       '<button data-blend="'+k+'">Brew</button>'+(b.mythNeed&&unlocked.green?'<button data-blendmyth="'+k+'">Magic tier</button>':'')+'</div>'; });
-  h+='<div class="sec">Healing ladder</div><div class="small">🧴 Salves — heal over time, no roll, auto from hotbar. 🩹 Bandages — every character\'s hotbar; HoT + Heal check (d20+Wis+ranks). ⚪ Grey draughts — stronger HoT. 💚 Green — instant (brass+ pot).</div>';
+  h+='<div class="sec">Healing ladder</div><div class="small">Salve — heals over time, no roll, and can apply itself from the bar. Bandages — HoT plus a Heal check (d20+Wis+ranks). Grey draughts — a stronger heal over time. Green — instant, once the pot is brass or better.</div>';
   return h;
 }
 

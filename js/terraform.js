@@ -82,9 +82,12 @@ function buildVis(){ attach(); clearVis(); if(!cur) return; cur.lakes.forEach(la
 const dm=new T.Object3D(), tcol=new T.Color();
 function placeTrees(px,pz,force){ if(!pine||!cur) return; if(px==null&&lastTreeAt){ px=lastTreeAt[0]; pz=lastTreeAt[1]; } if(px==null){ px=0; pz=0; }
   lastTreeAt=[px,pz]; const R=quality.treeR; let np=0, no=0, nt=0;
-  for(let i=0;i<cur.trees.length;i++){ const t=cur.trees[i]; const [x,z,s,ty]=t; if(Math.hypot(x-px,z-pz)>R) continue; const g=t.g!=null?t.g:1; const k=Math.max(0.0001,s*g);
-    dm.position.set(x,SW.heightAt(x,z)-0.25,z); dm.rotation.set(0,i*1.7,0); dm.scale.set(k,k*(ty===0?1.25:1),k); dm.updateMatrix();
-    const M=ty===0?pine:oak, n=ty===0?np++:no++; M.setMatrixAt(n,dm.matrix); M.setColorAt(n,tcol.set(ty===0?TREECOL.pine[i%TREECOL.pine.length]:TREECOL.oak[i%TREECOL.oak.length]).offsetHSL(((i*7)%5-2)*0.008,0,0).multiplyScalar(1+((i*3)%5-2)*0.12)) /* v3.2: scale, not HSL-lightness (linear space made dark pines black) */; trunk.setMatrixAt(nt++,dm.matrix); }
+  for(let i=0;i<cur.trees.length;i++){ const t=cur.trees[i]; const [x,z,s,ty]=t; if(Math.hypot(x-px,z-pz)>R) continue; const sp=window.LUMBER?LUMBER.fromSaved(ty): (ty===0?'pine':'oak'); const shape=window.LUMBER?LUMBER.shapeOf(sp):(ty===0?'soft':'hard'); const spec=window.LUMBER&&LUMBER.species(sp);
+    const g=t.g!=null?t.g:1; const key='tf|'+cur.id+'|'+i; const stump=window.GATHERING&&GATHERING.ready&&!GATHERING.ready({key}); const k=stump?Math.max(0.08,s*0.18):Math.max(0.0001,s*g);
+    const tall=shape==='yew'?1.4:shape==='iron'?0.75:shape==='soft'?1.25:1;
+    dm.position.set(x,SW.heightAt(x,z)-0.25,z); dm.rotation.set(0,i*1.7,0); dm.scale.set(k,k*tall,k); dm.updateMatrix();
+    const cone=shape==='soft'||shape==='yew'; const M=cone?pine:oak, n=cone?np++:no++; const colr=spec?spec.color:(cone?TREECOL.pine[i%TREECOL.pine.length]:TREECOL.oak[i%TREECOL.oak.length]);
+    M.setMatrixAt(n,dm.matrix); M.setColorAt(n,tcol.set(colr).multiplyScalar(1+((i*3)%5-2)*0.08)); trunk.setMatrixAt(nt++,dm.matrix); }
   pine.count=np; oak.count=no; trunk.count=nt; [pine,oak,trunk].forEach(m=>{ m.instanceMatrix.needsUpdate=true; if(m.instanceColor) m.instanceColor.needsUpdate=true; }); }
 /* ---------- flowers: Mori-planted (saved in the region delta) + natural meadow patches (from the world seed, never saved) ---------- */
 const fr01=(x,z)=>{ const v=Math.sin(x*12.9898+z*78.233)*43758.5453; return v-Math.floor(v); };
@@ -181,7 +184,8 @@ function plan(kind,px,pz,yaw,spot){ if(!cur) return {err:'This region is not loa
     P.x=pts[Math.floor(pts.length/2)][0]; P.z=pts[Math.floor(pts.length/2)][1]; P.x0=s.x; P.z0=s.z; }
   else if(kind==='grove'){ const B=SW.biomeAt(s.x,s.z); const n=Math.min(CAP.trees-cur.trees.length,14+Math.floor(rr(1)*10)); const pineBias=B==='taiga'||B==='mountain'?0.85:B==='jungle'||B==='savanna'?0.1:0.45;
     for(let q=0;q<n*3&&P.trees.length<n;q++){ const a=rr(10+q)*Math.PI*2, d=Math.sqrt(rr(200+q))*P.r; const x=s.x+Math.cos(a)*d, z=s.z+Math.sin(a)*d;
-      if(P.trees.some(t=>Math.hypot(t[0]-x,t[1]-z)<3.2)) continue; if(blocks(x,z,SW.heightAt(x,z))) continue; if(SW.F.roads.length&&SW.roadDist(x,z)<5) continue; P.trees.push([x,z,0.8+rr(400+q)*0.7,rr(600+q)<pineBias?0:1]); }
+      if(P.trees.some(t=>Math.hypot(t[0]-x,t[1]-z)<3.2)) continue; if(blocks(x,z,SW.heightAt(x,z))) continue; if(SW.F.roads.length&&SW.roadDist(x,z)<5) continue;
+      const sp=window.LUMBER?LUMBER.pick(B, ()=>rr(700+q)):(rr(600+q)<pineBias?'pine':'oak'); P.trees.push([x,z,0.8+rr(400+q)*0.7,sp]); }
     if(!P.trees.length) return {err:'No clear ground for a grove there.'}; P.steps=P.trees.length; P.dur=Math.max(5,P.trees.length*0.45);
     // grove floor flowers: shade-loving species in little clumps between the trees
     const sp=window.FLORA?FLORA.BIOME_SP.grove:[0], nf=Math.min(CAP.flowers-cur.flowers.length,18+Math.floor(rr(5)*14)); for(let q=0;q<nf*3&&P.flowers.length<nf;q++){ const a=rr(800+q)*Math.PI*2, d=(0.25+0.85*Math.sqrt(rr(900+q)))*P.r; const x=s.x+Math.cos(a)*d, z=s.z+Math.sin(a)*d;
@@ -245,7 +249,8 @@ window.TERRAFORM={ KINDS, CAP, CELL,
   stats(){ return {region:cur&&cur.id, cells:cur?cur.cells.size:0, trees:cur?cur.trees.length:0, drawnTrees:pine?pine.count+oak.count:0, feats:cur?cur.feats.length:0, lakes:cur?cur.lakes.length:0, rivers:cur?cur.rivers.length:0, cached:cache.size,
     particles:part.sp?part.sp.live+part.du.live:0, flowers:cur?cur.flowers.length:0, drawnFlowers:flora?flora.drawn||0:0, flowerDraws:flora?flora.draws:0, flowerTris:flora?flora.tris||0:0, patches:patchMesh.length, bytes:cur?encodeCells(cur.cells).length:0}; },
   summary(id){ const r=id==null?cur:get(id); if(!r) return ''; const c={}; r.feats.forEach(f=>{ const k=KNAME[f[0]]; c[k]=(c[k]||0)+1; }); return {counts:c, trees:r.trees.length, flowers:r.flowers.length, cells:r.cells.size}; },
-  encode, decode,
+  encode, decode, refreshTrees(){ placeTrees(null,null,true); },
+  treeChops(){ if(!cur||!window.LUMBER) return []; return cur.trees.map((t,i)=>{ const sp=LUMBER.species(LUMBER.fromSaved(t[3]))||LUMBER.species('oak'); return {key:'tf|'+cur.id+'|'+i, x:t[0], z:t[1], y:SW.heightAt(t[0],t[1]), type:'wood', rid:sp.log, tier:sp.tier, req:LUMBER.req(sp.tier), tree:true}; }); },
   /* v3.4: what the impostor layer draws beyond the 3D cut: Mori's planted trees + one clump card per natural flower patch */
   cardSources(px,pz,r0,r1){ const trees=[], fl=[]; if(!cur) return {trees,fl};
     for(const t of cur.trees){ const d=Math.hypot(t[0]-px,t[1]-pz); if(d<r0||d>r1) continue; const g=t.g!=null?t.g:1; if(g<0.3) continue; trees.push([t[0],t[1],t[2]*g,t[3]]); }

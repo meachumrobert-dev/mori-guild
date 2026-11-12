@@ -21,10 +21,27 @@ function install(json){
   if(!json||!json.w||json.w.length<8000) throw new Error('dict is too small');
   data=json; indexOf(json); linkIntents(); return json;
 }
+/* Everyday clippings. Mori hears "tech" and means technology, not an unknown word. */
+const CLIP={
+  tech:'technology', info:'information', ammo:'ammunition', gear:'equipment',
+  fridge:'refrigerator', phone:'telephone', bike:'bicycle', lab:'laboratory',
+  exam:'examination', math:'mathematics', stats:'statistics', intro:'introduction',
+  photo:'photograph', photos:'photograph', mic:'microphone', demo:'demonstration',
+  promo:'promotion', gym:'gymnasium', flu:'influenza', specs:'specification',
+  temp:'temperature', max:'maximum', min:'minimum', doc:'document', docs:'document',
+  meds:'medicine', vet:'veterinarian', app:'application', pics:'picture',
+  auto:'automobile', bio:'biography'
+};
+function expansion(w){
+  const full=CLIP[w]; if(!full) return null;
+  if((at&&at.has(full))||packs.has(full)) return full;
+  return w;
+}
 function lemmaOf(word){
   const w=String(word||'').toLowerCase();
   if(!w) return null;
   if((at&&at.has(w))||packs.has(w)) return w;
+  const clip=expansion(w); if(clip) return clip;
   const tries=[];
   if(/ies$/.test(w)&&w.length>4) tries.push(w.slice(0,-3)+'y');
   if(/es$/.test(w)&&w.length>3){ tries.push(w.slice(0,-2)); tries.push(w.slice(0,-1)); }
@@ -87,6 +104,6 @@ function load(url){
 window.DICT={
   get ready(){ return !!data; },
   get size(){ return data?data.w.length:0; },
-  online, install, load, lemmaOf, knows, pos, synonyms, unknownWord, addPack, restorePacks, linkIntents
+  online, install, load, lemmaOf, knows, pos, synonyms, unknownWord, addPack, restorePacks, linkIntents, CLIP
 };
 })();
