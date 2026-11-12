@@ -99,6 +99,7 @@ const forge=W.forge(scene); colliders.circles.push({x:W.STATIONS.forge.x+0.5,z:W
 const encForge=W.enchantForge?W.enchantForge(scene):null; if(encForge) colliders.circles.push({x:W.STATIONS.enchantForge.x,z:W.STATIONS.enchantForge.z,r:1.4});
 const encCircle=W.enchantCircle?W.enchantCircle(scene):null; if(encCircle) colliders.circles.push({x:W.STATIONS.enchantCircle.x,z:W.STATIONS.enchantCircle.z,r:1.8});
 const bench=W.bench(scene); colliders.circles.push({x:W.STATIONS.bench.x,z:W.STATIONS.bench.z,r:1.4});
+if(window.FURNITURE) FURNITURE.build(scene);
 const tav=W.tavern(scene,colliders);
 const obelisk=(()=>{ const g=new T.Group(); const st=W.STATIONS.seed; g.position.set(st.x,V2H(st.x,st.z),st.z); scene.add(g);
   const M=HERO.M; const base=new T.Mesh(new T.CylinderGeometry(1.4,1.7,0.5,8),M('#3a3d46')); base.position.y=0.25; g.add(base);
@@ -442,8 +443,9 @@ function benchFit(force){ const C=CRAFT, HR=house(), ccl=crafterCL(); const cur=
     for(const sp of cands){ const cfg=Object.assign({},benchCfg,{base:k,use,spells:sp,meta:[],enh:0,clBonus:0,ritual:false}); const pr=C.price(cfg,HR,ccl); if(!pr.ok) continue; if(!okAny) okAny=cfg; if(pr.guildGold<=S.gold){ okAfford=cfg; break; } }
     if(okAfford) break; }
   const pickCfg=okAfford||okAny; if(!pickCfg) return false; const nm=benchCfg.name; benchCfg=pickCfg; if(!nm||nm==="Robert's Strider Armor"||nm==='My Wondrous Item'||force) benchCfg.name=C.BASES[pickCfg.base].name+' of '+C.SPELLS[pickCfg.spells[0]].name; return true; }
+function retitleBench(){ if(!CRAFT.staleBenchName||!CRAFT.staleBenchName(benchCfg.name, benchCfg.base)) return; const sp=benchCfg.spells&&benchCfg.spells[0]&&CRAFT.SPELLS[benchCfg.spells[0]]; benchCfg.name=CRAFT.titledName(benchCfg.base, sp&&sp.name); }
 function benchUI(){
-  benchFit(false);
+  benchFit(false); retitleBench();
   const C=CRAFT, HR=house(), ccl=crafterCL(), p=C.price(benchCfg, HR, ccl);
   const opt=(o,sel)=>Object.keys(o).map(k=>'<option value="'+k+'" '+(k===sel?'selected':'')+'>'+o[k].name+(o[k].price!==undefined?' ('+o[k].price+' gp)':'')+'</option>').join('');
   const metaOff=!HR.dmMeta&&(p.use==='continuous'||p.use==='use');
@@ -508,7 +510,7 @@ function updateCrafting(dt){ const c=(S.crafting||[])[0]; if(!c) return; c.remai
 function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(CH.sel);
   let h='<div class="small">AC '+st.ac+' <span title="SRD: '+st.acNote+'">('+st.acNote+')</span> · Attack +'+st.atk+' · Damage 1d8+'+st.dmg+' · Speed +'+Math.round(st.speed*100)+'%'+(S.follower?' · <i>loyal follower of Delroth</i>':'')+'</div>';
   h+='<div class="sec">Items ('+S.inv.length+')</div>'+(S.inv.length?S.inv.map(it=>'<div class="q"><span>'+(it.equipped?'✅ ':'')+rName(it)+' <span class="small">'+rarity(it).name+' · '+(it.cat||'')+(it.spells?' · '+it.spells.join(', ')+(it.meta&&it.meta.length?' ['+it.meta.join(', ')+']':'')+' · '+it.use+(it.craftNote?' · '+it.craftNote:''):'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+(it.durability!=null?' · dur '+it.durability+'/'+it.maxDur+' · life '+((it.lifetime||0)-(it.uses||0))+' left':'')+'</span></span>'+
-    (it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'<span class="small">quest item</span>':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+(it.value>1&&!it.equipped?'<button data-sell="'+it.id+'" title="SRD: items sell for half their market price">Sell '+Math.floor(it.value/2).toLocaleString()+'</button>':'')+(it.crafted&&!it.equipped?'<button data-treas="'+it.id+'">Treasury buys</button>':'')+'</div>').join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
+    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'<span class="small">quest item</span>':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+(it.value>1&&!it.equipped?'<button data-sell="'+it.id+'" title="SRD: items sell for half their market price">Sell '+Math.floor(it.value/2).toLocaleString()+'</button>':'')+(it.crafted&&!it.equipped?'<button data-treas="'+it.id+'">Treasury buys</button>':'')+'</div>').join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
   h+=GATHERING.bagHTML();
   h+='<div class="sec">Template Painter — '+(ch.locked?'(locked preset: duplicate it in HeroLock to paint)':ch.name)+'</div>';
   h+='<div class="small">Templates owned: '+S.templates.join(', ')+'</div><div class="row">'+
@@ -517,6 +519,7 @@ function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(
     DYES.map(d=>'<button data-dye="'+d.hex+'" title="'+d.name+'" '+(S.dyes.includes(d.name)&&!ch.locked?'':'disabled')+' style="border-left:14px solid '+d.hex+'">'+d.name+'</button>').join('')+'</div>';
   h+='<div class="small">Instruments: '+(S.instruments.join(', ')||'none yet')+' · Outpost: '+(Object.keys(S.outpost).join(', ')||'nothing yet')+'</div>';
   b.innerHTML=h;
+  b.querySelectorAll('[data-tablet]').forEach(x=>x.onclick=()=>openTablet());
   b.querySelectorAll('[data-use]').forEach(x=>x.onclick=()=>{ drink(S.inv.find(i=>i.id===x.dataset.use)); renderBag(); });
   b.querySelectorAll('[data-sell]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.sell); if(!it) return; const g=Math.floor(it.value/2); S.inv.splice(S.inv.indexOf(it),1); S.gold+=g; log('Sold '+it.name+' for '+g.toLocaleString()+' gold (half its '+it.value.toLocaleString()+' gp price). 1 gold = 1 gp.'); save(); renderBag(); });
   b.querySelectorAll('[data-treas]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.treas); if(!it||!window.STATIONS) return; const r=STATIONS.treasuryBuyCrafted(it); if(!r.ok){ log('Treasury: '+ (r.why||'cannot buy')); return; } S.inv.splice(S.inv.indexOf(it),1); log('Guild treasury bought '+it.name+' for '+r.paid+' Mori Marks.'); save(); renderBag(); });
@@ -621,8 +624,10 @@ function moriCtx(){ if(!S.moriMem) S.moriMem={}; const rid=curRegion(), inf=PL.r
   const rdy=act.filter(q=>QUESTS.ready(q.id)); const nx=QUESTS.list.find(q=>!QUESTS.state(q.id)&&(QUESTS.PLACE[q.place]&&(q.place==='guild'||q.place==='bard')===atGuild()))||QUESTS.list.find(q=>!QUESTS.state(q.id));
   const questLine=(rdy.length?'"'+rdy[0].title+'" is ready! go see '+NPCS.byId(QUESTS.turnTo(rdy[0])).name+'. ':'')+(act.length?'you have '+act.length+' quest'+(act.length>1?'s':'')+': '+act.slice(0,3).map(q=>q.title+' ('+QUESTS.progress(q.id)+')').join('; ')+'. ':'no quests yet! ')+(nx?'ask '+NPCS.byId(nx.giver).name+' in '+QUESTS.PLACE[nx.place]+' — they need help. ':'')+'press L or 📜 for the quest log.';
   const sk=(S.gather&&S.gather.skills)||{}; const skills=['herbalism','mining','woodcutting','skinning'].map(k=>k+' '+GATHERING.level(sk[k]||0)).join(', ');
-  const st=stats(); return { mem:S.moriMem, n:moriN, place:(atGuild()?'the guild · ':'')+inf.name, atGuild:atGuild(), busy:curJob&&!curJob.idle?jobLabel(curJob):'', openQuests:offers, questLine, skills, level:charLevel(),
+  const st=stats(); return { mem:S.moriMem, n:moriN, regionName:inf.name, place:(atGuild()?'the guild, in ':'')+inf.name, atGuild:atGuild(), busy:curJob&&!curJob.idle?jobLabel(curJob):'', openQuests:offers, questLine, skills, level:charLevel(), hereCity, cityList,
     combatTip:'your ac is '+st.ac+', attack +'+st.atk+', hp '+Math.round(S.hp)+'/'+st.maxHp+'.', people:here.length?here.map(d=>d.name+' ('+d.role+')').join(', '):'nobody nearby — try the guild, gravenmoor or havenwall', world:worldStats, suggest:nx?'try asking '+NPCS.byId(nx.giver).short+' for work.':'' }; }
+function hereCity(){ const id=curRegion(), stg=stageOf(id); if(!(stg>=4||atGuild())) return {named:false, region:PL.regionInfo(id).name}; const cid=stg>=4?id:guildId; const cs=PL.cityState(cid,guildId); const civ=civicProfileFor(cid); return {named:true, name:cs.name, ruler:cs.ruler, motto:cs.motto, govName:cs.govName, race:civ&&civ.race, arts:(civ&&civ.arts)||[], region:PL.regionInfo(cid).name}; }
+function cityList(){ const w=WD(), out=[]; for(const k in w.reg){ if((w.reg[k]|0)<4) continue; const id=+k, cs=PL.cityState(id,guildId), civ=civicProfileFor(id); out.push({name:cs.name, ruler:cs.ruler, motto:cs.motto, govName:cs.govName, race:civ&&civ.race, region:PL.regionInfo(id).name}); } return out; }
 function worldStats(){ const w=WD(), reg=w.reg; const byStage=[0,0,0,0,0]; for(const k in reg) byStage[Math.min(4,reg[k]|0)]++; const programmed=Object.keys(reg).length;
   const cities=Object.keys(reg).filter(k=>reg[k]>=4).map(k=>({id:+k, name:PL.cityState(+k,guildId).name, gov:PL.cityState(+k,guildId).govName})); const pk=CLAN.ready?CLAN.pick():{};
   return { seed:S.seed, radiusKm:PL.RADIUS_KM, regions:PL.COUNT, programmed, blank:PL.COUNT-programmed, byStage:{void:PL.COUNT-programmed, terrain:byStage[1], roads:byStage[2], villages:byStage[3], cityStates:byStage[4]}, cities:cities.length, cityNames:cities.map(c=>c.name),
@@ -706,7 +711,24 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
-$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
+$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
+function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
+let tabletDraft=null, tabletResult=null;
+function tabletSlots(){ const h=hereCity(); return {ruler:h.ruler||'The Guild Charter (Seedkeeper Mori)', name:h.name||'Guildhold', motto:h.motto||'', gov:h.govName||'Guild Charter', race:h.race||'', region:h.region||'', arts:''}; }
+function moriDraft(){ return {note:'one vocab finger', fingers:[
+  {kind:'vocab', id:'ruler.n', add:['sovereign']},
+  {kind:'intent', id:'ruler', any:['who is the sovereign'], template:'ruler'},
+  {kind:'template', id:'ruler', text:'{ruler} rules {name}. the motto is "{motto}".'}
+]}; }
+function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.tablet&&S.tablet.approved||[]).length; const face=tabletResult?(tabletResult.pass?'The runes hold. Every check passed.':'The runes reject this. '+((tabletResult.fails||[]).slice(0,3).join('; '))):(tabletDraft?'A draft is waiting. It has not been applied.':'The glass is dark. Ask Mori for one small change.');
+  el.innerHTML='<div id="tabletFace">'+face+'</div><div class="small">Approved fingers: '+n+'. A finger is one vocab pack, one intent, one template, one furniture note, or one recipe note. Nothing runs in the live game until you tap Approve.</div>'+
+    '<div class="row"><button type="button" id="tabDraft">Ask Mori</button><button type="button" id="tabRun">Run checks</button><button type="button" class="pri" id="tabYes"'+(tabletResult&&tabletResult.pass?'':' disabled')+'>Approve</button><button type="button" id="tabNo">Revert</button></div>';
+  $('tabDraft').onclick=()=>{ tabletDraft=moriDraft(); tabletResult=null; renderTablet(); };
+  $('tabRun').onclick=()=>{ if(!tabletDraft){ tabletDraft=moriDraft(); } const slots=tabletSlots(); const cases=[{text:'who is the sovereign', intent:'ruler', includes:[slots.ruler, slots.name], slots}]; TABLET.check(TABLET.normalize?TABLET.normalize(tabletDraft):tabletDraft, cases).then(r=>{ tabletResult=r; renderTablet(); }); };
+  $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(window.FINGERS) FINGERS.reapply(S.tablet.approved); if(window.FURNITURE) FURNITURE.build(scene); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
+  $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length) S.tablet.approved.pop(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
+}
+function openTablet(){ ensureTablet(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
  '<li><b>Move</b>: WASD / arrows (phones: left-thumb joystick). <b>Look</b>: drag to orbit, wheel / pinch to zoom.</li>'+
  '<li><b>Loot rarity:</b> '+RARITY.map(r=>'<span style="color:'+r.c+'">■ '+r.name+'</span>').join(' · ')+'. Magic gear starts dropping around character level 4–5 (level = 3 + full dungeon clears). A full clear is the boss portal home. Clearing one room does not raise it.</li>'+
@@ -786,7 +808,8 @@ function regionTargets(){ return SW.F.targets.map(t=>Object.assign({},t,{act:()=
 function regionAct(t){ if(t.kind==='globe') openGlobe(); else if(t.kind==='dungeon') enterDungeon({name:t.name, lvl:t.lvl, ret:SW.F.barrow});
   else if(t.kind==='city') cityModal(t.city); else if(t.kind==='village') log('Villagers wave. '+PL.regionInfo(curRegion()).name+' has roads and homes now — one more seed job and it could become a city-state.');
   else if(t.kind==='void') { log('▦ The void hums. Nothing here is programmed yet. Queue a seed job on the globe.'); openGlobe(); } }
-function worldTargets(){ return GATHERING.targets().concat(NPCS.targets(),CLAN.targets(),baseWorldTargets()); }
+function sitOn(t){ player.sit={x:t.x,z:t.z,name:t.name}; player.pos.x=t.x; player.pos.z=t.z; log(t.name+'. '+(t.flavor||'')); }
+function worldTargets(){ const furn=window.FURNITURE?FURNITURE.targets().map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
 function baseWorldTargets(){ if(!atGuild()) return regionTargets(); const st=W.STATIONS, sw=tav.userData.stageWorld; return regionTargets().concat([
   {x:st.seed.x+1.5,z:st.seed.z+1.5,r:3.4,label:'🌱 World Seed Obelisk (globe & seed)',act:()=>openGlobe()},
   {x:st.doll.x,z:st.doll.z+1.8,r:3.2,label:'🪆 Mori Doll shop',act:dollShop},
@@ -825,11 +848,12 @@ function updatePlayer(dt){
   const fx=-Math.sin(camYaw), fz=-Math.cos(camYaw), rx=Math.cos(camYaw), rz=-Math.sin(camYaw);
   const dx=fx*iz+rx*ix, dz=fz*iz+rz*ix; const sp=5.2*(1+stats().speed)*(keys.ShiftLeft?1.4:1);
   const moving=Math.hypot(dx,dz)>0.05;
-  if(moving){ const nx=player.pos.x+dx*sp*dt, nz=player.pos.z+dz*sp*dt; if(mode==='world'){ player.pos.x=nx; player.pos.z=nz; collide(player.pos,0.45); } else dungeonMove(player.pos,nx,nz,0.4); player.face=Math.atan2(dx,dz); }
+  if(moving){ player.sit=null; const nx=player.pos.x+dx*sp*dt, nz=player.pos.z+dz*sp*dt; if(mode==='world'){ player.pos.x=nx; player.pos.z=nz; collide(player.pos,0.45); } else dungeonMove(player.pos,nx,nz,0.4); player.face=Math.atan2(dx,dz); }
+  else if(player.sit){ player.pos.x=player.sit.x; player.pos.z=player.sit.z; }
   player.pos.y=mode==='world'?groundY(player.pos.x,player.pos.z):0;
   // tavern floor/stage
   if(mode==='world'&&tav.userData.inside(player.pos.x,player.pos.z)) player.pos.y=Math.max(player.pos.y, tav.userData.floorY||0.15);
-  player.model.position.copy(player.pos); player.model.rotation.y=lerpAngle(player.model.rotation.y,player.face,Math.min(1,dt*12));
+  player.model.position.copy(player.pos); if(player.sit) player.model.position.y-=0.42; player.model.rotation.y=lerpAngle(player.model.rotation.y,player.face,Math.min(1,dt*12));
   HERO.animate(player.model, clockT, moving?Math.min(1.4,len*(1+stats().speed)):0);
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
   // breadcrumbs for the companions
@@ -1183,6 +1207,7 @@ IDLEBUILD.init({
   clearIdleJob:()=>{ if(curJob&&curJob.idle) curJob=null; },
   renderSeedPanel:()=>renderSeedPanel()
 });
+ensureTablet(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene);
 voiceSetup(); $('npcBack').onclick=()=>{ endNpc(); openMoriChat(); };
 if(CLAN.site) refreshFrame(); // the first frame was built before the Clan / NPCs knew the player (no-op otherwise)
 addEventListener('resize',resize); resize(); hud(); updBrain();

@@ -112,5 +112,7 @@ function price(cfg, rules, crafterCL){
     guildGold:Math.max(1,Math.ceil(craftGp))}; // v3.2: 1 gold = 1 gp (SRD scale)
 }
 const PRESETS={ strider:{label:"Robert's Strider Armor", name:"Robert's Strider Armor", base:'chainshirt', use:'continuous', spells:['expeditious','longstrider','catsgrace','haste'], meta:[], clBonus:0, charges:3, enh:0, ritual:false, crafter:'mori'} };
-window.CRAFT={SPELLS, METAMAGIC, USES, BASES, DURMOD, price, PRESETS, minCL, FEATS, CRAFTERS, featFor, HOUSE_DEFAULT, BUDGET, RITUAL};
+function staleBenchName(name, base){ if(!name||name==='My Wondrous Item') return true; if(/strider armor/i.test(name)&&base!=='chainshirt') return true; return false; }
+function titledName(baseKey, spellName){ const b=BASES[baseKey]; if(!b) return 'My Wondrous Item'; return b.name+(spellName?' of '+spellName:''); }
+window.CRAFT={SPELLS, METAMAGIC, USES, BASES, DURMOD, price, PRESETS, minCL, FEATS, CRAFTERS, featFor, HOUSE_DEFAULT, BUDGET, RITUAL, staleBenchName, titledName};
 })();

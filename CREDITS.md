@@ -32,6 +32,9 @@ The SRD-derived mechanics in `js/srd.js` and `js/craft.js` are Open Game Content
 - Templates v2 textures/palettes: derived from photos in Robert's approved "Mori templates" Drive folder (used with permission); only textures/colours are kept, no photos ship.
 - Geometry flowers: procedural code written for this project (MIT), no external assets.
 
+## Mori's lexicon
+`js/lexicon.js` is original wording for this game. The synset shape follows the idea of Princeton WordNet (https://wordnet.princeton.edu/, Princeton University). The WordNet database itself is not included.
+
 ## Grounded world pass
 Rules behind `js/grounded.js` are original code. The references were read for general ideas only; no textbook text, figures, Bannerlord data, or real-place names are included. Full URLs and licenses are in `GROUNDING.md`.
 - OpenStax, *Algebra and Trigonometry 2e* (Jay Abramson and co-authors, Rice University), CC BY-NC-SA 4.0. Roof pitch uses tan and cos.

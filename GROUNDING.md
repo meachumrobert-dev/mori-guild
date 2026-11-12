@@ -58,6 +58,12 @@ These are not started, and a level does not unlock them.
 - **Armies.** The crest span above is the cap on direct command. Fielding troops needs food, a logistics path, treasury pay, and a captain who already holds a crest. Diplomacy may someday trade a captain or a teacher. A teacher accelerates or opens one culture art. A teacher does not hand out a stat bonus.
 - **Hydrology, timed research, armor crafting rewrite.** The probe is not a river. Days and shifts are not a clock. The Guild forge ladder is unchanged.
 
+## Mori's English and the tablet
+
+`js/lexicon.js` is an original list of game words and paraphrases, grouped as synsets. That grouping is the same idea as Princeton WordNet (https://wordnet.princeton.edu/). This file is not a copy of the WordNet database, so the WordNet license does not apply and no WordNet gloss is reproduced. `js/english.js` only supplies articles, plurals, and the Oxford comma. Answers about a ruler, a motto, a people, or an art are read from the current city card. If the card has no ruler, Mori says so. She names the guild meadow for an herb only when a patch of that herb is actually there.
+
+Herb patches in a forest city take turns through that biome's herb list. A flower node still pulls the plants into a cluster. It does not paint the whole region one species. A field plot may still be the one crop that plot was given.
+
 ## Limits a player will notice
 
 - Village ground is recomputed from the seed. An old visit shows the new hamlet the next time you arrive. Terraform deltas and depletion timers still load.

@@ -63,6 +63,7 @@ const level=xp=>Math.min(20,1+Math.floor(Math.sqrt((xp||0)/25)));
 const xpFor=l=>25*(l-1)*(l-1);
 const skillLv=k=>level(G().skills[k]);
 function pickW(rnd,list,wf){ let tot=0; const w=list.map(x=>{ const v=wf(x); tot+=v; return v; }); let r=rnd()*tot; for(let i=0;i<list.length;i++){ r-=w[i]; if(r<=0) return list[i]; } return list[list.length-1]; }
+function pickHerb(biome, rnd){ const list=HERBS[biome]||HERBS.grass; const roll=typeof rnd==='function'?rnd:()=>Math.random(); return pickW(roll, list, id=>TW[R[id].tier]||0.2); }
 
 /* ---------- meshes ---------- */
 let grp=null, IM={}, flora=null, ring=null, beams=null, chips=null; const CAP=160;
@@ -137,7 +138,7 @@ function genCell(ci,cj){ const SW=X.SW, F=SW.F, rnd=P().rngFor(P().seed,'gath',F
       if(type==='herb'){ const hit=Gnd.flowerWeight(x,z,ctx); if(!hit) continue;
         const j=P().rngFor(P().seed,'flj',F.id,ci,cj,k); const spot=Gnd.clusterPoints(hit.node,1,j,(px,pz)=>okSpot(px,pz))[0];
         if(spot){ x=spot.x; z=spot.z; } else if(!okSpot(x,z)) continue;
-        const prefer=Gnd.SPECIES_REAGENT[hit.node.species]; if(prefer&&(HERBS[B]||HERBS.grass).indexOf(prefer)>=0&&rnd()<0.7) rid=prefer;
+        const herbBiome=b==='guild'?'guild':B; const patchRnd=P().rngFor(P().seed,'herbpatch',F.id,Math.floor(ci/2),Math.floor(cj/2)); rid=pickHerb(herbBiome, patchRnd);
         const farm=F.settlement&&F.settlement.farms&&F.settlement.farms.filter(f=>Math.hypot(f.x-x,f.z-z)<6)[0];
         if(farm&&farm.reagent&&R[farm.reagent]) rid=farm.reagent;
       } else if(type==='ore'){ const hit=Gnd.oreAt(x,z,ctx); if(!hit) continue;
@@ -274,15 +275,17 @@ function reagentMention(word){ const t=String(word||'').toLowerCase(); let best=
     if(t.includes(name)||t.includes(spaced)){ if(!best||name.length>best.name.length) best=R[id]; } }
   return best; }
 function biomesFor(id){ const fam=R[id]&&R[id].fam; const table=fam==='herb'?HERBS:fam==='ore'?ORES:fam==='stone'?STONES:fam==='wood'?WOODS:null; const out=[];
-  if(!table) return out; for(const b in table) if(b!=='_'&&table[b].indexOf(id)>=0) out.push(b==='guild'?'the guild meadow':b); return out; }
+  if(!table) return out; for(const b in table) if(b!=='_'&&b!=='guild'&&table[b].indexOf(id)>=0) out.push(b); return out; }
 function whereNamed(word){ const r=reagentMention(word); if(!r) return null;
   const nodeType=['herb','ore','stone','wood'].includes(r.fam)?r.fam:null;
-  const bios=biomesFor(r.id); const whereBio=bios.length?bios.slice(0,4).join(', '):'the right ground';
+  const bios=biomesFor(r.id); const whereBio=bios.length?(window.ENGLISH?ENGLISH.oxford(bios.slice(0,4)):bios.slice(0,4).join(', ')):'no listed biome';
   if(!nodeType) return r.name.toLowerCase()+' is not something you pick off the ground.';
-  if(!X||X.mode()!=='world') return 'we are not on the surface. '+r.name.toLowerCase()+' shows up in '+whereBio+'.';
+  const meadow=!!(X&&nodes.some(n=>n.rid===r.id&&Math.hypot(n.x,(n.z||0)-39)<22));
+  const meadowBit=meadow?' a patch of it is in the guild meadow.':'';
+  if(!X||X.mode()!=='world') return 'i have not looked at the ground. the gather list allows '+r.name.toLowerCase()+' in '+whereBio+'.'+meadowBit;
   const p=X.player.pos; const ls=nodes.filter(n=>n.type===nodeType&&n.rid===r.id&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
-  if(!ls.length) return 'i don\'t see '+r.name.toLowerCase()+' in this spot. it grows in '+whereBio+'.';
-  return r.name.toLowerCase()+' is '+Math.round(ls[0].d)+' m '+dirTo(ls[0].n.x-p.x,ls[0].n.z-p.z)+'. it also shows up in '+whereBio+'.'; }
+  if(!ls.length) return 'i don\'t see '+r.name.toLowerCase()+' loaded around you. the gather list allows it in '+whereBio+'.'+meadowBit;
+  return r.name.toLowerCase()+' is '+Math.round(ls[0].d)+' m '+dirTo(ls[0].n.x-p.x,ls[0].n.z-p.z)+'. the gather list also allows it in '+whereBio+'.'+meadowBit; }
 function where(word){ const t=famOf(word); if(!t) return null; const p=X.player.pos; if(X.mode()!=='world') return 'we are underground. i can only smell rocks. go outside first!';
   const ls=nodes.filter(n=>n.type===t&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
   if(!ls.length) return 'i don\'t see any '+(t==='herb'?'herbs':t)+' near here. try another region — '+(t==='ore'?'mountains have the good ore.':t==='herb'?'grass and jungle have lots of flowers.':'forests have logs.');
@@ -315,7 +318,7 @@ function sell(id){ const s=X.S(); const n=s.reag[id]||0; if(!n) return 0; const 
 
 window.GATHERING={ R, TIER, REQ, RESPAWN, SKILLS, PARTS, CELL, HERBS, ORES, WOODS,
   init(o){ X=o; G(); buildMeshes(); registerWarm(); },
-  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, reagentMention, biomesFor, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, iconURL, skillLv, level, xpFor,
+  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, iconURL, skillLv, level, xpFor,
   spawnHostile(kind,x,z){ try{ const m=SRD.makeMonster(kind); const g=critMesh(m); g.position.set(x,X.SW.heightAt(x,z),z); g.name='raid_'+kind; g.userData.sw=true; X.scene.add(g);
       const c={key:'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), kind, m, g, x, z, hx:x, hz:z, alive:true, ag:true, cd:0.8, hit:0, wt:0, tx:x, tz:z, critter:true, room:-1, raid:true}; crit.push(c); return c; }catch(e){ return null; } },
   get nodes(){ return nodes; }, get crit(){ return crit; }, get carc(){ return carc; }, get act(){ return act; }, get run(){ return run; }, stats, ready, toolMesh,
