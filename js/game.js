@@ -33,6 +33,10 @@ if(!S.v38){ S.v38=1; if(!S.craftSkills) S.craftSkills={alchemy:0,smithing:0,ench
 if(window.HOTBAR) S.bars=HOTBAR.restore(S.bars);
 if(window.ORES) ORES.migrate(S);
 if(window.VILLAGE) VILLAGE.migrate(S);
+if(window.TROLLS) TROLLS.migrate(S);
+if(window.LEGEND) LEGEND.migrate(S);
+if(window.RECIPES) RECIPES.migrate(S);
+if(window.LEGEND&&window.STOCKPILE){ const prices=LEGEND.prices(); for(const id in prices) STOCKPILE.register(id, prices[id]); }
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -759,6 +763,9 @@ function bindVillage(root){
   root.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>{ const r=VILLAGE.sell(S, townKey(), b.dataset.sell, 1); log(r.ok?'Sold 1 '+b.dataset.sell.replace(/_/g,' ')+' to the stockpile for '+r.paid+' gold.':'The town cannot take that. '+(r.why||'')); save(); renderVillage('elderP'); });
   root.querySelectorAll('[data-craft]').forEach(b=>b.onclick=()=>{ const r=VILLAGE.craft(S, b.dataset.craft); log(r.ok?'Made '+r.name+'.':r.why); save(); renderVillage('elderP'); });
   root.querySelectorAll('[data-contract]').forEach(b=>b.onclick=()=>{ const r=VILLAGE.deliver(S, b.dataset.contract); log(r.ok?'Contract is now '+r.stage+' ('+r.done+').':(r.why||'not yet')); save(); renderVillage('boardP'); });
+  root.querySelectorAll('[data-mix]').forEach(b=>b.onclick=()=>{ if(!window.RECIPES) return; const app=(root.querySelector('#alembic')||{}).value||'mortar'; const ids=Object.keys(S.reag||{}).filter(k=>(S.reag[k]|0)>0&&RECIPES.REAGENTS[k]).slice(0,4); const r=RECIPES.combine(S.reag, ids, {apparatus:app, skill:(S.alchemy&&S.alchemy.mix)|0, known:S.alchemy&&S.alchemy.known}); if(r.ok&&r.item){ for(let i=0;i<(r.yield||1);i++) addItem(Object.assign({}, r.item)); } log(r.ok?(r.name+' · '+(r.shown.length?r.shown.join(', '):'effects still hidden')+' · '+r.era):r.why); save(); renderVillage('elderP'); });
+  root.querySelectorAll('[data-distill]').forEach(b=>b.onclick=()=>{ if(!window.RECIPES) return; const app=(root.querySelector('#alembic')||{}).value||'distillery'; const r=RECIPES.distill(S.reag, app); log(r.ok?'Distilled '+r.qty+' '+r.name+'.':r.why); save(); renderVillage('elderP'); });
+  root.querySelectorAll('[data-taste]').forEach(b=>b.onclick=()=>{ const r=RECIPES.taste(S, b.dataset.taste); log(r.ok?(r.learned?'You taste '+r.learned+'. ('+r.era+')':'You already know what this '+r.era.toLowerCase()+' can tell you.'):r.why); save(); renderVillage('elderP'); });
 }
 $('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
@@ -901,9 +908,12 @@ let brandTaps=0; $('brand').onclick=()=>{ if(++brandTaps>=5&&!S.hatEgg){ S.hatEg
 /* ---------- interaction targets ---------- */
 let mode='world'; // 'world' | 'dungeon'
 function regionTargets(){ return SW.F.targets.map(t=>Object.assign({},t,{act:()=>regionAct(t)})); }
-function regionAct(t){ if(t.kind==='globe') openGlobe(); else if(t.kind==='dungeon') enterDungeon({name:t.name, lvl:t.lvl, ret:SW.F.barrow});
+function regionAct(t){ if(t.kind==='globe') openGlobe(); else if(t.kind==='portal') ridePortal(t.dest); else if(t.kind==='hive') takeHive(t); else if(t.kind==='dungeon') enterDungeon({name:t.name, lvl:t.lvl, ret:SW.F.barrow});
   else if(t.kind==='city') cityModal(t.city); else if(t.kind==='village') log('Villagers wave. '+PL.regionInfo(curRegion()).name+' has roads and homes now — one more seed job and it could become a city-state.');
   else if(t.kind==='void') { log('▦ The void hums. Nothing here is programmed yet. Queue a seed job on the globe.'); openGlobe(); } }
+function ridePortal(id){ const fade=$('roadFade'); if(fade) fade.classList.add('on'); const wait=window.PORTALS?Math.min(400, PORTALS.FADE_MS):300;
+  setTimeout(()=>{ travelTo(id); save(); setTimeout(()=>{ if(fade) fade.classList.remove('on'); }, window.PORTALS?PORTALS.FADE_MS:700); }, wait); }
+function takeHive(t){ if(!S.reag) S.reag={}; S.reag.royal_honey=(S.reag.royal_honey||0)+1; log('The hive gives up a jar of Royal Ironwood Bee Honey.'); t.kind='spent'; save(); }
 function sitOn(t){ player.sit={x:t.x,z:t.z,name:t.name}; player.pos.x=t.x; player.pos.z=t.z; log(t.name+'. '+(t.flavor||'')); }
 function worldTargets(){ const furn=window.FURNITURE?FURNITURE.targets().map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(resourceTargets(),NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
 function resourceTargets(){ return nodes.filter(n=>n.rid&&window.ORES&&ORES.kind(n.rid)).map(n=>({x:n.x,z:n.z,r:2.6,label:n.ready?ORES.prompt(n.rid):'⏳ '+ORES.nameOf(n.rid),tip:ORES.tip(n.rid),act:()=>gatherNode(n)})); }
@@ -942,6 +952,14 @@ function collide(p, r){
 }
 function dungeonMove(p, nx, nz, r){ const D=dun; if(D.walk(nx+Math.sign(nx-p.x)*r, p.z)&&D.walk(nx,p.z)) p.x=nx; if(D.walk(p.x, nz+Math.sign(nz-p.z)*r)&&D.walk(p.x,nz)) p.z=nz; }
 const groundY=(x,z)=>{ let h=W.height(x,z); if(SW.F.seaY!=null) h=Math.max(h,SW.F.seaY); const w=TF.waterAt(x,z); if(w!=null&&w-0.7>h) h=w-0.7; return h; }; // wade, don't sink, in Mori's lakes
+function noteBridge(){ if(!window.TROLLS||!SW.F||!SW.F.bridges) return; if(!S.roads) S.roads={bridge:null}; const hit=TROLLS.enter(player.pos, SW.F.bridges, S.roads); if(!hit) return;
+  const level=stageOf(curRegion()); const meet=TROLLS.meet(()=>Math.random(), level); if(!meet){ log('The bridge creaks. No one is home.'); return; }
+  const pay=meet.canPay?'<button id="trollPay">Pay '+meet.toll+' gold</button>':'';
+  modal('<h3>'+meet.name+'</h3><p>A troll sits on the planks and offers a riddle instead of a fight. Region level '+level+'.</p><div class="row">'+pay+'<button id="trollFight">Stand your ground</button></div>', card=>{
+    const done=choice=>{ const res=TROLLS.resolve({choice, level, gold:S.gold|0, rng:Math.random}); if(choice==='pay'&&res.ok) S.gold-=res.paid; if(res.drop){ if(!S.reag) S.reag={}; S.reag[res.drop]=(S.reag[res.drop]||0)+(res.qty||1); } if(res.hurt) S.hp=Math.max(1, S.hp-res.hurt); log(res.line||res.why||'The troll shrugs.'); closeModal(); save(); };
+    const a=card.querySelector('#trollPay'); if(a) a.onclick=()=>done('pay'); const f=card.querySelector('#trollFight'); if(f) f.onclick=()=>done('fight');
+  });
+}
 function updatePlayer(dt){
   let ix=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+joy.x, iz=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-joy.y;
   const len=Math.hypot(ix,iz); if(len>1){ ix/=len; iz/=len; }
@@ -1026,6 +1044,7 @@ function attack(){ if(crOpen||atkCd>0) return; atkCd=0.55; player.atkT=0.35; com
   if(best.m.hp<=0) killMob(best, mode==='dungeon');
 }
 function killMob(best, inDun){ best.alive=false; GATHERING.addCarcass(best, inDun); const g=SRD.rnd(6)*best.m.xp; S.gold+=g;
+  if(window.LEGEND&&best.m&&best.m.parts){ const tale=LEGEND.onKill(S, best.m, atGuild()?'guild':String(curRegion()), (S.village&&S.village.day)|0); if(tale.rumor) log(tale.rumor.text); }
   if(inDun){ dunSaveState(); S.larpy+=best.m.boss?3:0; if(best.room>=0&&!mobs.some(m=>m.alive&&m.room===best.room)){ QUESTS.event('room',best.room); noteRoomClear(dun&&dun.rooms[best.room]&&dun.rooms[best.room].name); } } const parts=GATHERING.partsFor(best.m).map(q=>GATHERING.R[q[0]].name).filter((v,i,a)=>a.indexOf(v)===i);
   log(best.m.name+' destroyed! +'+g+' gold'+(best.m.boss?' +3 LARPy — the boss chest unlocks and a portal opens.':'')+' · 🔪 Skin the carcass (E): '+parts.join(', ')); }
 // shared SRD attack roll for any foe that reaches you (dungeon mobs and overworld critters)
@@ -1247,7 +1266,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   weedT-=dt; if(weedT<=0){ weedT=4; if(weeds.length<26) spawnWeed(); }
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
-  updatePlayer(dt); GATHERING.update(dt); CLAN.update(dt); if(mode==='world'){ NPCS.update(dt); DREADLORD.update(dt); } npcWatch();
+  updatePlayer(dt); if(mode==='world') noteBridge(); GATHERING.update(dt); CLAN.update(dt); if(mode==='world'){ NPCS.update(dt); DREADLORD.update(dt); } npcWatch();
   if(mode==='dungeon') updateDungeon(dt); else { if(heavy.plan.world) SW.update(player.pos.x,player.pos.z, heavy.plan.chunk); if(heavy.plan.build) TF.update(dt,player.pos.x,player.pos.z); if(heavy.plan.world) IMPOSTORS.update(); townT-=dt; if(townT<=0){ townT=1; setTownVisible(atGuild()); } }
   // targets
   const tg=mode==='world'?worldTargets():dungeonTargets(); curTarget=null; let bd=1e9; tg.forEach(t=>{ const d=Math.hypot(t.x-player.pos.x,t.z-player.pos.z); if(d<t.r&&d<bd){ bd=d; curTarget=t; } });

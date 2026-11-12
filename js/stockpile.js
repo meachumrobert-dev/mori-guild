@@ -10,6 +10,7 @@ const BASE={
   wolf_pelt:3, scraped_hide:5, trail_leather:12,
   mint:1, chamomile:1, traveler_tisane:4
 };
+function register(id, base){ if(id&&base>0) BASE[id]=base; }
 function baseOf(id){ return BASE[id]||2; }
 function clampMul(m){ return Math.max(MIN, Math.min(MAX, m)); }
 function price(town, id){
@@ -57,6 +58,6 @@ function migrate(save){
   save.village.v=1;
   return save;
 }
-root.STOCKPILE={MIN, MAX, BASE, baseOf, price, town, ensure, sell, produce, migrate};
+root.STOCKPILE={MIN, MAX, BASE, baseOf, price, town, ensure, sell, produce, migrate, register};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.STOCKPILE;
 })(typeof window!=='undefined'?window:globalThis);

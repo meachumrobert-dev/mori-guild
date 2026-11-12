@@ -35,6 +35,7 @@ const RDEF={
 const R={}; for(const id in RDEF){ const d=RDEF[id]; R[id]=Object.assign({id, name:d[0], fam:d[1], tier:d[2], gp:d[3], wt:d[4], stack:d[5]}, d[6]||{}); }
 if(window.LUMBER) LUMBER.reagents().forEach(r=>{ if(!R[r.id]) R[r.id]=r; });
 if(window.ORES) window.ORES.reagents().forEach(r=>{ if(!R[r.id]) R[r.id]=r; });
+if(window.RECIPES) RECIPES.reagents().forEach(r=>{ if(!R[r.id]) R[r.id]=Object.assign({id:r.id}, r); });
 const SKILL_OF={herb:'herbalism', ore:'mining', stone:'mining', wood:'woodcutting', part:'skinning'};
 const TOOL_OF={herbalism:'sickle', mining:'pick', woodcutting:'axe', skinning:'knife'};
 const SND_OF={sickle:'sickle', pick:'pick', axe:'axe', knife:'knife'};
