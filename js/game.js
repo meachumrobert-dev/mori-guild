@@ -32,6 +32,7 @@ if(!S.dun) S.dun={};
 if(!S.v38){ S.v38=1; if(!S.craftSkills) S.craftSkills={alchemy:0,smithing:0,enchanting:0,heal:0,jewelry:0}; if(!S.stations) S.stations={pot:'clay',forge:'cast_iron',unlocked:['clay','cast_iron'],enchantForge:false,enchantCircle:false,zinc:false}; if(!S.hots) S.hots=[]; if(!S.hotbar) S.hotbar={bandage:true,potion:true,salve:true}; if(!S.inv.some(i=>i.kind==='bandage')) S.inv.unshift({id:'band_starter',name:'Linen Bandage',cat:'Bandage',kind:'bandage',value:1,fx:{hot:{pps:1,dur:8},healCheck:true}}); }
 if(window.HOTBAR) S.bars=HOTBAR.restore(S.bars);
 if(window.ORES) ORES.migrate(S);
+if(window.VILLAGE) VILLAGE.migrate(S);
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -54,6 +55,10 @@ const colliders={segs:[],circles:[]};
 /* ---------- World Seed planet (v3) ---------- */
 const SW=SEEDWORLD, PL=PLANET; const V2H=W.height;
 PL.setSeed(S.seed); let guildId=PL.startRegion();
+if(window.VILLAGE&&window.REPUTATION&&S.village){
+  const neigh=PL.neighbors(guildId).slice(0,8);
+  REPUTATION.seed(S.village.rep, neigh.map(n=>Object.assign({a:guildId, b:n}, PL.relation(guildId, n))));
+}
 /* v3.4 Part B: the Demon Clan city-state + its besieged sister city (js/demonclan.js). Wired early so the first frame already knows them. */
 const _safe=(f,d)=>{ try{ return f(); }catch(e){ return d; } };
 CLAN.init({ SW:SEEDWORLD, get player(){ return player; }, S:()=>S, guildId:()=>guildId, mode:()=>_safe(()=>mode,'world'), mobile:IS_TOUCH, day:()=>_safe(()=>dayNow,1),
@@ -623,6 +628,7 @@ function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); 
   { const cmd=/\b(build|plant|grow|raise|dig|carve|flatten|level|smooth|forge|brew|gather|mine|chop|pull|seed|program|cleanse|purge|raid|terraform|make a|add a)\b/.test(s); const c=moriCtx();
     const r=MORICHAT.reply(v,c); if(r&&(!cmd||['rule','behave','intro','feel','friend','world'].includes(c.intent))&&!['gather','craft','combat','places','thanks','bye','mori'].includes(c.intent)){ addChat('mo',r,{intent:c.intent,alts:MORICHAT.alts&&MORICHAT.alts(v,c)}); LORE.unlock('npc_mori'); save(); return; } }
   // v3.4: Mori knows where the reagents are, plans gather runs, and talks about Gravenmoor / Havenwall
+  if(window.VILLAGE&&/\bwhat next\b/.test(s)){ addChat('mo', VILLAGE.answer(S, atGuild()?'guild':String(curRegion()), atGuild())); return; }
   if(/\b(where|find|any|look|nearest|see)\b/.test(s)){ const named=GATHERING.whereNamed&&GATHERING.whereNamed(s); if(named){ addChat('mo',named); return; } if(/(herb|flower|petal|leaf|root|ore|metal|iron|copper|tin|zinc|manganese|nickel|clay|silver|mithral|adamant|stone|rock|granite|marble|obsidian|wood|log|timber|tree|oak|pine|yew|mint|lavender)/.test(s)){ const a=GATHERING.where(s); if(a){ addChat('mo',a); return; } } }
   if(/\b(gather|herb|mining|ore|wood|lumber)(ing)? (run|trip)\b|\bgo gather/.test(s)){ addChat('mo',GATHERING.planRun(s)); return; }
   if(/\b(cleanse|purge)\b|\bclan raid\b/.test(s)){ addChat('mo',queueCleanse(/clan|raid/.test(s)?'clan':'kin',true)); return; }
@@ -737,6 +743,23 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
+if($('bElder')) $('bElder').onclick=()=>openVillage('elderP');
+if($('bBoard')) $('bBoard').onclick=()=>openVillage('boardP');
+if($('bRep')) $('bRep').onclick=()=>openVillage('repP');
+function townKey(){ return atGuild()?'guild':String(curRegion()); }
+function openVillage(id){ togglePanel(id); renderVillage(id); }
+function renderVillage(id){
+  if(!window.VILLAGE) return;
+  const key=townKey(), hall=atGuild();
+  if(id==='elderP'&&$('elderBody')){ $('elderBody').innerHTML=VILLAGE.elderHTML(S, key, hall); bindVillage($('elderBody')); }
+  if(id==='boardP'&&$('boardBody')){ $('boardBody').innerHTML=VILLAGE.boardHTML(S, key, hall); bindVillage($('boardBody')); }
+  if(id==='repP'&&$('repBody')) $('repBody').innerHTML=VILLAGE.repHTML(S);
+}
+function bindVillage(root){
+  root.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>{ const r=VILLAGE.sell(S, townKey(), b.dataset.sell, 1); log(r.ok?'Sold 1 '+b.dataset.sell.replace(/_/g,' ')+' to the stockpile for '+r.paid+' gold.':'The town cannot take that. '+(r.why||'')); save(); renderVillage('elderP'); });
+  root.querySelectorAll('[data-craft]').forEach(b=>b.onclick=()=>{ const r=VILLAGE.craft(S, b.dataset.craft); log(r.ok?'Made '+r.name+'.':r.why); save(); renderVillage('elderP'); });
+  root.querySelectorAll('[data-contract]').forEach(b=>b.onclick=()=>{ const r=VILLAGE.deliver(S, b.dataset.contract); log(r.ok?'Contract is now '+r.stage+' ('+r.done+').':(r.why||'not yet')); save(); renderVillage('boardP'); });
+}
 $('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
 let tabletDraft=null, tabletResult=null;
@@ -1116,7 +1139,7 @@ function project(obj3, yOff, el, html){ tmpV.copy(obj3).setY(obj3.y+yOff).projec
 
 /* ---------- day / night ---------- */
 const DAY=240; const cDay=new T.Color('#8ec5ff'), cDusk=new T.Color('#ff9a6a'), cNight=new T.Color('#0b0a22'), skyC=new T.Color();
-function updateSky(dt){ S.clock=(S.clock+dt)%DAY; const ph=S.clock/DAY, el=Math.sin(ph*Math.PI*2); // el>0 day
+function updateSky(dt){ const before=S.clock; S.clock=(S.clock+dt)%DAY; if(before>200&&S.clock<before&&window.VILLAGE) VILLAGE.onDay(S, atGuild()?'guild':String(curRegion()), atGuild()); const ph=S.clock/DAY, el=Math.sin(ph*Math.PI*2); // el>0 day
   const day=Math.max(0,Math.min(1,el*2.5+0.3)); skyC.copy(cNight).lerp(cDay,day); if(Math.abs(el)<0.3) skyC.lerp(cDusk,(0.3-Math.abs(el))/0.3*0.55);
   scene.background=skyC; scene.fog.color.copy(skyC); hemi.intensity=0.25+0.85*day; sun.intensity=2.2*day+0.05;
   sun.position.set(player.pos.x+Math.cos(ph*Math.PI*2)*40, Math.max(6,el*50), player.pos.z+12); sun.target.position.set(player.pos.x,0,player.pos.z);

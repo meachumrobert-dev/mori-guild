@@ -283,7 +283,7 @@ function biomesFor(id){ const fam=R[id]&&R[id].fam; const table=fam==='herb'?HER
 const places=[];
 function notePlace(p){ if(p&&p.rid) places.push(p); }
 function whereNamed(word){
-  if(!window.ORES){ const r=reagentMention(word); if(!r) return null; return r.name.toLowerCase()+' is on the gather list.'; }
+  if(!window.ORES){ const r=reagentMention(word); if(!r) return null; const bios=biomesFor(r.id); const whereBio=bios.length?bios.slice(0,4).join(', '):'no listed biome'; return r.name.toLowerCase()+' is known in '+whereBio+'.'; }
   const catalog=Object.keys(R).map(id=>{ const row={id, name:R[id].name, biomes:biomesFor(id), aliases:[]}; return row; });
   if(window.LUMBER) Object.keys(LUMBER.SPECIES).forEach(sid=>{ const s=LUMBER.SPECIES[sid]; const row=catalog.find(c=>c.id===s.log); if(row){ row.aliases.push(sid, s.name.toLowerCase()); } });
   const seen=[];
