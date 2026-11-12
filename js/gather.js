@@ -34,6 +34,7 @@ const RDEF={
 };
 const R={}; for(const id in RDEF){ const d=RDEF[id]; R[id]=Object.assign({id, name:d[0], fam:d[1], tier:d[2], gp:d[3], wt:d[4], stack:d[5]}, d[6]||{}); }
 if(window.LUMBER) LUMBER.reagents().forEach(r=>{ if(!R[r.id]) R[r.id]=r; });
+if(window.ORES) window.ORES.reagents().forEach(r=>{ if(!R[r.id]) R[r.id]=r; });
 const SKILL_OF={herb:'herbalism', ore:'mining', stone:'mining', wood:'woodcutting', part:'skinning'};
 const TOOL_OF={herbalism:'sickle', mining:'pick', woodcutting:'axe', skinning:'knife'};
 const SND_OF={sickle:'sickle', pick:'pick', axe:'axe', knife:'knife'};
@@ -46,7 +47,7 @@ const TYPEW={forest:[.35,.15,.1,.4],jungle:[.5,.05,.05,.4],grass:[.5,.15,.1,.25]
 const HERBS={grass:['vinca_leaf','marigold','zinnia','sunflower_seed','squash_blossom','gloomrose_thorn','lavender','chamomile','yarrow','mint','calendula','sage','comfrey','rosemary'],forest:['vinca_leaf','zinnia','gloomrose_thorn','marigold','lavender','comfrey','willow_bark','mint','rosemary','sage'],jungle:['canna_root','vinca_leaf','zinnia','canna_root','mint','comfrey'],
   savanna:['sunflower_seed','marigold','squash_blossom','chamomile','frankincense','aloe','myrrh','calendula'],steppe:['marigold','sunflower_seed','squash_blossom','chamomile','yarrow','sage','lavender'],swamp:['gloomrose_thorn','canna_root','vinca_leaf','mint','willow_bark','comfrey'],taiga:['vinca_leaf','gloomrose_thorn','marigold','willow_bark','rosemary'],
   mountain:['vinca_leaf','gloomrose_thorn','yarrow','sage','frankincense','rosemary'],desert:['squash_blossom','sunflower_seed','frankincense','aloe','myrrh'],tundra:['vinca_leaf','yarrow'],beach:['vinca_leaf','marigold','rosemary','mint'],guild:['mint','lavender','chamomile','calendula','sage']};
-const ORES={mountain:['iron_ore','copper_ore','silver_ore','zinc_ore','mithral_ore','adamantine_ore'], _:['iron_ore','copper_ore','zinc_ore','silver_ore']};
+const ORE_BIO={mountain:['iron_ore','copper_ore','silver_ore','zinc_ore','tin_ore','manganese_ore','nickel_ore','mithral_ore','adamantine_ore'], swamp:['bog_iron_ore','iron_ore','clay'], grass:['bog_iron_ore','copper_ore','tin_ore','clay'], forest:['bog_iron_ore','copper_ore','tin_ore'], guild:['bog_iron_ore','copper_ore','tin_ore','clay'], _:['bog_iron_ore','iron_ore','copper_ore','tin_ore','zinc_ore','clay','silver_ore']};
 const STONES={mountain:['fieldstone','granite','marble','obsidian'],desert:['fieldstone','obsidian','marble'],taiga:['fieldstone','granite'],tundra:['fieldstone','granite'],_:['fieldstone','granite','marble']};
 const WOODS=window.LUMBER?LUMBER.woods():{forest:['deadfall','oak_log','yew_bough','darkwood_log','ironwood_log'],jungle:['deadfall','yew_bough','darkwood_log','ironwood_log'],swamp:['deadfall','oak_log','darkwood_log'],taiga:['deadfall','yew_bough'],_:['deadfall','oak_log','ironwood_log']};
 const TW=[1,0.55,0.2,0.06,0.02];
@@ -132,7 +133,7 @@ function genCell(ci,cj){ const SW=X.SW, F=SW.F, rnd=P().rngFor(P().seed,'gath',F
   for(let k=0;k<2;k++){ let x=(ci+0.12+rnd()*0.76)*CELL, z=(cj+0.12+rnd()*0.76)*CELL; const roll=rnd(), roll2=rnd(), rot=rnd()*6.283, s=0.8+rnd()*0.45; const b=F.guild&&Math.hypot(x,z)<200?'guild':SW.biomeAt(x,z);
     const B=b==='guild'?'grass':b; const dens=(DENS[b]||0.4)*(k?0.45:1)*(X.mobile?0.8:1); if(roll>dens) continue; if(!okSpot(x,z)) continue;
     const tw=TYPEW[B]||TYPEW.grass; const type=pickW(()=>roll2,['herb','ore','stone','wood'],t=>tw[['herb','ore','stone','wood'].indexOf(t)]); if(type==='wood'&&!(tw[3]>0)) continue;
-    const list=(type==='herb'?HERBS[B]||HERBS.grass:type==='ore'?ORES[B]||ORES._:type==='stone'?STONES[B]||STONES._:WOODS[B]||WOODS._);
+    const list=(type==='herb'?HERBS[B]||HERBS.grass:type==='ore'?ORE_BIO[B]||ORE_BIO._:type==='stone'?STONES[B]||STONES._:WOODS[B]||WOODS._);
     let rid=pickW(rnd,list,id=>TW[R[id].tier]*(B==='mountain'&&R[id].fam==='ore'&&R[id].tier>=3?3:1));
     if(window.GROUNDED){
       const Gnd=GROUNDED, ctx={seed:P().seed, regionId:F.id, guild:!!F.guild, rng:P().rngFor, biomeAt:(x,z)=>SW.biomeAt(x,z), elevAt:(x,z)=>{ const d=SW.toDir(x,z); return P().elevation(d[0],d[1],d[2]); }};
@@ -272,23 +273,25 @@ function targets(){ const out=[]; if(!X||X.mode()==='globe') return out; const p
 /* ---------- Mori: where is stuff, gather runs ---------- */
 const DIRS=['north','north-east','east','south-east','south','south-west','west','north-west'];
 function dirTo(dx,dz){ const a=Math.atan2(dx,-dz); return DIRS[(Math.round(a/(Math.PI/4))+8)%8]; }
-function famOf(word){ return /herb|flower|plant|petal|leaf|root|thorn/.test(word)?'herb':/ore|metal|iron|copper|silver|mithral|adamant/.test(word)?'ore':/stone|rock|granite|marble|obsidian/.test(word)?'stone':/wood|log|timber|tree|branch/.test(word)?'wood':null; }
+function famOf(word){ return /herb|flower|plant|petal|leaf|root|thorn|mint|lavender|chamomile/.test(word)?'herb':/ore|metal|iron|copper|tin\b|zinc|manganese|nickel|silver|mithral|adamant|clay/.test(word)?'ore':/stone|rock|granite|marble|obsidian/.test(word)?'stone':/wood|log|timber|tree|branch|oak|pine|yew|ash/.test(word)?'wood':null; }
 function reagentMention(word){ const t=String(word||'').toLowerCase(); let best=null;
   for(const id in R){ const name=R[id].name.toLowerCase(), spaced=id.replace(/_/g,' ');
     if(t.includes(name)||t.includes(spaced)){ if(!best||name.length>best.name.length) best=R[id]; } }
   return best; }
-function biomesFor(id){ const fam=R[id]&&R[id].fam; const table=fam==='herb'?HERBS:fam==='ore'?ORES:fam==='stone'?STONES:fam==='wood'?WOODS:null; const out=[];
+function biomesFor(id){ const fam=R[id]&&R[id].fam; const table=fam==='herb'?HERBS:fam==='ore'?ORE_BIO:fam==='stone'?STONES:fam==='wood'?WOODS:null; const out=[];
   if(!table) return out; for(const b in table) if(b!=='_'&&b!=='guild'&&table[b].indexOf(id)>=0) out.push(b); return out; }
-function whereNamed(word){ const r=reagentMention(word); if(!r) return null;
-  const nodeType=['herb','ore','stone','wood'].includes(r.fam)?r.fam:null;
-  const bios=biomesFor(r.id); const whereBio=bios.length?(window.ENGLISH?ENGLISH.oxford(bios.slice(0,4)):bios.slice(0,4).join(', ')):'no listed biome';
-  if(!nodeType) return r.name.toLowerCase()+' is not something you pick off the ground.';
-  const meadow=!!(X&&nodes.some(n=>n.rid===r.id&&Math.hypot(n.x,(n.z||0)-39)<22));
-  const meadowBit=meadow?' a patch of it is in the guild meadow.':'';
-  if(!X||X.mode()!=='world') return 'i have not looked at the ground. the gather list allows '+r.name.toLowerCase()+' in '+whereBio+'.'+meadowBit;
-  const p=X.player.pos; const ls=nodes.filter(n=>n.type===nodeType&&n.rid===r.id&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
-  if(!ls.length) return 'i don\'t see '+r.name.toLowerCase()+' loaded around you. the gather list allows it in '+whereBio+'.'+meadowBit;
-  return r.name.toLowerCase()+' is '+Math.round(ls[0].d)+' m '+dirTo(ls[0].n.x-p.x,ls[0].n.z-p.z)+'. the gather list also allows it in '+whereBio+'.'+meadowBit; }
+const places=[];
+function notePlace(p){ if(p&&p.rid) places.push(p); }
+function whereNamed(word){
+  if(!window.ORES){ const r=reagentMention(word); if(!r) return null; return r.name.toLowerCase()+' is on the gather list.'; }
+  const catalog=Object.keys(R).map(id=>{ const row={id, name:R[id].name, biomes:biomesFor(id), aliases:[]}; return row; });
+  if(window.LUMBER) Object.keys(LUMBER.SPECIES).forEach(sid=>{ const s=LUMBER.SPECIES[sid]; const row=catalog.find(c=>c.id===s.log); if(row){ row.aliases.push(sid, s.name.toLowerCase()); } });
+  const seen=[];
+  nodes.forEach(n=>{ if(!n.rid) return; seen.push({rid:n.rid, x:n.x, z:n.z, ready:ready(n), region:(X&&X.region?X.region():'this region')}); });
+  places.forEach(p=>{ const readyNow=p.ready?p.ready():true; seen.push({rid:p.rid, x:p.x, z:p.z, ready:readyNow, region:typeof p.region==='function'?p.region():p.region}); });
+  const pos=X&&X.player?X.player.pos:{x:0,z:0};
+  return window.ORES.whereLine(word, {catalog, nodes:seen, x:pos.x, z:pos.z, region:X&&X.region?X.region():'this region'});
+}
 function where(word){ const t=famOf(word); if(!t) return null; const p=X.player.pos; if(X.mode()!=='world') return 'we are underground. i can only smell rocks. go outside first!';
   const ls=nodes.filter(n=>n.type===t&&ready(n)).map(n=>({n,d:Math.hypot(n.x-p.x,n.z-p.z)})).sort((a,b)=>a.d-b.d);
   if(!ls.length) return 'i don\'t see any '+(t==='herb'?'herbs':t)+' near here. try another region — '+(t==='ore'?'mountains have the good ore.':t==='herb'?'grass and jungle have lots of flowers.':'forests have trees you can chop.');
@@ -320,9 +323,9 @@ function fmtGp(g){ return g>=1?(Math.round(g*10)/10)+' gp':g>=0.1?Math.round(g*1
 function sell(id){ const s=X.S(); const n=s.reag[id]||0; if(!n) return 0; const g=Math.round(R[id].gp*n); delete s.reag[id]; s.gold+=g; return g; }
 function mill(inputId){ if(!window.LUMBER) return {ok:false, why:'no lumber table'}; const g=G(); const skill=skillLv('woodcutting'); const tech=skill>=4?['saw']:[]; const plan=LUMBER.work(inputId, {skill, tech}); if(!plan.ok) return plan; if((X.S().reag[inputId]||0)<1) return {ok:false, why:'you have no '+inputId.replace(/_/g,' ')}; spendKey('r:'+inputId,1); addReag(plan.out,1); g.skills.woodcutting+=6+plan.labor*4; clean(); return plan; }
 
-window.GATHERING={ R, TIER, REQ, RESPAWN, SKILLS, PARTS, CELL, HERBS, ORES, WOODS,
+window.GATHERING={ R, TIER, REQ, RESPAWN, SKILLS, PARTS, CELL, HERBS, ORES:ORE_BIO, WOODS,
   init(o){ X=o; G(); buildMeshes(); registerWarm(); if(window.SEEDWORLD&&SEEDWORLD.setTreeGate) SEEDWORLD.setTreeGate(key=>{ const d=G().dep[key]; return !!(d>G().t); }); },
-  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, mill, iconURL, skillLv, level, xpFor,
+  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, notePlace, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, mill, iconURL, skillLv, level, xpFor,
   spawnHostile(kind,x,z){ try{ const m=SRD.makeMonster(kind); const g=critMesh(m); g.position.set(x,X.SW.heightAt(x,z),z); g.name='raid_'+kind; g.userData.sw=true; X.scene.add(g);
       const c={key:'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), kind, m, g, x, z, hx:x, hz:z, alive:true, ag:true, cd:0.8, hit:0, wt:0, tx:x, tz:z, critter:true, room:-1, raid:true}; crit.push(c); return c; }catch(e){ return null; } },
   get nodes(){ return nodes; }, get crit(){ return crit; }, get carc(){ return carc; }, get act(){ return act; }, get run(){ return run; }, stats, ready, toolMesh,

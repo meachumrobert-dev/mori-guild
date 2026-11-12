@@ -313,19 +313,19 @@ function clusterPoints(node, n, rnd, ok){
 /* ---------- ore: region geology, then a patchy vein ---------- */
 const OR_CELL=220;
 const GEO={
-  mountain:{ores:['iron_ore','copper_ore','silver_ore','zinc_ore'], rare:true, p:0.82},
+  mountain:{ores:['iron_ore','copper_ore','tin_ore','silver_ore','zinc_ore','manganese_ore','nickel_ore'], rare:true, p:0.82},
   snow:{ores:['iron_ore','silver_ore'], p:0.3},
-  desert:{ores:['copper_ore','zinc_ore'], p:0.5},
-  taiga:{ores:['iron_ore','copper_ore','silver_ore'], p:0.42},
+  desert:{ores:['copper_ore','tin_ore','zinc_ore'], p:0.5},
+  taiga:{ores:['iron_ore','copper_ore','silver_ore','manganese_ore'], p:0.42},
   tundra:{ores:['iron_ore'], p:0.26},
-  swamp:{ores:['iron_ore'], p:0.48},
-  forest:{ores:['iron_ore','copper_ore'], p:0.2},
-  grass:{ores:['copper_ore','iron_ore'], p:0.16},
+  swamp:{ores:['bog_iron_ore','iron_ore','clay'], p:0.48},
+  forest:{ores:['bog_iron_ore','iron_ore','copper_ore','tin_ore'], p:0.2},
+  grass:{ores:['bog_iron_ore','copper_ore','tin_ore','clay'], p:0.16},
   jungle:{ores:['copper_ore','zinc_ore'], p:0.18},
   savanna:{ores:['copper_ore','zinc_ore'], p:0.22},
   steppe:{ores:['iron_ore','copper_ore'], p:0.16},
-  beach:{ores:['copper_ore'], p:0.05},
-  ocean:{ores:[], p:0}, deep:{ores:[], p:0}, guild:{ores:['copper_ore','iron_ore'], p:0.12}
+  beach:{ores:['clay','copper_ore'], p:0.05},
+  ocean:{ores:[], p:0}, deep:{ores:[], p:0}, guild:{ores:['bog_iron_ore','copper_ore','tin_ore','clay'], p:0.12}
 };
 const oreCache=new Map();
 function clearOreCache(){ oreCache.clear(); }
