@@ -192,8 +192,8 @@ function coarseY(x,z,step){ const x0=Math.floor((x+1e-6)/step)*step, z0=Math.flo
   return (h00*(1-tx)+h10*tx)*(1-tz)+(h01*(1-tx)+h11*tx)*tz; }
 function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
   seams=seams||{e:0,w:0,n:0,s:0};
-  const g=new T.Group(); g.position.set(ix*CH,0,iz*CH); const rec={lod:seg, near, obj:g, ix, iz, seg, seams};
-  if(chunkVoid(ix,iz)){ const p=new T.Mesh(voidPlaneG,matVoid); g.add(p); const l=new T.LineSegments(voidLineG,matVoidLine); g.add(l); g.userData.void=true; return rec; }
+  const g=new T.Group(); g.position.set(ix*CH,0,iz*CH); g.userData.terrain=true; g.userData.noCull=true; const rec={lod:seg, near, obj:g, ix, iz, seg, seams};
+  if(chunkVoid(ix,iz)){ const p=new T.Mesh(voidPlaneG,matVoid); p.userData.terrain=true; p.userData.noCull=true; g.add(p); const l=new T.LineSegments(voidLineG,matVoidLine); l.userData.terrain=true; l.userData.noCull=true; g.add(l); g.userData.void=true; return rec; }
   const n=seg+1; let geo=(pool[seg]||[]).pop(), pos, col;
   if(geo){ stat.reused++; pos=geo.attributes.position.array; col=geo.attributes.color.array; if(!geo.attributes.normal) geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); }
   else { pos=new Float32Array(n*n*3); col=new Float32Array(n*n*3); }
@@ -213,8 +213,8 @@ function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
   if(!geo){ geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(pos,3)); geo.setAttribute('color',new T.BufferAttribute(col,3)); geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); geo.setIndex(new T.BufferAttribute(idxFor(seg),1)); geo.userData.seg=seg; }
   else { geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; }
   writeNormals(geo.attributes.normal.array,ix,iz,seg); geo.attributes.normal.needsUpdate=true; geo.computeBoundingSphere();
-  const m=new T.Mesh(geo,matLand); m.receiveShadow=!opt.mobile; g.add(m); rec.land=m; rec.bcol=bcol; rec.target=target;
-  const skirt=new T.Mesh(skirtGeo(seg),matLand); skirt.receiveShadow=!opt.mobile; writeSkirt(skirt.geometry,pos,col,seg); g.add(skirt); rec.skirt=skirt;
+  const m=new T.Mesh(geo,matLand); m.receiveShadow=!opt.mobile; m.userData.terrain=true; m.userData.noCull=true; g.add(m); rec.land=m; rec.bcol=bcol; rec.target=target;
+  const skirt=new T.Mesh(skirtGeo(seg),matLand); skirt.receiveShadow=!opt.mobile; skirt.userData.terrain=true; skirt.userData.noCull=true; writeSkirt(skirt.geometry,pos,col,seg); g.add(skirt); rec.skirt=skirt;
   if(moving){ rec.morph=morph; rec.morphT=0; let reach=SKIRT+1; for(let v=0;v<n*n;v++) reach=Math.max(reach, Math.abs(target[v]-morph[v])+SKIRT+1); if(geo.boundingSphere) geo.boundingSphere.radius+=reach; }
   else if(geo.boundingSphere) geo.boundingSphere.radius+=SKIRT+1;
   if(fadeIn){ const fm=matLand.clone(); fm.transparent=true; fm.opacity=0; fm.depthWrite=false; rec.fade=0; rec.fadeMat=fm; m.material=fm; skirt.material=fm; }
