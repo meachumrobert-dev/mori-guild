@@ -10,7 +10,7 @@ const RECIPENOTES={
 };
 function apply(f){
   if(!f||!f.kind) return false;
-  if(f.kind==='vocab'&&window.LEXICON){ LEXICON.addLemmas(f.id, f.add||[]); return true; }
+  if(f.kind==='vocab'&&window.LEXICON){ LEXICON.addLemmas(f.id, f.add||[]); if(window.DICT) DICT.addPack((f.add||[]).map(w=>({w, p:'x'}))); return true; }
   if((f.kind==='intent'||f.kind==='template')&&window.MORICHAT){ MORICHAT.addFinger(f); return true; }
   if(f.kind==='furniture'&&window.FURNITURE){ return !!FURNITURE.addPiece({id:f.id, kind:f.piece, name:f.name, flavor:f.flavor||'', x:f.x, z:f.z}); }
   if(f.kind==='recipe'){ return !!RECIPENOTES.add(f); }
@@ -18,6 +18,7 @@ function apply(f){
 }
 function restore(){
   if(window.LEXICON&&LEXICON.restore) LEXICON.restore();
+  if(window.DICT&&DICT.restorePacks){ DICT.restorePacks(); if(DICT.ready) DICT.linkIntents(); }
   if(window.MORICHAT&&MORICHAT.restore) MORICHAT.restore();
   if(window.FURNITURE&&FURNITURE.restore) FURNITURE.restore();
   RECIPENOTES.restore();

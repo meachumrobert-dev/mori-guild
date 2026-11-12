@@ -614,6 +614,7 @@ function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); 
   if(/\b(who|what) are you\b|\bdelroth\b/.test(s)&&/delroth/.test(s)){ addChat('mo','delroth is on the tavern stage. he is level sixty and his hat is +5. he is nice to me.'); return; }
   { const c=moriCtx(), r=MORICHAT.reply(v,c); if(r){ addChat('mo',r); save(); return; } }
   if(/\b(daw|beats?|nle|cut|yellow|226|blue room|build|proud)\b/.test(s)){ const r=ENG.talk(v); addChat('mo',r); return; }
+  if(window.DICT&&DICT.ready){ const unk=DICT.unknownWord(s); if(unk){ addChat('mo','i don\'t know that word yet: "'+unk+'". i won\'t guess.'); return; } }
   addChat('mo',MORICHAT.fallback(moriCtx()));
 }
 /* ---------- v3.5: Mori's context, NPC chats, the quest log, voice input ---------- */
@@ -1208,6 +1209,7 @@ IDLEBUILD.init({
   renderSeedPanel:()=>renderSeedPanel()
 });
 ensureTablet(); if(window.FINGERS) FINGERS.reapply(S.tablet.approved||[]); if(window.FURNITURE) FURNITURE.build(scene);
+setTimeout(()=>{ if(window.DICT&&DICT.load) DICT.load().catch(()=>{}); }, 600);
 voiceSetup(); $('npcBack').onclick=()=>{ endNpc(); openMoriChat(); };
 if(CLAN.site) refreshFrame(); // the first frame was built before the Clan / NPCs knew the player (no-op otherwise)
 addEventListener('resize',resize); resize(); hud(); updBrain();

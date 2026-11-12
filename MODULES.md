@@ -6,7 +6,7 @@ The hosts below stay as they are. A finger does not replace `window.GATHERING`, 
 
 | Finger | Hook | What it may change |
 |---|---|---|
-| `vocab` | `LEXICON.addLemmas(id, words)` | Extra lemmas on a synset |
+| `vocab` | `LEXICON.addLemmas(id, words)` and `DICT.addPack` | Extra lemmas on a synset, and words the common list should treat as known |
 | `intent` | `MORICHAT.addFinger` | Phrases that select a template id |
 | `template` | `MORICHAT.addFinger` | A sentence with `{ruler}` `{name}` `{motto}` `{gov}` `{race}` `{region}` `{arts}` only |
 | `furniture` | `FURNITURE.addPiece` | A bench, chair, table, stool, or shelf inside the guild yard |

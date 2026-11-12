@@ -52,8 +52,8 @@ function rulerLine(c){ const h=(c.hereCity&&c.hereCity())||{}; const E=window.EN
 function citiesLine(c){ const list=(c.cityList&&c.cityList())||[]; const E=window.ENGLISH; if(!list.length) return 'no city-state is founded yet. a region becomes one at its fourth layer. i will not invent one.'; const bits=list.slice(0,4).map(cs=>cs.name+' in '+cs.region+', ruled by '+cs.ruler+', motto "'+cs.motto+'"'); return 'the city-states on the map are '+(E?E.oxford(bits):bits.join('; '))+'.'+(list.length>4?' and '+(list.length-4)+' more.':''); }
 function splitGreeting(t){ const m=/^(?:hi|hello|hey|hiya|howdy|yo|greetings|good (?:morning|evening|afternoon|day)|well met|sup)\b[,!.…]*(?:\s+mori\b)?[,!.…]*\s*(.*)$/i.exec(t); if(!m) return {greet:false, rest:t}; return {greet:true, rest:(m[1]||'').trim()}; }
 function grounded(t, c){
-  if(/\bwho (?:rules|leads|governs|runs)\b|\bruler of\b|\bin charge\b/.test(t) || (window.LEXICON&&LEXICON.hasPhrase(t,'ruler'))){ c.intent='ruler'; return rulerLine(c); }
-  if((/\bcity-states?\b|\bcity states?\b/.test(t) || (window.LEXICON&&LEXICON.hasPhrase(t,'cities'))) && /\b(tell|about|what|which|list|the|any)\b/.test(t)){ c.intent='cities'; return citiesLine(c); }
+  if(/\bwho (?:rules|leads|governs|runs)\b|\bruler of\b|\bin charge\b/.test(t) || (window.LEXICON&&(LEXICON.hasPhrase(t,'ruler')||(/\b(who|what)\b/.test(t)&&LEXICON.hasLemma(t,'ruler.n'))))){ c.intent='ruler'; return rulerLine(c); }
+  if((/\bcity-states?\b|\bcity states?\b/.test(t) || (window.LEXICON&&(LEXICON.hasPhrase(t,'cities')||LEXICON.hasLemma(t,'city.n')))) && /\b(tell|about|what|which|list|the|any)\b/.test(t)){ c.intent='cities'; return citiesLine(c); }
   for(const f of extra){ if(f.kind==='intent' && (f.any||[]).some(p=>t.indexOf(String(p).toLowerCase())>=0)){ c.intent=f.id; const tpl=templates[f.template||f.id]; if(tpl&&window.ENGLISH) return ENGLISH.fill(tpl, slotsOf(c)); return rulerLine(c); } }
   return null;
 }

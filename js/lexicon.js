@@ -21,9 +21,12 @@ function synset(id){ return SYNSETS.find(s=>s.id===id)||null; }
 function covers(text, id){ const s=synset(id); const t=String(text||'').toLowerCase(); if(!s) return false; return s.lemmas.some(l=>t.indexOf(l)>=0); }
 function phrases(id){ return (PHRASES[id]||[]).slice(); }
 function hasPhrase(text, id){ const t=String(text||'').toLowerCase(); return phrases(id).some(p=>t.indexOf(p)>=0); }
+function hasLemma(text, id){ const s=synset(id); const t=String(text||'').toLowerCase(); if(!s) return false;
+  return s.lemmas.some(l=>{ if(l==='rule'||l==='rules') return false; if(l.includes(' ')) return t.indexOf(l)>=0; return new RegExp('\\b'+l.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(t); });
+}
 const BASE=SYNSETS.map(s=>({id:s.id, lemmas:s.lemmas.slice()}));
 function restore(){ SYNSETS.length=0; BASE.forEach(s=>SYNSETS.push({id:s.id, lemmas:s.lemmas.slice()})); }
-window.LEXICON={ SYNSETS, PHRASES, synset, covers, phrases, hasPhrase, restore,
+window.LEXICON={ SYNSETS, PHRASES, synset, covers, phrases, hasPhrase, hasLemma, restore,
   addLemmas(id, extra){ const s=synset(id); const add=(extra||[]).map(w=>String(w||'').toLowerCase().trim()).filter(w=>w && w.length<40); if(!s){ SYNSETS.push({id, lemmas:add}); return add; } add.forEach(w=>{ if(s.lemmas.indexOf(w)<0) s.lemmas.push(w); }); return s.lemmas.slice(); }
 };
 })();

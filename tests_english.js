@@ -54,23 +54,43 @@ const fin=load('js/fingers.js', {LEXICON:L.LEXICON, ENGLISH:E.ENGLISH, MORICHAT:
 fin.LEXICON=L.LEXICON; fin.MORICHAT=M; fin.FURNITURE=furn.FURNITURE; fin.window.LEXICON=L.LEXICON; fin.window.MORICHAT=M; fin.window.FURNITURE=furn.FURNITURE;
 ok(!tab.TABLET.validatePatch({fingers:[{kind:'template', id:'x', text:'eval(1)'}]}).ok, 'a patch that looks like code is refused');
 const draft={fingers:[
-  {kind:'vocab', id:'ruler.n', add:['sovereign']},
-  {kind:'intent', id:'ruler', any:['who is the sovereign'], template:'ruler'},
+  {kind:'vocab', id:'ruler.n', add:['grandee']},
+  {kind:'intent', id:'ruler', any:['who is the grandee'], template:'ruler'},
   {kind:'template', id:'ruler', text:'{ruler} rules {name}.'}
 ]};
 const slots={ruler:'Lady Venn', name:'Old Tor', motto:'Stone remembers.', gov:'Lordship', race:'human', region:'The Old Tor Marches', arts:''};
-const checked=tab.TABLET.runCases(draft, [{text:'who is the sovereign', intent:'ruler', includes:['Lady Venn','Old Tor'], slots}]);
+const checked=tab.TABLET.runCases(draft, [{text:'who is the grandee', intent:'ruler', includes:['Lady Venn','Old Tor'], slots}]);
 ok(checked.pass&&checked.isolated, 'the sandbox passes a data finger');
 const src=tab.TABLET.workerSource();
 ok(src.indexOf('localStorage.getItem')<0 && src.indexOf('document.body')<0 && src.indexOf('eval(')<0, 'the worker source does not touch the save or the page');
 fin.FINGERS.reapply([draft]);
-ok(/Seedkeeper Mori/.test(M.reply('who is the sovereign', ctx)), 'an approved finger answers with the live card');
+ok(/Seedkeeper Mori/.test(M.reply('who is the grandee', ctx)), 'an approved finger answers with the live card');
 const spare={fingers:[{kind:'furniture', id:'spare', piece:'stool', name:'Spare stool', flavor:'a spare', x:3, z:-3}]};
 ok(tab.TABLET.validatePatch(spare).ok);
 fin.FINGERS.reapply([spare]);
 ok(furn.FURNITURE.list().some(p=>p.id==='spare'), 'an approved furniture finger plugs into the furniture list');
 fin.FINGERS.restore();
 ok(!furn.FURNITURE.list().some(p=>p.id==='spare') && furn.FURNITURE.list().some(p=>p.name==="Robert's Strider Armor"), 'revert drops the finger and keeps the built-in bench');
-ok(M.reply('who is the sovereign', ctx)===null, 'revert drops the extra phrase');
+ok(M.reply('who is the grandee', ctx)===null, 'revert drops the extra phrase');
+
+const dictCtx={console, Math, window:{}};
+dictCtx.window=dictCtx;
+vm.createContext(dictCtx);
+['js/lexicon.js','js/english.js','js/morichat.js','js/dict.js'].forEach(f=>vm.runInContext(fs.readFileSync(path.join(__dirname,f),'utf8'), dictCtx));
+const raw=JSON.parse(fs.readFileSync(path.join(__dirname,'data/dict.json'),'utf8'));
+dictCtx.DICT.install(raw);
+ok(dictCtx.DICT.size>=8000, 'the common list has at least 8,000 lemmas');
+ok(dictCtx.DICT.online.enabled===false && dictCtx.DICT.online.lookup==null, 'online lookup is off and makes no request');
+ok(dictCtx.DICT.pos('person')==='n' && dictCtx.DICT.pos('be')==='v' && dictCtx.DICT.pos('the')==='f', 'parts of speech come from the list');
+ok(dictCtx.DICT.lemmaOf('cities')==='city', 'a plural resolves to its lemma');
+ok(dictCtx.DICT.synonyms('city').indexOf('metropolis')>=0, 'city keeps a WordNet synonym link');
+ok(dictCtx.DICT.unknownWord('who rules here')===null, 'ordinary words are not called unknown');
+ok(dictCtx.DICT.unknownWord('what is a flibbertigibbet')==='flibbertigibbet', 'an absent word is named, not guessed');
+dictCtx.DICT.addPack([{w:'zzyzx', p:'n'}]);
+ok(dictCtx.DICT.knows('zzyzx'), 'a tablet pack adds a word');
+dictCtx.DICT.restorePacks();
+ok(!dictCtx.DICT.knows('zzyzx'), 'revert drops the tablet pack');
+const metro=dictCtx.MORICHAT.reply('tell me about the metropolis', ctx);
+ok(/Old Tor/.test(metro), 'a WordNet synonym can reach the city intent');
 
 console.log('tests_english: '+n+' checks passed');
