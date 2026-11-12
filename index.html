@@ -20,7 +20,7 @@ button.on{background:var(--acc);color:#111;border-color:var(--acc)}
 #hpbar{display:inline-block;width:60px;height:7px;background:#311;border-radius:4px;vertical-align:middle;overflow:hidden}#hpbar i{display:block;height:100%;background:#ff4d6d}
 #bottom{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;padding:6px;padding-bottom:max(6px,env(safe-area-inset-bottom));background:linear-gradient(#0e0b1600,#0e0b16f0);z-index:5}
 #bottom button{background:var(--bg)}
-#log{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;max-width:min(560px,92vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 12px;text-align:center;z-index:4;pointer-events:none;transition:opacity .4s}
+#log{position:fixed;left:50%;transform:translateX(-50%);bottom:156px;max-width:min(560px,92vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 12px;text-align:center;z-index:4;pointer-events:none;transition:opacity .4s}
 #moriLine{position:fixed;left:8px;top:64px;max-width:min(330px,60vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 10px;z-index:4;font-size:12px}
 #moriLine .bar{height:5px;background:#222;border-radius:3px;margin-top:4px;overflow:hidden}#moriLine .bar i{display:block;height:100%;background:var(--acc);width:0}
 #sugg{margin-top:6px;display:none}#sugg button{padding:3px 8px;margin-right:4px}
@@ -86,11 +86,22 @@ table.pt{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0}table.p
 
 select,input[type=color]{background:#000a;color:#fff;border:1px solid #fff3;border-radius:6px;font:inherit}
 .msg{margin:2px 0}
-body.cr #top,body.cr #moriLine,body.cr #log,body.cr #ctx,body.cr #joy,body.cr .label3d{display:none!important}
+body.cr #top,body.cr #moriLine,body.cr #log,body.cr #ctx,body.cr #joy,body.cr #hotbar,body.cr .label3d{display:none!important}
+#bBandage,#bSalve{display:none!important}
+#hotbar{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:4px;padding:4px;background:rgba(14,11,22,.9);border:1px solid var(--ln);border-radius:14px;max-width:calc(100vw - 16px)}
+#barSlots{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+#barSlots::-webkit-scrollbar{display:none}
+.barSlot{width:48px;min-width:48px;height:48px;padding:2px 2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;flex:0 0 48px}
+.barSlot .k{font-size:10px;opacity:.65}
+.barSlot .n{font-size:10px;font-weight:700;max-width:46px;text-align:center;line-height:1.05;white-space:normal}
+.barSlot.empty{opacity:.5}
+#barUp,#barDown{width:48px;min-width:48px;height:48px;padding:0;font-size:16px}
+#barPage{min-width:32px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums}
+#barGhost{position:fixed;z-index:30;pointer-events:none;background:var(--acc);color:#111;padding:6px 8px;border-radius:8px;font-weight:700}
 .sl{grid-template-columns:92px 1fr}
-@media (max-width:760px){ #crLeft{flex-wrap:nowrap;align-items:center} body.cr #bottom{display:none} #crLeft{bottom:6px!important} #crViews{bottom:104px!important;flex-wrap:nowrap;gap:3px} #crViews button{padding:4px 7px;font-size:11px} #crTitle{top:132px!important} #crRight{bottom:146px!important;height:27vh!important} #crLeft .q{min-width:110px;flex-direction:column;align-items:flex-start} #crLeft .row{flex-wrap:nowrap} #crLeft .sec{display:none} #ctx{bottom:100px} #log{bottom:96px;font-size:11px} }
+@media (max-width:760px){ #crLeft{flex-wrap:nowrap;align-items:center} body.cr #bottom{display:none} #crLeft{bottom:6px!important} #crViews{bottom:104px!important;flex-wrap:nowrap;gap:3px} #crViews button{padding:4px 7px;font-size:11px} #crTitle{top:132px!important} #crRight{bottom:146px!important;height:27vh!important} #crLeft .q{min-width:110px;flex-direction:column;align-items:flex-start} #crLeft .row{flex-wrap:nowrap} #crLeft .sec{display:none} #ctx{bottom:100px} #log{bottom:156px;font-size:11px} }
 /* v3 globe */
-body.globe #ctx, body.globe #joy, body.globe .label3d, body.globe #moriLine #sugg{display:none!important}
+body.globe #ctx, body.globe #joy, body.globe #hotbar, body.globe .label3d, body.globe #moriLine #sugg{display:none!important}
 body.globe #seedP{left:12px; right:auto; width:min(400px,40vw)}
 .glabel{position:fixed; transform:translate(-50%,-125%); pointer-events:none; font:12px/1.2 system-ui,sans-serif; color:#fff; text-shadow:0 1px 3px #000,0 0 2px #000; white-space:nowrap; text-align:center; z-index:4; display:none}
 .glabel span{color:#d9d9e6; font-size:10px}
@@ -122,13 +133,15 @@ body.phone #ctx #bInteract.hot{opacity:1}
 #phoneMenu{display:none}
 body.phone #phoneMenu{display:flex;position:fixed;z-index:8;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:48px;min-height:48px;width:48px;height:48px;padding:0;align-items:center;justify-content:center;font-size:22px}
 body.phone #bottom{display:none}
-body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:calc(var(--hud-top, 96px) + 8px);left:8px;right:8px;bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - 168px);overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
+body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:calc(var(--hud-top, 96px) + 8px);left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - var(--chrome-bottom, 212px));overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
 body.phone.menu #bottom button{min-width:48px;min-height:48px}
-body.phone #talkP{left:12px;top:calc(var(--hud-top, 96px) + 44px);right:auto;bottom:auto;width:min(360px,calc(100vw - 24px));height:min(360px,calc(100dvh - var(--hud-top, 96px) - 212px));max-height:calc(100dvh - var(--hud-top, 96px) - 212px);font-size:16px}
-body.phone.land #talkP{left:max(148px,calc(env(safe-area-inset-left) + 132px));top:calc(var(--hud-top, 72px) + 8px);width:min(480px,calc(100vw - 310px));height:min(220px,calc(100dvh - var(--hud-top, 72px) - 148px));max-height:calc(100dvh - var(--hud-top, 72px) - 148px)}
-body.phone #tabletP{left:8px;right:8px;top:calc(var(--hud-top, 96px) + 8px);width:auto;bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - 168px)}
+body.phone .panel{left:max(8px,env(safe-area-inset-left));right:auto;width:min(360px,calc(100vw - 48px - env(safe-area-inset-left) - env(safe-area-inset-right)));top:calc(var(--hud-top, 96px) + 8px);bottom:calc(var(--chrome-bottom, 212px) + env(safe-area-inset-bottom));height:auto;max-height:none}
+body.phone .panel button{min-width:48px;min-height:48px}
+body.phone.land .panel{left:max(148px,calc(env(safe-area-inset-left) + 128px));width:min(480px,calc(100vw - 340px));bottom:calc(76px + env(safe-area-inset-bottom))}
+body.phone.wide:not(.land) .panel{left:auto;right:max(160px,env(safe-area-inset-right));width:min(420px,calc(100vw - 340px));bottom:calc(76px + env(safe-area-inset-bottom))}
+body.phone.wide.land .panel{left:max(148px,calc(env(safe-area-inset-left) + 128px));right:max(200px,env(safe-area-inset-right));width:auto;bottom:calc(76px + env(safe-area-inset-bottom))}
+body.phone #talkP{font-size:16px}
 body.phone #tabletP button{min-width:48px;min-height:48px}
-body.phone.land #tabletP{left:max(148px,calc(env(safe-area-inset-left) + 8px));right:max(160px,env(safe-area-inset-right))}
 body.phone #talkP h3{min-height:48px;touch-action:none;cursor:grab}
 body.phone #chatFold{display:inline-flex;min-width:48px;min-height:36px;align-items:center;justify-content:center}
 body.phone #chatLog{font-size:16px;line-height:1.4;min-height:96px}
@@ -139,7 +152,7 @@ body.phone #talkP.collapsed .body{display:none}
 #statSheet{display:none}
 #statMore{display:none}
 #turnHint{display:none}
-body.phone #hudStack{display:flex;flex-direction:column;align-items:stretch;position:fixed;z-index:7;top:0;left:0;right:0;max-height:calc(100dvh - 168px);padding-top:env(safe-area-inset-top);pointer-events:none;overflow:auto;touch-action:pan-y}
+body.phone #hudStack{display:flex;flex-direction:column;align-items:stretch;position:fixed;z-index:7;top:0;left:0;right:0;max-height:calc(100dvh - var(--chrome-bottom, 212px));padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);pointer-events:none;overflow:auto;touch-action:pan-y}
 body.phone #hudStack>*{pointer-events:auto}
 body.phone #top{position:relative;top:auto;left:auto;right:auto;flex-wrap:nowrap;overflow:hidden;gap:4px;padding:4px 58px 4px 8px;background:linear-gradient(#0e0b16f2,#0e0b16e6);z-index:1}
 body.phone #brand{max-width:34vw;overflow:hidden;text-overflow:ellipsis}
@@ -151,9 +164,13 @@ body.phone.stats #statSheet .st{pointer-events:auto}
 body.phone #moriLine{position:relative;top:auto;left:auto;max-width:none;width:auto;margin:4px 8px 0;font-size:14px;line-height:1.3;z-index:1;background:#0e0b16}
 body.phone #moriLine .bar{display:none}
 body.phone #sugg button{min-height:48px;min-width:48px;font-size:16px;padding:8px 14px}
-body.phone #log{position:fixed;left:8px;right:8px;top:calc(var(--hud-top, 96px) + 4px);bottom:auto;transform:none;margin:0;max-width:none;max-height:2.8em;overflow:hidden;text-align:left;pointer-events:none;z-index:6;background:rgba(14,11,22,.97)}
-body.phone.land #log{left:210px;right:200px;top:auto;bottom:max(16px,env(safe-area-inset-bottom));text-align:center}
-body.phone.land #hudStack{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));max-height:calc(100dvh - 136px)}
+body.phone #log{position:fixed;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));top:calc(var(--hud-top, 96px) + 4px);bottom:auto;transform:none;margin:0;max-width:none;max-height:2.8em;overflow:hidden;text-align:left;pointer-events:none;z-index:6;background:rgba(14,11,22,.97)}
+body.phone.land #log{left:calc(148px + env(safe-area-inset-left));right:calc(210px + env(safe-area-inset-right));top:auto;bottom:calc(76px + env(safe-area-inset-bottom));text-align:center}
+body.phone.land #hudStack{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));max-height:calc(100dvh - 168px)}
+body.phone #hotbar{transform:none;left:8px;right:8px;bottom:calc(16px + 128px + 8px + env(safe-area-inset-bottom));max-width:none;padding-left:max(4px,env(safe-area-inset-left));padding-right:max(4px,env(safe-area-inset-right))}
+body.phone.pad:not(.land):not(.wide) #hotbar{bottom:calc(16px + 156px + 8px + env(safe-area-inset-bottom))}
+body.phone.land #hotbar,body.phone.wide #hotbar{left:calc(204px + env(safe-area-inset-left));right:calc(10px + 184px + 8px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom))}
+body.phone.wide:not(.land) #hotbar{right:calc(10px + 140px + 8px + env(safe-area-inset-right))}
 body.phone.land #moriLine{max-width:none;font-size:13px}
 body.phone:not(.land):not(.stayport) #turnHint{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px;padding:8px 10px;background:rgba(14,11,22,.97);border:1px solid var(--ln);border-radius:14px}
 body.phone #turnHint button{min-height:48px;min-width:48px}
@@ -188,7 +205,14 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <div id="dpad" aria-label="Move"><button type="button" data-pad="n" aria-label="Forward">▲</button><button type="button" data-pad="w" aria-label="Left">◀</button><button type="button" data-pad="e" aria-label="Right">▶</button><button type="button" data-pad="s" aria-label="Back">▼</button></div>
 <button type="button" id="padMode" aria-label="Switch between joystick and D-pad">✥</button>
 <button type="button" id="phoneMenu" aria-label="Open the menu">☰</button>
-<div id="ctx"><button id="bInteract">E · Interact</button><button id="bBandage">🩹 Bandage</button><button id="bSalve">🧴 Salve</button><button id="bPotion">🧪 Potion</button><button id="bAttack">⚔ Attack</button></div>
+<div id="ctx"><button id="bInteract">E · Interact</button><button id="bBandage" title="Bandage. Heal check, then healing over time.">Bandage</button><button id="bSalve" title="Salve. Heals over time. No roll.">Salve</button><button id="bPotion" title="Potion">🧪 Potion</button><button id="bAttack">⚔ Attack</button></div>
+<div id="hotbar" aria-label="Action bar">
+  <button type="button" id="barUp" aria-label="Previous hotbar page">▲</button>
+  <div id="barSlots"></div>
+  <button type="button" id="barDown" aria-label="Next hotbar page">▼</button>
+  <span id="barPage">1/4</span>
+</div>
+<div id="barGhost" hidden></div>
 <div id="bottom">
   <button id="bHero">🧬 HeroLock</button><button id="bJobs">🔨 Mori's Jobs</button><button id="bBag">🎒 Bag &amp; Painter</button>
   <button id="bTalk">💬 Talk</button><button id="bQuests">📜 Quests</button><button id="bLore">🃏 Lore</button><button id="bMem">💛 Memory</button><button id="bPersona">🪪 Persona</button><button id="bBeat">🥁 Beat</button><button id="bBlue">🟦 Blue room</button>
@@ -259,6 +283,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <script src="js/power.js"></script>
 <script src="js/occlusion.js"></script>
 <script src="js/phone.js"></script>
+<script src="js/hotbar.js"></script>
 <script src="js/furniture.js"></script>
 <script src="js/tablet.js"></script>
 <script src="js/tinker.js"></script>
