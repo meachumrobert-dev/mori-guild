@@ -1,8 +1,9 @@
 /* Coarse occlusion and a camera-relative render origin.
-   Frustum culling stays three.js's own. This only hides a small object when a
-   building box or a hill sample sits on the ray, and only after two agreeing
-   tests, so a ridge does not pop. The render origin subtracts the player so
-   far coordinates stay precise. No network. */
+   Frustum culling stays three.js's own. This only hides a small prop when a
+   different building sits on the ray, and only after two agreeing tests.
+   Terrain, framed buildings, and their doors and windows are never hidden.
+   A hidden prop is tested again, so a mistake comes back.
+   The render origin subtracts the player so far coordinates stay precise. */
 (function(){
 'use strict';
 const stats={tested:0, hidden:0, shown:0, hill:0, box:0, far:0, debug:false, lastCam:0, origin:0};
@@ -18,12 +19,13 @@ function slab(ox,oy,oz, dx,dy,dz, box){
   }
   return t0>0?t0:t1>0?t1:null;
 }
-function occluded(cam, point, boxes, pad){
+function occluded(cam, point, boxes, pad, self){
   const dx=point.x-cam.x, dy=point.y-cam.y, dz=point.z-cam.z;
   const dist=Math.hypot(dx,dy,dz)||1;
   if(dist<8) return false;
   const inv=1/dist, rdx=dx*inv, rdy=dy*inv, rdz=dz*inv;
   for(const box of boxes){
+    if(self&&box.obj&&sameBuild(self, box.obj)) continue;
     const t=slab(cam.x,cam.y,cam.z, rdx,rdy,rdz, box);
     if(t!=null && t>0.5 && t<dist-pad) return true;
   }
@@ -45,18 +47,42 @@ function viewOffset(px, pz, cx, cz){
   return {cx:cx-px, cz:cz-pz, sx:-px, sz:-pz, shifted:true};
 }
 let cursor=0, refresh=0, occluders=[], candidates=[];
+const culled=new Set();
+function exempt(obj){
+  let o=obj, n=0;
+  while(o&&n<6){
+    const u=o.userData||{};
+    if(u.sw||u.noCull||u.terrain||u.ground||u.card||u.frame) return true;
+    const name=o.name||'';
+    if(name.indexOf('frame_')===0||name==='gatherNodes') return true;
+    o=o.parent; n++;
+  }
+  return false;
+}
 function boxOf(T, obj){
   const b=new T.Box3().setFromObject(obj);
   if(!isFinite(b.min.x)||b.isEmpty()) return null;
   return {min:[b.min.x,b.min.y,b.min.z], max:[b.max.x,b.max.y,b.max.z], obj};
 }
+function sameBuild(a, b){
+  if(!a||!b) return false;
+  const set=new Set(); let o=a, n=0;
+  while(o&&n<3){ set.add(o); o=o.parent; n++; }
+  o=b; n=0;
+  while(o&&n<3){ if(set.has(o)) return true; o=o.parent; n++; }
+  return false;
+}
 function consider(obj, out, T){
-  if(!obj||!obj.visible||obj.userData&&(obj.userData.sw||obj.userData.noCull)) return;
-  if(obj.isLight) return;
+  if(!obj||obj.isLight) return;
+  if(exempt(obj)){
+    if(obj.userData&&obj.userData._occ){ obj.visible=true; obj.userData._occ=0; obj.userData._occN=0; culled.delete(obj); stats.shown++; }
+    return;
+  }
+  if(!obj.visible && !(obj.userData&&obj.userData._occ)) return;
   const b=boxOf(T, obj); if(!b) return;
   const sx=b.max[0]-b.min[0], sy=b.max[1]-b.min[1], sz=b.max[2]-b.min[2];
   b.size=Math.max(sx,sy,sz);
-  if(sy>2 && sx>1.6 && sz>1.6 && b.size<80) occluders.push(b);
+  if(sy>2 && sx>1.6 && sz>1.6 && b.size<80 && obj.visible) occluders.push(b);
   else if(b.size<30) out.push(b);
 }
 function update(scene, camera, opt){
@@ -65,7 +91,12 @@ function update(scene, camera, opt){
   if(refresh<=0){
     refresh=45; occluders=[]; candidates=[];
     scene.children.forEach(o=>{
-      if(!o.visible||o.userData&&(o.userData.sw||o.userData.noCull)||o.isLight) return;
+      if(o.isLight) return;
+      if(o.userData&&(o.userData.sw||o.userData.noCull||o.userData.terrain)){
+        if(o.userData._occ){ o.visible=true; o.userData._occ=0; o.userData._occN=0; culled.delete(o); stats.shown++; }
+        return;
+      }
+      if(!o.visible && !(o.userData&&o.userData._occ)) return;
       consider(o, candidates, T);
       if(o.children&&o.children.length&&o.children.length<40) o.children.forEach(c=>consider(c, candidates, T));
     });
@@ -82,17 +113,18 @@ function update(scene, camera, opt){
     const cx=(item.min[0]+item.max[0])/2, cy=(item.min[1]+item.max[1])/2, cz=(item.min[2]+item.max[2])/2;
     const dist=Math.hypot(cx-cam.x, cy-cam.y, cz-cam.z);
     const pad=c.userData._occ?0.6:2.2;
+    if(exempt(c)){ c.userData._occN=0; if(!c.visible||c.userData._occ){ c.visible=true; c.userData._occ=0; culled.delete(c); stats.shown++; } continue; }
     const byHill=hillBlocks(cam,{x:cx,y:cy,z:cz}, opt&&opt.heightAt);
-    const byBox=occluded(cam,{x:cx,y:cy,z:cz}, occluders, pad);
+    const byBox=occluded(cam,{x:cx,y:cy,z:cz}, occluders, pad, c);
     const byFar=tooFar(dist, far, item.size);
     const hide=byHill||byBox||byFar;
     if(hide){ if(byHill) stats.hill++; if(byBox) stats.box++; if(byFar) stats.far++; }
     if(hide){
       c.userData._occN=(c.userData._occN||0)+1;
-      if(c.userData._occN>=2 && c.visible){ c.visible=false; c.userData._occ=1; stats.hidden++; hidden++; }
+      if(c.userData._occN>=2 && c.visible){ c.visible=false; c.userData._occ=1; culled.add(c); stats.hidden++; hidden++; }
     } else {
       c.userData._occN=0;
-      if(c.userData._occ){ c.visible=true; c.userData._occ=0; stats.shown++; }
+      if(c.userData._occ||culled.has(c)){ c.visible=true; c.userData._occ=0; culled.delete(c); stats.shown++; }
     }
   }
   return stats;
@@ -106,5 +138,5 @@ function beginView(scene, camera, px, pz){
   return v;
 }
 function endView(scene){ if(scene) scene.position.set(0,0,0); }
-window.OCCLUSION={ stats, slab, occluded, hillBlocks, tooFar, floatGap, viewOffset, update, beginView, endView, LIMIT };
+window.OCCLUSION={ stats, slab, occluded, hillBlocks, tooFar, floatGap, viewOffset, update, beginView, endView, exempt, sameBuild, LIMIT };
 })();
