@@ -206,8 +206,16 @@ function dungeonEntrance(scene, colliders){
 
 /* ---------- resources ---------- */
 function rng(seed){ let s=seed>>>0; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function oreSprite(text, col){
+  const c=document.createElement('canvas'); c.width=512; c.height=96; const x=c.getContext('2d');
+  x.fillStyle='rgba(12,10,18,0.86)'; x.fillRect(8,8,496,80);
+  x.strokeStyle=col||'#f4e2c2'; x.lineWidth=6; x.strokeRect(8,8,496,80);
+  x.fillStyle='#f4ead8'; x.font='bold 40px Georgia, serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text, 256, 48);
+  const t=new T.CanvasTexture(c); t.colorSpace=T.SRGBColorSpace;
+  const s=new T.Sprite(new T.SpriteMaterial({map:t, depthWrite:false})); s.scale.set(3.4,0.64,1); s.position.y=2.35; s.name='oreLabel'; s.userData.tip=text; return s;
+}
 function resources(scene, colliders){
-  const R=rng(42), nodes=[];
+  const R=rng(42), woodR=rng(99), nodes=[];
   const trunk=M('#5b3a1e'), leafA=M('#2f6b34'), leafB=M('#3f8a3a'), stumpM=M('#7a5634');
   const tg=new T.CylinderGeometry(0.22,0.32,2,6), cg=new T.ConeGeometry(1.4,2.6,7), cg2=new T.ConeGeometry(1.0,2,7), ig=new T.IcosahedronGeometry(1.4,0);
   for(let i=0;i<46;i++){ const x=28+R()*48, z=-34+R()*68; const y=height(x,z);
@@ -217,21 +225,30 @@ function resources(scene, colliders){
     if(R()<0.6){ mesh(cg,leafA,0,2.8,0,crown); mesh(cg2,leafB,0,4,0,crown); } else mesh(ig,leafB,0,3,0,crown);
     const stump=mesh(new T.CylinderGeometry(0.3,0.34,0.4,6),stumpM,0,0.2,0,g); stump.visible=false;
     const s=0.8+R()*0.5; crown.scale.setScalar(s);
-    nodes.push({type:'timber', x, z, g, crown, stump, ready:true, regrow:0}); colliders.circles.push({x,z,r:0.5}); }
+    const sp=window.LUMBER?LUMBER.pick('forest', woodR):'oak';
+    const rid=window.LUMBER&&LUMBER.species(sp)?LUMBER.species(sp).log:'oak_log';
+    nodes.push({type:'timber', rid, x, z, g, crown, stump, ready:true, regrow:0, place:'Old Wood'}); colliders.circles.push({x,z,r:0.5}); }
   const rockM=M('#7a7f86'), oreM=M('#2dd4bf',{e:'#0f766e',ei:0.6}), goldM=M('#facc15',{e:'#a16207',ei:0.5});
   for(let i=0;i<16;i++){ const x=-30-R()*32, z=-26+R()*52; const y=height(x,z);
-    const g=new T.Group(); g.position.set(x,y,z); scene.add(g); const crown=new T.Group(); g.add(crown);
+    const rid=window.ORES?ORES.starter(i):'bog_iron_ore';
+    const spec=window.ORES?ORES.kind(rid):null;
+    const fleck=spec?M(spec.col,{e:spec.col,ei:0.45}):oreM;
+    const g=new T.Group(); g.position.set(x,y,z); g.name='ore_'+rid; scene.add(g); const crown=new T.Group(); g.add(crown);
     const r=mesh(new T.DodecahedronGeometry(1.1,0),rockM,0,0.6,0,crown); r.scale.set(1.2,0.8,1); r.rotation.y=R()*6;
-    for(let k=0;k<4;k++){ const sh=mesh(new T.OctahedronGeometry(0.22),k%2?oreM:goldM,(R()-0.5)*1.4,0.9+R()*0.3,(R()-0.5)*1.2,crown); sh.rotation.set(R(),R(),R()); }
+    for(let k=0;k<4;k++){ const sh=mesh(new T.OctahedronGeometry(0.22),k%2?fleck:goldM,(R()-0.5)*1.4,0.9+R()*0.3,(R()-0.5)*1.2,crown); sh.rotation.set(R(),R(),R()); }
     const stump=mesh(new T.DodecahedronGeometry(0.5,0),rockM,0,0.2,0,g); stump.visible=false;
-    nodes.push({type:'ore', x, z, g, crown, stump, ready:true, regrow:0}); colliders.circles.push({x,z,r:1.1}); }
+    const label=oreSprite(window.ORES?ORES.worldLabel(rid):'Bog Iron Ore', spec&&spec.col);
+    g.add(label);
+    g.userData.tip=window.ORES?ORES.tip(rid):'Bog Iron Ore.';
+    nodes.push({type:'ore', rid, x, z, g, crown, stump, label, ready:true, regrow:0, place:'Grey Quarry'}); colliders.circles.push({x,z,r:1.1}); }
   const herbA=M('#4caf50'), flower=M('#c4ff5a',{e:'#7dff3a',ei:0.7}), flower2=M('#ff8af0',{e:'#ff3df0',ei:0.5});
+  const herbIds=['mint','chamomile','lavender','calendula','yarrow','sage','comfrey','rosemary'];
   for(let i=0;i<16;i++){ const x=-22+R()*44, z=28+R()*22; const y=height(x,z);
     const g=new T.Group(); g.position.set(x,y,z); scene.add(g); const crown=new T.Group(); g.add(crown);
     for(let k=0;k<6;k++){ const l=mesh(new T.ConeGeometry(0.12,0.7,4),herbA,(R()-0.5)*0.6,0.3,(R()-0.5)*0.6,crown); l.rotation.set((R()-0.5)*0.6,0,(R()-0.5)*0.6); }
     mesh(new T.SphereGeometry(0.12,6,5),R()<0.5?flower:flower2,0,0.75,0,crown);
     const stump=mesh(new T.CylinderGeometry(0.2,0.25,0.06,6),M('#4a3018'),0,0.03,0,g); stump.visible=false;
-    nodes.push({type:'herbs', x, z, g, crown, stump, ready:true, regrow:0}); }
+    nodes.push({type:'herbs', rid:herbIds[i%herbIds.length], x, z, g, crown, stump, ready:true, regrow:0, place:'Herb Meadow'}); }
   return nodes;
 }
 

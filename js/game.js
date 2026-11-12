@@ -31,6 +31,7 @@ if(!S.v32){ S.v32=1; // v3.2: SRD armor AC by type (no double-counted enhancemen
 if(!S.dun) S.dun={};
 if(!S.v38){ S.v38=1; if(!S.craftSkills) S.craftSkills={alchemy:0,smithing:0,enchanting:0,heal:0,jewelry:0}; if(!S.stations) S.stations={pot:'clay',forge:'cast_iron',unlocked:['clay','cast_iron'],enchantForge:false,enchantCircle:false,zinc:false}; if(!S.hots) S.hots=[]; if(!S.hotbar) S.hotbar={bandage:true,potion:true,salve:true}; if(!S.inv.some(i=>i.kind==='bandage')) S.inv.unshift({id:'band_starter',name:'Linen Bandage',cat:'Bandage',kind:'bandage',value:1,fx:{hot:{pps:1,dur:8},healCheck:true}}); }
 if(window.HOTBAR) S.bars=HOTBAR.restore(S.bars);
+if(window.ORES) ORES.migrate(S);
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -277,7 +278,9 @@ function startJob(j){
 function finishJob(j){
   if(j.kind==='gather'){
     if(j.what==='weeds'){ const w=j.target; if(weeds.includes(w)){ scene.remove(w.g); weeds.splice(weeds.indexOf(w),1); } const n=3*(S.buffs.tokenbloom>0?2:1); S.life+=n; log('Mori pulled weeds: +'+n+' Life'); }
-    else { const n=YIELD()+(j.what==='ore'&&S.outpost.goldPick?1:0); S[j.what]+=n; const nd=j.target; nd.crown.visible=false; nd.stump.visible=true; nd.regrow=40; nd.claimed=false; log('Mori: +'+n+' '+j.what+' from the '+GATHER[j.what].at); }
+    else { const n=YIELD()+(j.what==='ore'&&S.outpost.goldPick?1:0); const nd=j.target; nd.crown.visible=false; nd.stump.visible=true; if(nd.label) nd.label.visible=false; nd.regrow=40; nd.claimed=false;
+      if(nd.rid&&window.ORES&&ORES.kind(nd.rid)){ if(!S.reag) S.reag={}; S.reag[nd.rid]=(S.reag[nd.rid]||0)+n; log(ORES.gatherLine(nd.rid, n, nd.place||GATHER[j.what].at)); }
+      else { S[j.what]+=n; log('Mori: +'+n+' '+j.what+' from the '+GATHER[j.what].at); } }
   } else if(j.kind==='brew'){ const r=BREWS[j.what];
     if(r.pot==='green'&&window.STATIONS&&!STATIONS.canGreen()){ log('Green / magic potions need a brass (or higher) pot. Upgrade at Crafting Stations.'); S.jobs.unshift({kind:j.kind,what:j.what}); curJob=null; return; }
     spend(r.need); let n=r.batch||1; if(r.opt&&!Object.keys(missing(r.opt)).length){ spend(r.opt); n+=r.optN||1; }
@@ -620,7 +623,7 @@ function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); 
   { const cmd=/\b(build|plant|grow|raise|dig|carve|flatten|level|smooth|forge|brew|gather|mine|chop|pull|seed|program|cleanse|purge|raid|terraform|make a|add a)\b/.test(s); const c=moriCtx();
     const r=MORICHAT.reply(v,c); if(r&&(!cmd||['rule','behave','intro','feel','friend','world'].includes(c.intent))&&!['gather','craft','combat','places','thanks','bye','mori'].includes(c.intent)){ addChat('mo',r,{intent:c.intent,alts:MORICHAT.alts&&MORICHAT.alts(v,c)}); LORE.unlock('npc_mori'); save(); return; } }
   // v3.4: Mori knows where the reagents are, plans gather runs, and talks about Gravenmoor / Havenwall
-  if(/\b(where|find|any|look|nearest|see)\b/.test(s)){ const named=GATHERING.whereNamed&&GATHERING.whereNamed(s); if(named){ addChat('mo',named); return; } if(/(herb|flower|petal|leaf|root|ore|metal|iron|copper|silver|mithral|adamant|stone|rock|granite|marble|obsidian|wood|log|timber|tree)/.test(s)){ const a=GATHERING.where(s); if(a){ addChat('mo',a); return; } } }
+  if(/\b(where|find|any|look|nearest|see)\b/.test(s)){ const named=GATHERING.whereNamed&&GATHERING.whereNamed(s); if(named){ addChat('mo',named); return; } if(/(herb|flower|petal|leaf|root|ore|metal|iron|copper|tin|zinc|manganese|nickel|clay|silver|mithral|adamant|stone|rock|granite|marble|obsidian|wood|log|timber|tree|oak|pine|yew|mint|lavender)/.test(s)){ const a=GATHERING.where(s); if(a){ addChat('mo',a); return; } } }
   if(/\b(gather|herb|mining|ore|wood|lumber)(ing)? (run|trip)\b|\bgo gather/.test(s)){ addChat('mo',GATHERING.planRun(s)); return; }
   if(/\b(cleanse|purge)\b|\bclan raid\b/.test(s)){ addChat('mo',queueCleanse(/clan|raid/.test(s)?'clan':'kin',true)); return; }
   if(/gravenmoor|havenwall|demon clan|coilblight|\blegion\b|death of earth|moonfang|brakka|pale.*mantle/.test(s)){ addChat('mo',CLAN.moriLine()); return; }
@@ -879,7 +882,11 @@ function regionAct(t){ if(t.kind==='globe') openGlobe(); else if(t.kind==='dunge
   else if(t.kind==='city') cityModal(t.city); else if(t.kind==='village') log('Villagers wave. '+PL.regionInfo(curRegion()).name+' has roads and homes now — one more seed job and it could become a city-state.');
   else if(t.kind==='void') { log('▦ The void hums. Nothing here is programmed yet. Queue a seed job on the globe.'); openGlobe(); } }
 function sitOn(t){ player.sit={x:t.x,z:t.z,name:t.name}; player.pos.x=t.x; player.pos.z=t.z; log(t.name+'. '+(t.flavor||'')); }
-function worldTargets(){ const furn=window.FURNITURE?FURNITURE.targets().map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
+function worldTargets(){ const furn=window.FURNITURE?FURNITURE.targets().map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(resourceTargets(),NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
+function resourceTargets(){ return nodes.filter(n=>n.rid&&window.ORES&&ORES.kind(n.rid)).map(n=>({x:n.x,z:n.z,r:2.6,label:n.ready?ORES.prompt(n.rid):'⏳ '+ORES.nameOf(n.rid),tip:ORES.tip(n.rid),act:()=>gatherNode(n)})); }
+function gatherNode(n){ if(!n||!n.ready) return; const q=YIELD()+(n.type==='ore'&&S.outpost.goldPick?1:0); n.ready=false; n.crown.visible=false; n.stump.visible=true; if(n.label) n.label.visible=false; n.regrow=40;
+  if(n.rid&&window.ORES&&ORES.kind(n.rid)){ if(!S.reag) S.reag={}; S.reag[n.rid]=(S.reag[n.rid]||0)+q; log(ORES.gatherLine(n.rid, q, n.place)); return; }
+  S[n.type]+=q; log('+'+q+' '+n.type); }
 function baseWorldTargets(){ if(!atGuild()) return regionTargets(); const st=W.STATIONS, sw=tav.userData.stageWorld; return regionTargets().concat([
   {x:st.seed.x+1.5,z:st.seed.z+1.5,r:3.4,label:'🌱 World Seed Obelisk (globe & seed)',act:()=>openGlobe()},
   {x:st.doll.x,z:st.doll.z+1.8,r:3.2,label:'🪆 Mori Doll shop',act:dollShop},
@@ -899,7 +906,7 @@ function baseWorldTargets(){ if(!atGuild()) return regionTargets(); const st=W.S
 let curTarget=null;
 function interact(){ if(crOpen) return; if(curTarget){ curTarget.act(); return; }
   if(mode==='world'){ // gather by hand near a node
-    const n=nodes.find(n=>n.ready&&Math.hypot(n.x-player.pos.x,n.z-player.pos.z)<2.6); if(n){ n.ready=false; n.crown.visible=false; n.stump.visible=true; n.regrow=40; S[n.type]+=1; log('+1 '+n.type+' (Mori is faster at this)'); return; }
+    const n=nodes.find(n=>n.ready&&Math.hypot(n.x-player.pos.x,n.z-player.pos.z)<2.6); if(n){ gatherNode(n); return; }
     const w=weeds.find(w=>Math.hypot(w.x-player.pos.x,w.z-player.pos.z)<1.8); if(w){ scene.remove(w.g); weeds.splice(weeds.indexOf(w),1); const g=S.buffs.tokenbloom>0?2:1; S.life+=g; log('+'+g+' Life'); return; } } }
 
 /* ---------- player movement ---------- */
@@ -1120,7 +1127,7 @@ function updateSky(dt){ S.clock=(S.clock+dt)%DAY; const ph=S.clock/DAY, el=Math.
 
 /* ---------- HUD ---------- */
 function hud(){ const st=stats(); $('sHp').textContent=S.hp+'/'+st.maxHp; $('hpbar').firstElementChild.style.width=(S.hp/st.maxHp*100)+'%';
-  $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=S.ore; $('sTimber').textContent=S.timber;
+  $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=(S.ore||0)+(window.GATHERING?GATHERING.stand('ore'):0); $('sTimber').textContent=S.timber;
   { const id=curRegion(), inf=PL.regionInfo(id), stg=stageOf(id); $('sRegion').textContent=mode==='dungeon'&&dun?'🕳 '+dunName+' · '+(dunRoomName()||'passage')+' · rooms '+(S.roomClears||0)+' · full clears '+(S.clears||0)+' · under '+inf.name:'🌍 '+(atGuild()?'The Guild · ':'')+inf.name+' · '+(stg?PL.BIOMES[inf.biome].name:'void')+' · '+STAGES[stg];
   if($('sWorld')&&window.IDLEBUILD) $('sWorld').textContent=IDLEBUILD.progressChip(); }
   const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none'; }
@@ -1213,7 +1220,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   if(mode==='world'&&window.IDLEBUILD&&heavy.plan.build) IDLEBUILD.update(dt);
   if(mode==='world'&&window.TREASURY){ const r=TREASURY.tryRaid(dt); if(r) spawnBanditRaid(r); }
   updateMori(dt);
-  nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; } } });
+  nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; if(n.label) n.label.visible=true; } } });
   weedT-=dt; if(weedT<=0){ weedT=4; if(weeds.length<26) spawnWeed(); }
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
@@ -1222,7 +1229,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   // targets
   const tg=mode==='world'?worldTargets():dungeonTargets(); curTarget=null; let bd=1e9; tg.forEach(t=>{ const d=Math.hypot(t.x-player.pos.x,t.z-player.pos.z); if(d<t.r&&d<bd){ bd=d; curTarget=t; } });
   TS.pump(); // v3.4 two-speed: foreground jobs now, background jobs inside the frame budget
-  const bi=$('bInteract'); bi.textContent=document.body.classList.contains('phone')?'E':(curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'); bi.classList.toggle('hot',!!curTarget);
+  const bi=$('bInteract'); bi.textContent=document.body.classList.contains('phone')?'E':(curTarget?(IS_TOUCH?'':'E · ')+curTarget.label:'E · Interact'); bi.classList.toggle('hot',!!curTarget); bi.title=curTarget&&curTarget.tip?curTarget.tip:'';
 }
 function renderWorld(which){ if(!window.OCCLUSION){ renderer.render(which, camera); return; } const cx=camera.position.x, cz=camera.position.z; OCCLUSION.beginView(which, camera, player.pos.x, player.pos.z); renderer.render(which, camera); camera.position.x=cx; camera.position.z=cz; OCCLUSION.endView(which); }
 function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
@@ -1261,7 +1268,8 @@ let dayNow=1;
 function frame(now){ const raw=now-last, dt=Math.min(0.05,raw/1000); last=now; const t0=performance.now(); try{ dayNow=updateSky(dt); step(dt); const t1=performance.now(); hudT-=dt; if(hudT<=0){ hudT=0.2; hud(); } saveT+=dt; if(saveT>8){ saveT=0; save(); } render(dayNow); perfFrame(raw, t1-t0, performance.now()-t0); }catch(e){ console.error(e); } requestAnimationFrame(frame); }
 /* ---------- v3.4 Phase 2 modules: two-speed scheduler, gathering, South Park cards ---------- */
 const TS=TWOSPEED; TS.setup({renderer, camera, scene, budget:IS_TOUCH?1.0:1.5});
-GATHERING.init({ scene, SW, player, S:()=>S, mode:()=>mode, mobile:IS_TOUCH, fence:W.FENCE||20, log, showRoll, save, foeAttack, clock:()=>clockT, cur:()=>mode==='dungeon'&&dun?dun.scene:scene, target:()=>curTarget, extraWarm:()=>CLAN.extraWarm() });
+GATHERING.init({ scene, SW, player, S:()=>S, mode:()=>mode, mobile:IS_TOUCH, fence:W.FENCE||20, log, showRoll, save, foeAttack, clock:()=>clockT, cur:()=>mode==='dungeon'&&dun?dun.scene:scene, target:()=>curTarget, extraWarm:()=>CLAN.extraWarm(), region:()=>PL.regionInfo(curRegion()).name });
+nodes.forEach(n=>{ if(!n.rid||!GATHERING.notePlace) return; const place=n.place?(n.place+', '+PL.regionInfo(guildId).name):PL.regionInfo(guildId).name; GATHERING.notePlace({rid:n.rid, x:n.x, z:n.z, type:n.type, region:place, ready:()=>n.ready}); });
 IMPOSTORS.init({ scene, SW, player, mode:()=>mode, mobile:IS_TOUCH, quality:()=>QUAL[PERF.q].name, far:()=>scene.fog.far, flowerR:()=>QUAL[PERF.q].flowerR });
 QUESTS.init({ S:()=>S, log, addItem, save, rep:(f,n)=>CLAN.rep(f,n), showRoll });
 NPCS.init({ scene, S:()=>S, player, mode:()=>mode, atGuild, mobile:IS_TOUCH, DAY, STATIONS:W.STATIONS, openNpc:id=>openNpc(id), hAt:(x,z)=>{ const h=W.height(x,z); return atGuild()&&tav.userData.inside(x,z)?Math.max(h,0.3):h; } });
