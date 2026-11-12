@@ -25,6 +25,7 @@ button.on{background:var(--acc);color:#111;border-color:var(--acc)}
 #moriLine .bar{height:5px;background:#222;border-radius:3px;margin-top:4px;overflow:hidden}#moriLine .bar i{display:block;height:100%;background:var(--acc);width:0}
 #sugg{margin-top:6px;display:none}#sugg button{padding:3px 8px;margin-right:4px}
 .panel{position:fixed;right:8px;top:64px;bottom:64px;width:min(340px,94vw);background:rgba(14,11,22,.94);border:1px solid var(--ln);border-radius:14px;z-index:6;display:none;flex-direction:column;overflow:hidden}
+#tabletFace{background:radial-gradient(circle at 30% 20%, #3a2a55, #0c0810 70%);border:1px solid #6a5a88;color:#d7c6ff;min-height:72px;padding:10px;border-radius:12px;margin-bottom:8px}
 .panel.open{display:flex}.panel h3{margin:0;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;font-size:14px}
 .panel .body{flex:1;overflow:auto;padding:10px 12px;touch-action:pan-y}
 .row{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}.row button{padding:5px 8px;font-size:12px}
@@ -125,6 +126,9 @@ body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:calc(var(--hud-top, 96px
 body.phone.menu #bottom button{min-width:48px;min-height:48px}
 body.phone #talkP{left:12px;top:calc(var(--hud-top, 96px) + 44px);right:auto;bottom:auto;width:min(360px,calc(100vw - 24px));height:min(360px,calc(100dvh - var(--hud-top, 96px) - 212px));max-height:calc(100dvh - var(--hud-top, 96px) - 212px);font-size:16px}
 body.phone.land #talkP{left:max(148px,calc(env(safe-area-inset-left) + 132px));top:calc(var(--hud-top, 72px) + 8px);width:min(480px,calc(100vw - 310px));height:min(220px,calc(100dvh - var(--hud-top, 72px) - 148px));max-height:calc(100dvh - var(--hud-top, 72px) - 148px)}
+body.phone #tabletP{left:8px;right:8px;top:calc(var(--hud-top, 96px) + 8px);width:auto;bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - 168px)}
+body.phone #tabletP button{min-width:48px;min-height:48px}
+body.phone.land #tabletP{left:max(148px,calc(env(safe-area-inset-left) + 8px));right:max(160px,env(safe-area-inset-right))}
 body.phone #talkP h3{min-height:48px;touch-action:none;cursor:grab}
 body.phone #chatFold{display:inline-flex;min-width:48px;min-height:36px;align-items:center;justify-content:center}
 body.phone #chatLog{font-size:16px;line-height:1.4;min-height:96px}
@@ -187,7 +191,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <div id="bottom">
   <button id="bHero">🧬 HeroLock</button><button id="bJobs">🔨 Mori's Jobs</button><button id="bBag">🎒 Bag &amp; Painter</button>
   <button id="bTalk">💬 Talk</button><button id="bQuests">📜 Quests</button><button id="bLore">🃏 Lore</button><button id="bMem">💛 Memory</button><button id="bPersona">🪪 Persona</button><button id="bBeat">🥁 Beat</button><button id="bBlue">🟦 Blue room</button>
-  <button id="bGlobe">🌍 Globe</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
+  <button id="bGlobe">🌍 Globe</button><button id="bTablet">🪨 Tablet</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
 </div>
 
 <div class="panel" id="questP"><h3>📜 Quest log <button data-close="questP">✕</button></h3><div class="body" id="questBody"></div></div>
@@ -210,6 +214,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 </div></div>
 
 <div class="panel" id="seedP"><h3>🌍 World Seed · the planet <button data-close="seedP">✕</button></h3><div class="body" id="seedBody"></div></div>
+<div class="panel" id="tabletP"><h3>🪨 Obsidian Tablet <button data-close="tabletP">✕</button></h3><div class="body" id="tabletBody"></div></div>
 
 <div class="modal" id="modal"><div class="card" id="modalCard"></div></div>
 
@@ -222,6 +227,9 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 
 <script src="vendor/three-r170.min.js"></script>
 <script src="js/mori-engine.js"></script>
+<script src="js/lexicon.js"></script>
+<script src="js/english.js"></script>
+<script src="js/dict.js"></script>
 <script src="js/hero.js"></script>
 <script src="assets/templates/templates.js"></script>
 <script src="js/templates.js"></script>
@@ -249,6 +257,9 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <script src="js/idlebuild.js"></script>
 <script src="js/power.js"></script>
 <script src="js/phone.js"></script>
+<script src="js/furniture.js"></script>
+<script src="js/tablet.js"></script>
+<script src="js/fingers.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

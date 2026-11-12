@@ -58,6 +58,12 @@ These are not started, and a level does not unlock them.
 - **Armies.** The crest span above is the cap on direct command. Fielding troops needs food, a logistics path, treasury pay, and a captain who already holds a crest. Diplomacy may someday trade a captain or a teacher. A teacher accelerates or opens one culture art. A teacher does not hand out a stat bonus.
 - **Hydrology, timed research, armor crafting rewrite.** The probe is not a river. Days and shifts are not a clock. The Guild forge ladder is unchanged.
 
+## Mori's English and the tablet
+
+`js/lexicon.js` is a small original list of game paraphrases. The general vocabulary is separate: `data/dict.json` (also `data/dict.js` for pages opened from disk) is a compact subset of Princeton WordNet 3.1. It holds the 9,000 lemmas with the most semantic-concordance tags, plus a short original list of function words so ordinary sentences are not full of unknown words. Each content lemma keeps its most frequent part of speech (`n` `v` `a` `r`) and, where WordNet had them, up to six synonym links inside that same list. The file can grow later by the same shape; nothing in the loader assumes a maximum of 9,000. The full WordNet license notice is in `data/WORDNET-LICENSE.txt`. No WordNet gloss is copied. The list is fetched after the game is up, not parsed with the first scripts. A tablet vocab pack is stored on top and removed by Revert. `DICT.online` is the hook for a future server dictionary. It is disabled and the game never calls the network for a definition. Answers about a ruler, a motto, a people, or an art are read from the current city card. If the card has no ruler, Mori says so. She names the guild meadow for an herb only when a patch of that herb is actually there.
+
+Herb patches in a forest city take turns through that biome's herb list. A flower node still pulls the plants into a cluster. It does not paint the whole region one species. A field plot may still be the one crop that plot was given.
+
 ## Limits a player will notice
 
 - Village ground is recomputed from the seed. An old visit shows the new hamlet the next time you arrive. Terraform deltas and depletion timers still load.
