@@ -22,7 +22,8 @@ button.on{background:var(--acc);color:#111;border-color:var(--acc)}
 #bottom button{background:var(--bg)}
 #log{position:fixed;left:50%;transform:translateX(-50%);bottom:156px;max-width:min(560px,92vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 12px;text-align:center;z-index:4;pointer-events:none;transition:opacity .4s}
 #moriLine{position:fixed;left:8px;top:64px;max-width:min(330px,60vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 10px;z-index:4;font-size:12px}
-#moriLine .bar{height:5px;background:#222;border-radius:3px;margin-top:4px;overflow:hidden}#moriLine .bar i{display:block;height:100%;background:var(--acc);width:0}
+#buffRow{position:fixed;left:8px;top:108px;z-index:6;display:flex;flex-wrap:wrap;gap:4px;max-width:70vw}
+#buffRow button{min-height:28px;padding:2px 8px;font-size:11px;background:#14301c;border-color:#5dff7a;color:#d8ffe4}
 #sugg{margin-top:6px;display:none}#sugg button{padding:3px 8px;margin-right:4px}
 .panel{position:fixed;right:8px;top:64px;bottom:64px;width:min(340px,94vw);background:rgba(14,11,22,.94);border:1px solid var(--ln);border-radius:14px;z-index:6;display:none;flex-direction:column;overflow:hidden}
 #tabletFace{background:radial-gradient(circle at 30% 20%, #3a2a55, #0c0810 70%);border:1px solid #6a5a88;color:#d7c6ff;min-height:72px;padding:10px;border-radius:12px;margin-bottom:8px}
@@ -208,6 +209,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <div id="statSheet"></div>
 <div id="moriLine"><b>Mori</b>: <span id="moriStatus">waking up…</span><div class="bar"><i id="moriBar"></i></div>
   <div id="sugg"><div id="suggText" class="small"></div><button class="pri" id="suggOk">Approve</button><button id="suggNo">Not now</button></div></div>
+<div id="buffRow"></div>
 <div id="turnHint"><span id="turnText">Landscape gives each thumb more room.</span><button type="button" id="turnGo">Try landscape</button><button type="button" id="turnNo">Stay</button></div>
 </div>
 <div id="log">Welcome to the Guild. Mori is planning the town.</div>
@@ -317,6 +319,9 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <script src="js/crew.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/newworld.js"></script>
+<script src="js/reseed.js"></script>
+<script src="js/tags.js"></script>
+<script src="js/effects.js"></script>
 <script src="js/skills.js"></script>
 <script src="js/collide.js"></script>
 <script src="js/items.js"></script>

@@ -306,7 +306,7 @@ function animate(root, t, speed){
   if(U.irisMat && U.glow>0.4) U.irisMat.emissiveIntensity=0.6+U.glow*0.9+Math.sin(t*3)*0.25;
   if(U.hat){ const r=U.hat.userData.rose; const bl=(t%3.2)<0.14; r.userData.eye.forEach(e=>e.scale.y=bl?0.12:1);
     U.hat.userData.tag.rotation.z=Math.sin(t*2.5)*0.25; }
-  if(U.bolts){ U.boltT-=1/60; if(U.boltT<=0){ U.boltT=0.08+Math.random()*0.12; rollBolts(U); } U.bolts.material.opacity=0.4+Math.random()*0.5; }
+  if(U.bolts){ const allow=root.userData.npcAura||(root.userData.auraLeft>0); U.bolts.visible=!!allow; if(allow){ U.boltT-=1/60; if(U.boltT<=0){ U.boltT=0.12; rollBolts(U); } U.bolts.material.opacity=0.4+Math.random()*0.5; } }
   if(U.crystal){ U.crystal.rotation.y=t*1.5; U.crystal.material.emissiveIntensity=0.9+Math.sin(t*4)*0.3; }
 }
 

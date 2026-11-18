@@ -39,6 +39,7 @@ if(window.TROLLS) TROLLS.migrate(S);
 if(window.LEGEND) LEGEND.migrate(S);
 if(window.RECIPES) RECIPES.migrate(S);
 if(window.LEGEND&&window.STOCKPILE){ const prices=LEGEND.prices(); for(const id in prices) STOCKPILE.register(id, prices[id]); }
+if(window.EFFECTS){ if(!S.buffs) S.buffs={}; EFFECTS.scrub(S.buffs); if(S.inv) EFFECTS.rings(S.inv); }
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -150,7 +151,7 @@ const COMP_P=[
   Object.assign(HERO.params('halforc'),{name:'Juno', hair:'#1a1a1f', top:'#22d3ee', armor:'#1a1a1f', boots:'#121212', pauldron:true, bootStyle:'stomper', height:0.95}),
   Object.assign(HERO.params('halfling'),{name:'Kit', hair:'#ff4d6d', top:'#facc15', armor:'#6b4a2b', boots:'#3a2412', hairStyle:'wolfcut', corset:true})];
 const roles=['support','tank','ranged'];
-const comps=COMP_P.map((p,i)=>({name:p.name, role:roles[i], model:makeChar(p), pos:new T.Vector3(player.pos.x-1.6+i*1.6,0,player.pos.z+1.8), hp:20, max:20, slot:i, cd:0, healCd:0, buffCd:0, spellCd:0}));
+const comps=COMP_P.map((p,i)=>({name:p.name, role:roles[i], model:makeChar(p), pos:new T.Vector3(player.pos.x-1.6+i*1.6,0,player.pos.z+1.8), hp:20, max:20, slot:i, cd:0, healCd:0, buffCd:roles[i]==='support'?8:0, spellCd:0}));
 comps.forEach(c=>scene.add(c.model));
 (function markTrades(){
   if(!window.TRADES||!window.T) return;
@@ -167,7 +168,7 @@ comps.forEach(c=>scene.add(c.model));
 })();
 const trail=[]; // breadcrumb trail for follow-in-line
 const delroth={model:makeChar(HERO.PRESETS.delroth), line:0, t:0};
-{ const sw=tav.userData.stageWorld; delroth.model.position.set(sw[0],1.1,sw[1]); delroth.model.rotation.y=Math.PI/2; scene.add(delroth.model); }
+{ const sw=tav.userData.stageWorld; delroth.model.position.set(sw[0],1.1,sw[1]); delroth.model.rotation.y=Math.PI/2; scene.add(delroth.model); delroth.model.userData.npcAura=true; }
 const DELROTH_LINES=[
  "I am Delroth. Undead catfolk. Dread Necromancer of the sixtieth circle. And yes — the hat is load-bearing.",
  "Sixty levels. Do you know what sixty levels buys you? A permanent table at The Retired Bard and nobody asks why the rose is watching.",
@@ -365,7 +366,10 @@ function updateMori(dt){
     else { j.phase='work'; j.t+=dt; if(j.target&&j.target.x!==undefined) m.face=Math.atan2(j.target.x-m.pos.x,j.target.z-m.pos.z);
       if(j.kind==='build'&&j.b){ const b=j.b, h=b.g.userData.h||3, base=W.height(b.g.position.x,b.g.position.z); b.g.position.y=base-h+h*Math.min(1,j.t/j.dur); m.face=Math.atan2(b.g.position.x-m.pos.x,b.g.position.z-m.pos.z); }
       if(j.kind==='forge'){ forge.userData.goblin.userData.arm.rotation.x=-Math.abs(Math.sin(j.t*8))*1.4; }
-      if(j.kind==='cleanse'){ const n=Math.floor(j.t/2.5); while(j.k<n){ j.k++; CLAN.cleanseStep(j.side,'mori'); CLAN.stats.mori++; } if(j.t>=j.dur) finishJob(j); } else if(j.kind==='tf'){ if(j.plan.region!==curRegion()){ TF.finishNow(j.plan); finishJob(j); } else if(TF.tick(j.plan,dt,player.pos)) finishJob(j); } else if(j.t>=j.dur) finishJob(j); } }
+      if(j.kind==='cleanse'){ const n=Math.floor(j.t/2.5); while(j.k<n){ j.k++; CLAN.cleanseStep(j.side,'mori'); CLAN.stats.mori++; } if(j.t>=j.dur) finishJob(j); }
+      else if(j.kind==='tf'){ if(j.plan.region!==curRegion()){ TF.finishNow(j.plan); finishJob(j); } else if(TF.tick(j.plan,dt,player.pos)) finishJob(j); }
+      else if(j.kind==='seed'&&window.RESEED&&RESEED.jobTimeout(j)){ log('That seed stage ran too long. The ground stays.'); curJob=null; try{ refreshFrameAt(); }catch(e2){} }
+      else if(j.t>=j.dur){ try{ finishJob(j); }catch(e){ log('A seed stage failed. The ground stays. '+(e&&e.message||e)); curJob=null; try{ refreshFrameAt(); }catch(e2){} } } } }
   m.pos.y=W.height(m.pos.x,m.pos.z); m.model.position.copy(m.pos); m.model.rotation.y=lerpAngle(m.model.rotation.y,m.face,Math.min(1,dt*8));
   HERO.animate(m.model, clockT, moving?1:(curJob&&curJob.phase==='work'?0.3:0));
   if(curJob&&curJob.phase==='work'&&curJob.kind!=='build') m.model.userData.hero.limbs.armR.rotation.x=-1.2+Math.sin(clockT*10)*0.5;
@@ -903,6 +907,11 @@ function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) re
 if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
 if(QS.get('menu')==='1'){ document.body.classList.add('menu'); const box=$('sheetTabs'); if(box&&QS.get('tab')) box.dataset.grp=QS.get('tab'); paintSheetTabs(); setTimeout(()=>{ const m=$('modal'); if(m) m.classList.remove('open'); }, 600); }
 if(QS.get('elder')==='1') setTimeout(()=>{ if(typeof openVillage==='function') openVillage('elderP'); }, 400);
+if(QS.get('fresh')) setTimeout(()=>{
+  const seed=QS.get('fresh')==='1'?'fresh-'+Math.floor(Math.random()*9999):QS.get('fresh');
+  if(window.NEWWORLD){ const r=NEWWORLD.apply(S, seed, {confirm:true}); if(r.ok) adoptWorld(r.save); }
+  const m=$('modal'); if(m) m.classList.remove('open');
+}, 0);
 if(QS.get('globe')==='1') setTimeout(()=>{ if(typeof openGlobe==='function') openGlobe(); const m=$('modal'); if(m) m.classList.remove('open'); }, 700);
 function showPiece(part){
   if(!window.SNAP) return;
@@ -1040,6 +1049,7 @@ function updatePlayer(dt){
   // tavern floor/stage
   if(mode==='world'&&tav.userData.inside(player.pos.x,player.pos.z)) player.pos.y=Math.max(player.pos.y, tav.userData.floorY||0.15);
   player.model.position.copy(player.pos); if(player.sit) player.model.position.y-=0.42; player.model.rotation.y=lerpAngle(player.model.rotation.y,player.face,Math.min(1,dt*12));
+  if(player.model) player.model.userData.auraLeft=(S.buffs&&S.buffs.dread)||0;
   HERO.animate(player.model, clockT, moving?Math.min(1.4,len*(1+stats().speed)):0);
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
   // companions walk their own slots and swing on their own timers
@@ -1309,15 +1319,19 @@ function renderCreator(){ const w=innerWidth,h=innerHeight; renderer.setScissorT
 /* ---------- labels (speech bubbles) ---------- */
 function label(id){ let e=$(id); if(!e){ e=document.createElement('div'); e.id=id; e.className='label3d'; document.body.appendChild(e); } return e; }
 const lblD=label('lblDelroth'), lblM=label('lblMori'), lblDoll=label('lblDoll'), lblT=label('lblTarget');
+const _itemTag=window.TAGS?TAGS.fresh():{shown:false,text:''};
 { const t=document.createElement('div'); t.id='crThumbLab'; t.className='small'; t.innerHTML='<div style="display:flex;justify-content:space-around">'+VIEWS.map(v=>'<span>'+v[0]+'</span>').join('')+'</div><div style="text-align:center">identity lock · 5 angles</div>'; $('creator').appendChild(t); }
 function project(obj3, yOff, el, html){ tmpV.copy(obj3).setY(obj3.y+yOff).project(camera); if(tmpV.z>1||Math.abs(tmpV.x)>1.1||Math.abs(tmpV.y)>1.1){ el.style.display='none'; return; }
   el.style.display='block'; el.style.left=((tmpV.x+1)/2*innerWidth)+'px'; el.style.top=((1-tmpV.y)/2*innerHeight)+'px'; if(el._h!==html){ el.innerHTML=html; el._h=html; } }
 
 /* ---------- day / night ---------- */
 const DAY=240; const cDay=new T.Color('#8ec5ff'), cDusk=new T.Color('#ff9a6a'), cNight=new T.Color('#0b0a22'), skyC=new T.Color();
-function updateSky(dt){ const before=S.clock; S.clock=(S.clock+dt)%DAY; if(before>200&&S.clock<before&&window.VILLAGE) VILLAGE.onDay(S, atGuild()?'guild':String(curRegion()), atGuild()); const ph=S.clock/DAY, el=Math.sin(ph*Math.PI*2); // el>0 day
-  const day=Math.max(0,Math.min(1,el*2.5+0.3)); skyC.copy(cNight).lerp(cDay,day); if(Math.abs(el)<0.3) skyC.lerp(cDusk,(0.3-Math.abs(el))/0.3*0.55);
-  scene.background=skyC; scene.fog.color.copy(skyC); if(skyMesh){ skyMesh.position.set(player.pos.x,0,player.pos.z); if(skyMesh.material&&skyMesh.material.color) skyMesh.material.color.copy(skyC); } hemi.intensity=0.25+0.85*day; sun.intensity=2.2*day+0.05;
+function updateSky(dt){ const before=S.clock;
+  const sky=window.RESEED?RESEED.sky(S.clock, dt):{clock:(Number.isFinite(S.clock)?S.clock:40)+(dt||0), day:1, light:1, sun:2};
+  S.clock=sky.clock;
+  if(before>200&&S.clock<before&&window.VILLAGE) VILLAGE.onDay(S, atGuild()?'guild':String(curRegion()), atGuild()); const ph=S.clock/240, el=Math.sin(ph*Math.PI*2);
+  const day=sky.day; skyC.copy(cNight).lerp(cDay,day); if(Math.abs(el)<0.3) skyC.lerp(cDusk,(0.3-Math.abs(el))/0.3*0.55);
+  scene.background=skyC; scene.fog.color.copy(skyC); if(skyMesh){ skyMesh.position.set(player.pos.x,0,player.pos.z); if(skyMesh.material&&skyMesh.material.color) skyMesh.material.color.copy(skyC); } hemi.intensity=sky.light; sun.intensity=sky.sun;
   sun.position.set(player.pos.x+Math.cos(ph*Math.PI*2)*40, Math.max(6,el*50), player.pos.z+12); sun.target.position.set(player.pos.x,0,player.pos.z);
   stars.material.opacity=1-day; stars.position.set(player.pos.x,0,player.pos.z);
   built.forEach(b=>{ if(b.g.userData.halo) b.g.userData.halo.material.opacity=0.15+0.6*(1-day); });
@@ -1329,11 +1343,12 @@ function hud(){ const st=stats(); $('sHp').textContent=S.hp+'/'+st.maxHp; $('hpb
   $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=(S.ore||0)+(window.GATHERING?GATHERING.stand('ore'):0); $('sTimber').textContent=S.timber;
   { const id=curRegion(), inf=PL.regionInfo(id), stg=stageOf(id); $('sRegion').textContent=mode==='dungeon'&&dun?'🕳 '+dunName+' · '+(dunRoomName()||'passage')+' · rooms '+(S.roomClears||0)+' · full clears '+(S.clears||0)+' · under '+inf.name:'🌍 '+(atGuild()?'The Guild · ':'')+inf.name+' · '+(stg?PL.BIOMES[inf.biome].name:'void')+' · '+STAGES[stg];
   if($('sWorld')&&window.IDLEBUILD) $('sWorld').textContent=IDLEBUILD.progressChip(); }
-  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none'; }
+  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none';
+  const brow=$('buffRow'); if(brow){ const keys=Object.keys(S.buffs||{}); brow.innerHTML=keys.map(k=>'<button type="button" data-buff="'+k+'">'+k+' '+Math.ceil(S.buffs[k])+'s</button>').join(''); brow.querySelectorAll('[data-buff]').forEach(b=>b.onclick=()=>{ if(window.EFFECTS) EFFECTS.dismiss(S.buffs, b.dataset.buff); if(player.model) player.model.userData.auraLeft=0; hud(); }); } }
 
 /* ---------- World Seed: travel, globe map, seed panel (v3) ---------- */
-function setTownVisible(v){ const skip=new Set([hemi,sun,sun.target,stars,player.model].concat(comps.map(c=>c.model)));
-  scene.children.forEach(o=>{ if(skip.has(o)||o.isLight||o.userData.sw) return; o.visible=v; }); }
+function setTownVisible(v){ const skip=new Set([hemi,sun,sun.target,stars,skyMesh,player.model].concat(comps.map(c=>c.model)));
+  scene.children.forEach(o=>{ if(!o||skip.has(o)||o.isLight||o.userData.sw) return; o.visible=v; }); }
 function tfFinishCur(){ if(curJob&&curJob.kind==='tf'&&curJob.plan){ TF.finishNow(curJob.plan); finishJob(curJob); } }
 function travelTo(id, quiet){ if(mode==='dungeon'||crOpen) return; id=+id; tfFinishCur(); S.at=id===guildId?null:id; refreshFrameAt();
   if(id===guildId) LORE.unlockFlag('visit_guild'); else if(window.CLAN&&CLAN.site){ if(CLAN.site.kind==='clan') LORE.unlockFlag('visit_clan'); if(CLAN.site.kind==='haven'){ LORE.unlockFlag('visit_haven'); if(CLAN.pct&&CLAN.pct()>0) LORE.unlockFlag('see_blight'); } }
@@ -1403,8 +1418,11 @@ function applySeed(v){ v=String(v||'').trim().slice(0,40); if(!v||v===S.seed) re
   TF.reset(); S.seed=v; PL.setSeed(v); guildId=PL.startRegion(); WD(); S.at=null; SW.globe.G.sel=guildId; SW.globe.build(); globeDirty=false;
   log('🌍 New World Seed "'+v+'". The Guild now stands in '+PL.regionInfo(guildId).name+'.'); const wasOpen=globeOpen; travelTo(guildId,true); if(wasOpen) openGlobe(); }
 function adoptWorld(next){ if(!window.NEWWORLD) return; NEWWORLD.install(S, next); tfFinishCur(); jobs=[]; if(curJob){ curJob=null; mori.path=[]; } if(window.TF) TF.reset();
-  PL.setSeed(S.seed||'mori'); guildId=PL.startRegion(); if(!S.worlds) S.worlds={}; WD(); S.at=null; SW.globe.G.sel=guildId; SW.globe.build(); globeDirty=false;
-  if(S.greet) addChat('mo', S.greet); log(S.greet||'The world is set.'); travelTo(guildId, true); if(globeOpen) renderSeedPanel(); }
+  if(!Number.isFinite(S.clock)) S.clock=40;
+  if(window.EFFECTS){ EFFECTS.scrub(S.buffs||(S.buffs={})); EFFECTS.rings(S.inv||[]); }
+  if(window.TAGS) TAGS.clear(_itemTag);
+  PL.setSeed(S.seed||'mori'); guildId=PL.startRegion(); if(!S.worlds) S.worlds={}; WD(); S.at=null; SW.globe.G.sel=guildId; try{ SW.globe.build(); }catch(e){} globeDirty=false;
+  if(S.greet) addChat('mo', S.greet); log(S.greet||'The world is set.'); travelTo(guildId, true); try{ refreshFrameAt(); }catch(e){ log('The ground layer stumbled. A lit floor stays under you.'); } if(globeOpen) renderSeedPanel(); }
 function newWorld(v){ if(!window.NEWWORLD) return; v=String(v||'').trim(); if(!v){ log('Type a seed name first.'); return; }
   if(!confirm('New World "'+v+'"? Your pack, skills, and gold stay. This world is backed up and can be reverted. Nothing is wiped unless you confirm.')) return;
   const r=NEWWORLD.apply(S, v, {confirm:true}); if(!r.ok){ log(r.why||'The new world was not made.'); return; } adoptWorld(r.save); }
@@ -1456,7 +1474,7 @@ let phaseN=0;
 function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phaseN):{world:true,audio:true,build:true,chunk:4,bgMs:1.5}}; if(window.TWOSPEED&&heavy.plan.bgMs!=null) TWOSPEED.budget=heavy.plan.bgMs;
   crewFxTick(dt);
   mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // flame frames stay on the render clock; new audio buffers do not
-  clockT+=dt; updateCrafting(dt); for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
+  clockT+=dt; updateCrafting(dt); if(window.EFFECTS) EFFECTS.tick(S.buffs, dt); else { for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
   if(logT>0){ logT-=dt; if(logT<=0) $('log').style.opacity=0.35; } if(rollT>0){ rollT-=dt; if(rollT<=0) $('roll').className=''; }
   // world simulation keeps running in the dungeon (Mori keeps building)
   if(mode==='world'&&window.IDLEBUILD&&heavy.plan.build) IDLEBUILD.update(dt);
@@ -1465,6 +1483,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   if(!held) tickMarch();
   updateMori(dt);
   nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; if(n.label) n.label.visible=true; } } });
+  nodes.forEach(n=>{ if(!n.label) return; const far=Math.hypot(n.x-player.pos.x, n.z-player.pos.z)>18; const menu=document.body.classList.contains('menu'); n.label.visible=!!(n.ready&&!far&&!menu); });
   weedT-=dt; if(weedT<=0){ weedT=4; if(weeds.length<26) spawnWeed(); }
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
@@ -1509,7 +1528,13 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
     const dl=W.STATIONS.doll; if(Math.hypot(dl.x-player.pos.x,dl.z-player.pos.z)<7) project(new T.Vector3(dl.x,0,dl.z),2.2,lblDoll,'🪆 “'+DOLL_LINES[Math.floor(clockT/6)%DOLL_LINES.length]+'”'); else lblDoll.style.display='none';
     renderWorld(scene);
   } else { [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); renderWorld(dun.scene); }
-  if(curTarget){ project(new T.Vector3(curTarget.x,mode==='world'?W.height(curTarget.x,curTarget.z):0,curTarget.z),1.0,lblT,curTarget.label); } else lblT.style.display='none';
+  if(curTarget){
+    const far=Math.hypot(curTarget.x-player.pos.x, curTarget.z-player.pos.z);
+    const menu=document.body.classList.contains('menu')||!!document.querySelector('.panel.open');
+    const tag=window.TAGS?TAGS.show(_itemTag, {id:curTarget.kind||curTarget.label, text:curTarget.label, dist:far, max:curTarget.r||6, gone:!!(curTarget.gone||curTarget.spent), menu}):{shown:!menu, text:curTarget.label};
+    if(tag.shown) project(new T.Vector3(curTarget.x,mode==='world'?W.height(curTarget.x,curTarget.z):0,curTarget.z),1.0,lblT,tag.text);
+    else lblT.style.display='none';
+  } else { if(window.TAGS) TAGS.clear(_itemTag); lblT.style.display='none'; }
 }
 function obeliskAnim(){ const u=obelisk.userData; u.orb.rotation.y=clockT*0.4; u.core.rotation.y=-clockT*0.3; u.ring.position.y=2.6+Math.sin(clockT*1.5)*0.6; const f=Math.min(1,programmedCount()/40); u.core.scale.setScalar(0.6+f*0.75); }
 let dayNow=1;

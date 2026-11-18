@@ -449,7 +449,8 @@ function setFrame(id, guild){
   if(!guild&&F.stage>0) F.flats.push({x:F.L.x,z:F.L.z,r0:6,r1:20,h:rawH(F.L.x,F.L.z).h});
   if(water){ root.remove(water); water=null; }
   if(F.seaY!=null){ water=new T.Mesh(new T.PlaneGeometry(1600,1600),new T.MeshLambertMaterial({color:'#2a6db5',transparent:true,opacity:0.82})); water.rotation.x=-Math.PI/2; water.position.y=F.seaY; water.userData.sw=true; root.add(water); }
-  buildSite(); lastPC=null; }
+  try{ buildSite(); }catch(err){ F.siteError=String(err&&err.message||err); }
+  lastPC=null; }
 function landing(){ const L=F.L; return {x:L.x, z:L.z}; }
 
 /* ---------- globe ---------- */
