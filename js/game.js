@@ -149,7 +149,7 @@ const COMP_P=[
   Object.assign(HERO.params('elf'),{name:'Lyra', hair:'#d6c7ff', top:'#8b5cf6', armor:'#ff8af0', boots:'#2a1e36', hairStyle:'long', height:0.92}),
   Object.assign(HERO.params('halforc'),{name:'Juno', hair:'#1a1a1f', top:'#22d3ee', armor:'#1a1a1f', boots:'#121212', pauldron:true, bootStyle:'stomper', height:0.95}),
   Object.assign(HERO.params('halfling'),{name:'Kit', hair:'#ff4d6d', top:'#facc15', armor:'#6b4a2b', boots:'#3a2412', hairStyle:'wolfcut', corset:true})];
-const comps=COMP_P.map((p,i)=>({name:p.name, model:makeChar(p), pos:new T.Vector3(player.pos.x-1-i,0,player.pos.z+1+i)}));
+const comps=COMP_P.map((p,i)=>({name:p.name, model:makeChar(p), pos:new T.Vector3(player.pos.x-1-i,0,player.pos.z+1+i), hp:20, max:20, slot:i}));
 comps.forEach(c=>scene.add(c.model));
 const trail=[]; // breadcrumb trail for follow-in-line
 const delroth={model:makeChar(HERO.PRESETS.delroth), line:0, t:0};
@@ -754,7 +754,9 @@ function wakeMori(){ S.blue=false; ENG.isMoriOnline=true; $('bBlue').textContent
 $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 
 /* ---------- panels ---------- */
-function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const open=!p.classList.contains('open'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(open){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!open) endNpc(true); }
+function sheetOpen(){ return !!document.querySelector('.panel.open'); }
+function closeSheets(){ document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); }
+function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const next=window.SHEETS?SHEETS.openOne(p.classList.contains('open')?id:null, id):(p.classList.contains('open')?null:id); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(next){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!next) endNpc(true); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
 if($('bElder')) $('bElder').onclick=()=>openVillage('elderP');
@@ -791,6 +793,7 @@ function wornPatches(){ const all=(S.tablet&&S.tablet.approved)||[]; if(S.tablet
 function applyWorn(){ if(window.FINGERS) FINGERS.reapply(wornPatches()); if(window.FURNITURE) FURNITURE.build(scene); }
 function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.tablet&&S.tablet.approved||[]).length; const wear=S.tablet&&S.tablet.wear==='tinker'; const face=tabletResult?(tabletResult.pass?'The runes hold. Every check passed.':'The runes reject this. '+((tabletResult.fails||[]).slice(0,3).join('; '))):(tabletDraft?'A draft is waiting. It has not been applied.':'The glass is dark. Ask Mori for one small change.');
   el.innerHTML='<div id="tabletFace">'+face+'</div><div class="small">Approved fingers: '+n+'. Wearing: '+(wear?'Tinker Gearwhistle (flavor, not a mind)':'Mori')+'. A finger is data. Nothing runs until you tap Approve.</div>'+
+    (window.CODEX?codexHTML():'')+
     '<div class="row"><button type="button" id="tabMori"'+(wear?'':' class="pri"')+'>Mori</button><button type="button" id="tabTinker"'+(wear?' class="pri"':'')+'>Tinker</button></div>'+
     '<div class="row"><button type="button" id="tabDraft">Ask Mori</button><button type="button" id="tabTinkerDraft">Tinker persona</button><button type="button" id="tabRun">Run checks</button><button type="button" class="pri" id="tabYes"'+(tabletResult&&tabletResult.pass?'':' disabled')+'>Approve</button><button type="button" id="tabNo">Revert</button></div>';
   $('tabMori').onclick=()=>{ S.tablet.wear='mori'; applyWorn(); save(); renderTablet(); };
@@ -858,14 +861,18 @@ function refreshPhone(){ if(!window.PHONE) return; let saved=null; try{ saved=lo
   const sheet=$('statSheet'), top=$('top');
   if(sheet&&top){ const extras=on?[...top.querySelectorAll('.extra')]:[...sheet.querySelectorAll('.extra')]; extras.forEach(el=>(on?sheet:top).appendChild(el)); }
   const more=$('statMore'); if(more){ more.hidden=!on; more.setAttribute('aria-expanded', document.body.classList.contains('stats')?'true':'false'); more.textContent=document.body.classList.contains('stats')?'▴':'···'; }
-  const stack=$('hudStack'); if(stack){ const h=on?Math.ceil(stack.getBoundingClientRect().height):0; document.documentElement.style.setProperty('--hud-top', h+'px'); } pinSheets(); }
+  const stack=$('hudStack'); if(stack){ const h=on?Math.ceil(stack.getBoundingClientRect().height):0; document.documentElement.style.setProperty('--hud-top', h+'px'); } pinSheets(); paintSheetTabs(); }
 if(window.ResizeObserver && $('hudStack')) new ResizeObserver(()=>{ if(!document.body.classList.contains('phone')){ document.documentElement.style.setProperty('--hud-top','0px'); return; } document.documentElement.style.setProperty('--hud-top', Math.ceil($('hudStack').getBoundingClientRect().height)+'px'); pinSheets(); }).observe($('hudStack'));
 function pinSheets(){ const stack=$('hudStack'); if(!stack||!document.body.classList.contains('phone')) return; const min=Math.ceil(stack.getBoundingClientRect().height)+8; document.querySelectorAll('.panel').forEach(p=>{ if(!p.style.top) return; const top=parseFloat(p.style.top); if(top<min) p.style.top=min+'px'; }); }
 if($('statMore')) $('statMore').onclick=()=>{ document.body.classList.toggle('stats'); refreshPhone(); };
 if($('turnNo')) $('turnNo').onclick=()=>{ document.body.classList.add('stayport'); try{ sessionStorage.setItem('mori.stayport','1'); }catch(e){} };
 if($('turnGo')) $('turnGo').onclick=async()=>{ try{ if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); }catch(e){} try{ if(screen.orientation&&screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(e){} };
 if(window.visualViewport) visualViewport.addEventListener('resize', ()=>{ if(typeof resize==='function') resize(); });
-if($('phoneMenu')) $('phoneMenu').onclick=()=>document.body.classList.toggle('menu');
+function codexHTML(){ if(!S.codex) S.codex=CODEX.fresh(); const cats=Object.keys(CODEX.CATS); return '<div class="sec">Codex</div><div class="small">A page stays dark until the world has shown it to you. '+CODEX.hidden(S.codex)+' still hidden.</div>'+cats.map(id=>{ const rows=CODEX.list(S.codex, id); return '<div class="small"><b>'+CODEX.CATS[id].label+'</b> — '+(rows.length?rows.map(p=>p.name).join(', '):'nothing seen yet')+'</div>'; }).join(''); }
+function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) return; const phone=document.body.classList.contains('phone')&&document.body.classList.contains('menu'); box.hidden=!phone; if(!phone){ document.querySelectorAll('#bottom button').forEach(b=>{ b.style.display=''; }); return; }
+  const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ box.dataset.grp=b.dataset.grp; paintSheetTabs(); }); }
+if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
+if(QS.get('menu')==='1'){ document.body.classList.add('menu'); paintSheetTabs(); }
 addEventListener('resize', refreshPhone); refreshPhone();
 document.addEventListener('gesturestart', e=>{ if(document.body.classList.contains('phone')) e.preventDefault(); });
 document.addEventListener('touchmove', e=>{ if(!document.body.classList.contains('phone')) return; if(e.touches.length>1 && !e.target.closest('#chatLog,.panel .body,.modal .card,#bottom')) e.preventDefault(); }, {passive:false});
@@ -988,7 +995,9 @@ function updatePlayer(dt){
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
   // breadcrumbs for the companions
   const last=trail[0]; if(!last||Math.hypot(last.x-player.pos.x,last.z-player.pos.z)>0.35){ trail.unshift({x:player.pos.x,z:player.pos.z}); if(trail.length>60) trail.pop(); }
-  comps.forEach((c,i)=>{ const crumb=trail[Math.min(trail.length-1,(i+1)*5)]||player.pos; const ddx=crumb.x-c.pos.x, ddz=crumb.z-c.pos.z, d=Math.hypot(ddx,ddz); let mv=0;
+  comps.forEach((c,i)=>{ let crumb=trail[Math.min(trail.length-1,(i+1)*5)]||player.pos;
+    if(window.CREW){ const pool=mode==='dungeon'?mobs:(window.GATHERING?GATHERING.crit:[]); const foes=(pool||[]).filter(m=>m.alive&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14).map(m=>({id:m.key||m.kind,x:m.x,z:m.z})); const ord=CREW.order(c,{foes, player:{x:player.pos.x,z:player.pos.z}, mode:c.guard?'guard':''}); if(ord.act!=='follow') crumb={x:ord.x,z:ord.z}; }
+    const ddx=crumb.x-c.pos.x, ddz=crumb.z-c.pos.z, d=Math.hypot(ddx,ddz); let mv=0;
     if(d>0.15){ const s=Math.min(d, sp*1.05*dt*(d>3?1.6:1)); c.pos.x+=ddx/d*s; c.pos.z+=ddz/d*s; c.model.rotation.y=lerpAngle(c.model.rotation.y,Math.atan2(ddx,ddz),Math.min(1,dt*10)); mv=1; }
     if(d>14){ c.pos.x=crumb.x; c.pos.z=crumb.z; }
     c.pos.y=mode==='world'?groundY(c.pos.x,c.pos.z):0; c.model.position.copy(c.pos); HERO.animate(c.model, clockT+i, mv);
@@ -1044,7 +1053,9 @@ let atkCd=0;
 function castSpellFx(target){ if(!(window.MT&&MT.on)) return; const w=S.inv.find(i=>i.equipped&&i.kind==='weapon'&&i.spells&&i.spells.length); if(!w) return;
   const sc=mode==='dungeon'&&dun?dun.scene:scene; const f=Math.sin(player.face), c=Math.cos(player.face); const from=new T.Vector3(player.pos.x+f*0.6,player.pos.y+1.3,player.pos.z+c*0.6);
   const to=target?new T.Vector3(target.x,(target.g?target.g.position.y:0)+0.9,target.z):new T.Vector3(player.pos.x+f*7,player.pos.y+1.1,player.pos.z+c*7); MT.cast(sc,from,to,MT.kindFor(w.spells)); }
-function attack(){ if(crOpen||atkCd>0) return; atkCd=0.55; player.atkT=0.35; comps.forEach((c,i)=>setTimeout(()=>{ c.atkT=0.35; },80+i*90));
+function attack(){ if(crOpen||atkCd>0) return;
+  if(window.SHEETS&&SHEETS.onAttack(sheetOpen()).close) closeSheets();
+  atkCd=0.55; player.atkT=0.35; comps.forEach((c,i)=>setTimeout(()=>{ c.atkT=0.35; },80+i*90));
   const st=stats(); let best=null, bd=1e9; (mode==='dungeon'?mobs:GATHERING.crit).forEach(m=>{ if(!m.alive) return; const d=Math.hypot(m.x-player.pos.x,m.z-player.pos.z)-m.m.size*0.5; if(d<st.reach&&d<bd){ bd=d; best=m; } });
   if(!best){ castSpellFx(null); return; } player.face=Math.atan2(best.x-player.pos.x,best.z-player.pos.z); castSpellFx(best);
   const fl=comps.length?2:0, r=SRD.d20(), tot=r+st.atk+fl; const hit=r===20||(r!==1&&tot>=best.m.ac); const ab=st.atk+(fl?'+2 flank':'');
@@ -1056,6 +1067,7 @@ function attack(){ if(crOpen||atkCd>0) return; atkCd=0.55; player.atkT=0.35; com
   if(best.m.hp<=0) killMob(best, mode==='dungeon');
 }
 function killMob(best, inDun){ best.alive=false; GATHERING.addCarcass(best, inDun); const g=SRD.rnd(6)*best.m.xp; S.gold+=g;
+  if(window.CODEX){ if(!S.codex) S.codex=CODEX.fresh(); CODEX.discover(S.codex, best.m.kind||best.kind); }
   if(window.LEGEND&&best.m&&best.m.parts){ const tale=LEGEND.onKill(S, best.m, atGuild()?'guild':String(curRegion()), (S.village&&S.village.day)|0); if(tale.rumor) log(tale.rumor.text); }
   if(inDun){ dunSaveState(); S.larpy+=best.m.boss?3:0; if(best.room>=0&&!mobs.some(m=>m.alive&&m.room===best.room)){ QUESTS.event('room',best.room); noteRoomClear(dun&&dun.rooms[best.room]&&dun.rooms[best.room].name); } } const parts=GATHERING.partsFor(best.m).map(q=>GATHERING.R[q[0]].name).filter((v,i,a)=>a.indexOf(v)===i);
   log(best.m.name+' destroyed! +'+g+' gold'+(best.m.boss?' +3 LARPy — the boss chest unlocks and a portal opens.':'')+' · 🔪 Skin the carcass (E): '+parts.join(', ')); }
@@ -1288,21 +1300,41 @@ function revertWorld(){ if(!window.NEWWORLD) return; if(!S.worldBackup){ log('Th
 let clockT=0, last=performance.now(), saveT=0, hudT=0, weedT=0, townT=0;
 let mtClock=0;
 
+let marchers=[];
 function spawnBanditRaid(info){
   const raid=window.RAIDS?RAIDS.plan(()=>Math.random()):{kind:'wolf', name:'wolf pack', n:3, human:false, edge:'north'};
-  const edge=window.TOWNPLAN?TOWNPLAN.guild().choke:{x:0,z:20};
+  const gate=window.TOWNPLAN?TOWNPLAN.guild().choke:{x:0,z:20};
+  const watches=window.TOWNPLAN?TOWNPLAN.guild().watches:[];
+  const towers=(watches||[]).map(w=>({x:w.x,z:w.z,range:18,zap:1}));
+  marchers=[];
   const out=[];
-  for(let i=0;i<raid.n;i++){ const ang=Math.random()*Math.PI*2, d=4+Math.random()*3; const x=edge.x+Math.cos(ang)*d, z=edge.z+6+Math.sin(ang)*d;
-    if(window.GATHERING&&GATHERING.spawnHostile){ const c=GATHERING.spawnHostile(raid.kind, x, z); if(c){ c.cause=raid.name; out.push(c); } }
+  for(let i=0;i<raid.n;i++){
+    const spot=window.RAIDMARCH?RAIDMARCH.place(gate, 18, i, raid.n):{x:gate.x, z:gate.z+18, tx:gate.x, tz:gate.z, hp:8, phase:'march'};
+    spot.kind=raid.kind; spot.name=raid.name; spot.settled=false;
+    if(window.GATHERING&&GATHERING.spawnHostile){ const c=GATHERING.spawnHostile(raid.kind, spot.x, spot.z); if(c){ c.cause=raid.name; spot.body=c; out.push(c); } }
+    marchers.push(spot);
   }
-  const town=window.STOCKPILE?STOCKPILE.ensure(S,'guild'):{items:{}};
-  const near=Math.hypot(player.pos.x-edge.x, player.pos.z-edge.z)<18;
-  const res=window.RAIDS?RAIDS.resolve({town, player:near}):{lost:0, line:raid.name+' at the palisade.', rep:0};
-  if(near&&res.rep&&window.REPUTATION){ const rep=REPUTATION.ensure(S); REPUTATION.shift(rep,'city','guild',res.rep,(S.village&&S.village.day)|0); }
-  log('⚔ '+raid.name+' at the '+raid.edge+' gate. '+res.line+(res.lost?' Stock scuffed: '+res.lost+'.':''));
+  if(window.CODEX){ if(!S.codex) S.codex=CODEX.fresh(); CODEX.discover(S.codex, raid.kind); }
+  log('⚔ '+raid.name+' is outside the wall and walking to the '+raid.edge+' gate.');
   showRoll('⚔',raid.name,info&&info.tier==='low'?'foe':'');
-  addChat('mo', near?'the watch sees you. hold the choke with them.':'wolves or rats at the palisade. the guards have the gate. come help if you can.');
+  addChat('mo','they are outside the palisade. the beacons will bite them. the watch meets whoever reaches the gate.');
   return out;
+}
+function tickMarch(){
+  if(!marchers.length||!window.RAIDMARCH) return;
+  const towers=window.TOWNPLAN?(TOWNPLAN.guild().watches||[]).map(w=>({x:w.x,z:w.z,range:18,zap:1})):[];
+  marchers.forEach(r=>{ if(r.phase==='down'||r.phase==='gate') return; RAIDMARCH.tick(r, towers); if(r.body){ r.body.x=r.x; r.body.z=r.z; if(r.body.g) r.body.g.position.set(r.x, r.body.g.position.y, r.z); if(r.phase==='down') r.body.alive=false; } });
+  const pending=marchers.filter(r=>!r.settled&&(r.phase==='gate'||r.phase==='down'));
+  if(!pending.length) return;
+  pending.forEach(r=>{ r.settled=true; });
+  if(marchers.some(r=>r.phase==='march')) return;
+  const met=RAIDMARCH.meet(marchers);
+  const town=window.STOCKPILE?STOCKPILE.ensure(S,'guild'):{items:{}};
+  const near=Math.hypot(player.pos.x-(marchers[0].tx||0), player.pos.z-(marchers[0].tz||0))<18;
+  let lost=0;
+  if(met.atGate&&window.RAIDS){ const res=RAIDS.resolve({town, player:near}); lost=Math.min(res.lost, RAIDMARCH.loss(met.atGate, RAIDS.CAP)); if(near&&res.rep&&window.REPUTATION){ const rep=REPUTATION.ensure(S); REPUTATION.shift(rep,'city','guild',res.rep,(S.village&&S.village.day)|0); } }
+  log('The watch sends '+met.guards+' to the gate. Stock lost: '+lost+'.');
+  marchers=[];
 }
 let phaseN=0;
 function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phaseN):{world:true,audio:true,build:true,chunk:4,bgMs:1.5}}; if(window.TWOSPEED&&heavy.plan.bgMs!=null) TWOSPEED.budget=heavy.plan.bgMs;
@@ -1312,11 +1344,17 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   // world simulation keeps running in the dungeon (Mori keeps building)
   if(mode==='world'&&window.IDLEBUILD&&heavy.plan.build) IDLEBUILD.update(dt);
   if(mode==='world'&&window.TREASURY){ const r=TREASURY.tryRaid(dt); if(r) spawnBanditRaid(r); }
+  const held=window.SHEETS&&SHEETS.shouldHold(sheetOpen()||document.body.classList.contains('menu'));
+  if(!held) tickMarch();
   updateMori(dt);
   nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; if(n.label) n.label.visible=true; } } });
   weedT-=dt; if(weedT<=0){ weedT=4; if(weeds.length<26) spawnWeed(); }
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
+  if(window.SHEETS&&SHEETS.shouldHold(sheetOpen()||document.body.classList.contains('menu'))){
+    const bi=$('bInteract'); if(bi) bi.classList.toggle('hot',!!curTarget);
+    return;
+  }
   updatePlayer(dt); if(mode==='world') noteBridge(); GATHERING.update(dt); CLAN.update(dt); if(mode==='world'){ NPCS.update(dt); DREADLORD.update(dt); } npcWatch();
   if(mode==='dungeon') updateDungeon(dt); else { if(heavy.plan.world) SW.update(player.pos.x,player.pos.z, heavy.plan.chunk); if(heavy.plan.build) TF.update(dt,player.pos.x,player.pos.z); if(heavy.plan.world) IMPOSTORS.update(); townT-=dt; if(townT<=0){ townT=1; setTownVisible(atGuild()); } }
   // targets
