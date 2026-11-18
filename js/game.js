@@ -672,6 +672,17 @@ function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); 
   if(/\b(who|what) are you\b|\bdelroth\b/.test(s)&&/delroth/.test(s)){ addChat('mo','delroth is on the tavern stage. he is level sixty and his hat is +5. he is nice to me.'); return; }
   { const c=moriCtx(), r=MORICHAT.reply(v,c); if(r){ addChat('mo',r); save(); return; } }
   if(/\b(daw|beats?|nle|cut|yellow|226|blue room|build|proud)\b/.test(s)){ const r=ENG.talk(v); addChat('mo',r); return; }
+  if(window.ROLE){
+    const law=atGuild()?'public':'wild';
+    const act=ROLE.read(v, {law:law});
+    if(act.intent){
+      const res=ROLE.resolve(act, {roll:window.SRD?SRD.d20():10, skill:Math.floor(charLevel()/2), oppose:12});
+      if(act.intent==='claim'&&res.ok&&window.LAND){ if(!S.land) S.land={}; if(!S.land.owner) LAND.claim(S.land, playerName()); }
+      if(act.intent==='place'&&res.ok&&window.SNAP){ S.pieces=SNAP.coBuild(SNAP.place(S.pieces||[], {kind:'wall', x:player.pos.x, z:player.pos.z}, 'you')); }
+      addChat('mo', res.line+(act.intent==='claim'&&S.land&&S.land.quest?' '+S.land.quest.text:''));
+      return;
+    }
+  }
   if(window.DICT&&DICT.ready){ const unk=DICT.unknownWord(s); if(unk){ addChat('mo','i don\'t know that word yet: "'+unk+'". i won\'t guess.'); return; } }
   addChat('mo',MORICHAT.fallback(moriCtx()));
 }
