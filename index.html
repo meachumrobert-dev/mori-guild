@@ -20,6 +20,8 @@ button.on{background:var(--acc);color:#111;border-color:var(--acc)}
 #hpbar{display:inline-block;width:60px;height:7px;background:#311;border-radius:4px;vertical-align:middle;overflow:hidden}#hpbar i{display:block;height:100%;background:#ff4d6d}
 #bottom{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;padding:6px;padding-bottom:max(6px,env(safe-area-inset-bottom));background:linear-gradient(#0e0b1600,#0e0b16f0);z-index:5}
 #bottom button{background:var(--bg)}
+#brightLab{display:flex;align-items:center;gap:4px;font-size:12px;background:var(--bg);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:4px 8px}
+#bright{width:84px;accent-color:#a3ff12}
 #log{position:fixed;left:50%;transform:translateX(-50%);bottom:156px;max-width:min(560px,92vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 12px;text-align:center;z-index:4;pointer-events:none;transition:opacity .4s}
 #moriLine{position:fixed;left:8px;top:64px;max-width:min(330px,60vw);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:6px 10px;z-index:4;font-size:12px}
 #buffRow{position:fixed;left:8px;top:108px;z-index:6;display:flex;flex-wrap:wrap;gap:4px;max-width:70vw}
@@ -236,7 +238,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
   <div id="sheetTabs"></div>
   <button id="bHero">🧬 HeroLock</button><button id="bJobs">🔨 Mori's Jobs</button><button id="bBag">🎒 Bag &amp; Painter</button>
   <button id="bTalk">💬 Talk</button><button id="bQuests">📜 Quests</button><button id="bElder">Elder</button><button id="bBoard">Board</button><button id="bRep">Rep</button><button id="bLore">🃏 Lore</button><button id="bMem">💛 Memory</button><button id="bPersona">🪪 Persona</button><button id="bBeat">🥁 Beat</button><button id="bBlue">🟦 Blue room</button>
-  <button id="bGlobe">🌍 Globe</button><button id="bNewWorld">New World / Reset</button><button id="bLook" type="button">☀ Look</button><button id="bTablet">🪨 Tablet</button><button id="bCull" type="button">👁 Cull</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
+  <button id="bGlobe">🌍 Globe</button><button id="bNewWorld">New World / Reset</button><button id="bLook" type="button">☀ Look</button><label id="brightLab">Bright <input id="bright" type="range" min="70" max="150" value="100" aria-label="Brightness"></label><button id="bTablet">🪨 Tablet</button><button id="bCull" type="button">👁 Cull</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
 </div>
 
 <div class="panel" id="questP"><h3>📜 Quest log <button data-close="questP">✕</button></h3><div class="body" id="questBody"></div></div>

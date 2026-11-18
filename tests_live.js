@@ -43,6 +43,16 @@ ok(!tag.shown&&tag.id==null, 'pickup clears that label');
 TAGS.show(tag, {id:'ore', text:'Bog iron', dist:1, max:6, menu:true});
 ok(!tag.shown, 'a menu clears the label');
 
+const LOOK=require('./js/look.js');
+const night=LOOK.grade(0, -1, 1), noonG=LOOK.grade(1, 1, 1), duskG=LOOK.grade(0.45, 0, 1);
+ok(night.horizon[2]>night.horizon[0] && night.horizon[2]>0.35, 'a moonlit night is blue, not black');
+ok(night.fill>=0.55 && night.sun>=0.6, 'night keeps a fill light and a moon');
+ok(night.fog[0]===night.horizon[0] && night.fog[2]===night.horizon[2], 'fog uses the horizon color');
+ok(night.exposure>noonG.exposure && noonG.sun>night.sun, 'day is the bright sun and night lifts exposure');
+ok(duskG.horizon[0]>duskG.horizon[2]*0.9, 'dusk warms the horizon without a hard band');
+const fakeR={toneMapping:0, toneMappingExposure:1, outputColorSpace:''};
+LOOK.applyRenderer(fakeR, {ACESFilmicToneMapping:4, SRGBColorSpace:'srgb'}, 'medium');
+ok(fakeR.toneMapping===4 && fakeR.outputColorSpace==='srgb' && LOOK.preset('medium').shadow && LOOK.preset('high').shadow && !LOOK.preset('low').shadow, 'ACES, sRGB, and soft shadows on Med and High');
 const dark=RESEED.sky(undefined, 0.05);
 ok(Number.isFinite(dark.clock)&&dark.light>0.2, 'a missing clock comes back as daylight');
 const noon=RESEED.sky(40, 0.05);

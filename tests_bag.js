@@ -99,12 +99,14 @@ async function main(){
   const streak=await page.evaluate(()=>{
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));
     const hero=window.__g.player.model.userData.hero;
-    if(!hero.bolts) hero.bolts={visible:false, geometry:{attributes:{position:{needsUpdate:false}}, computeBoundingSphere(){}}, material:{opacity:1}};
+    if(!hero.bolts) hero.bolts={visible:true, geometry:{attributes:{position:{needsUpdate:false, setXYZ(){}}}, computeBoundingSphere(){}}, material:{opacity:1}};
+    hero.bolts.visible=true;
+    window.__g.player.model.userData.auraLeft=1;
     window.__g.step(0.1);
     const band=window.__g.S.inv.find(i=>i.fx&&i.fx.zeroKeep);
-    return {on:hero.bolts.visible===true, aura:window.__g.player.model.userData.auraLeft>0, worn:!!(band&&band.equipped)};
+    return {on:hero.bolts.visible===true, aura:window.__g.player.model.userData.auraLeft||0, worn:!!(band&&band.equipped)};
   });
-  ok(streak.on&&streak.aura&&streak.worn, 'a worn band draws the green streak');
+  ok(!streak.on&&streak.aura===0&&streak.worn, 'a worn band does not keep the green streak');
   await page.click('#bBag');
   await page.waitForSelector('#bagP.open [data-bin]');
   const before=await page.evaluate(()=>window.__g.S.inv.filter(i=>i.fx&&i.fx.zeroKeep).length);
@@ -117,7 +119,7 @@ async function main(){
     const bolts=window.__g.player.model.userData.hero.bolts;
     return {n:window.__g.S.inv.filter(i=>i.fx&&i.fx.zeroKeep).length, aura:window.__g.player.model.userData.auraLeft||0, bolts:!!(bolts&&bolts.visible)};
   });
-  ok(before===1&&after.n===0&&after.aura===0&&after.bolts===false, 'destroying the band removes it and its green streak');
+  ok(before===1&&after.n===0&&after.aura===0&&after.bolts===false, 'destroying the band removes it');
   const hat=await page.evaluate(()=>window.__g.S.inv.find(i=>/HAT/.test(i.name)));
   const gold0=await page.evaluate(()=>window.__g.S.gold);
   await page.evaluate((id)=>{ document.querySelector('[data-sell="'+id+'"]').click(); }, hat.id);

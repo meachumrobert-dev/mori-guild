@@ -55,9 +55,11 @@ let ENG; try{ ENG=new MoriEngine({mode:'both'}); }catch(e){ ENG={talk:()=>"i'm h
 
 /* ---------- world scene ---------- */
 const scene=new T.Scene(); scene.fog=new T.Fog('#8ec5ff',IS_TOUCH?70:110,IS_TOUCH?240:360);
-const hemi=new T.HemisphereLight('#cfe8ff','#3a5a2a',1.0); scene.add(hemi);
-const sun=new T.DirectionalLight('#fff2d0',2.0); sun.castShadow=!IS_TOUCH; sun.shadow.mapSize.set(1024,1024);
-Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:120}); scene.add(sun); scene.add(sun.target);
+const hemi=new T.HemisphereLight('#c5d7f2','#3a4a28',0.9); scene.add(hemi);
+const fill=new T.AmbientLight('#d5e2f4',0.7); scene.add(fill);
+const sun=new T.DirectionalLight('#fff2d0',1.6); sun.castShadow=!IS_TOUCH; sun.shadow.mapSize.set(1024,1024);
+sun.shadow.radius=3; sun.shadow.bias=-0.0003; sun.shadow.normalBias=0.04;
+Object.assign(sun.shadow.camera,{left:-36,right:36,top:36,bottom:-36,near:1,far:140}); scene.add(sun); scene.add(sun.target);
 let skyMesh=null, scatterRoot=null;
 if(window.LOOK){ skyMesh=LOOK.makeSky(T); scene.add(skyMesh); }
 const colliders={segs:[],circles:[],boxes:[]};
@@ -81,9 +83,9 @@ W.height=(x,z)=>SW.heightAt(x,z);
 /* ---------- Phase 1 performance governor: frame-time budget steps quality down (and back up) ---------- */
 const QS=new URLSearchParams(location.search);
 if(window.POWER) POWER.boot(location.search);
-const QUAL=[{name:'low',   pr:1,    shadow:false,      smap:512,  R:3, near:0, treeR:60, flowerR:55, flowerCap:IS_TOUCH?300:450, fx:0.35, refreshCap:1, refreshMs:1.5},
-            {name:'medium',pr:1.25, shadow:!IS_TOUCH,  smap:512,  R:4, near:1, treeR:90, flowerR:85, flowerCap:IS_TOUCH?700:1100, fx:0.7,  refreshCap:IS_TOUCH?1:2, refreshMs:IS_TOUCH?1.5:2.5},
-            {name:'high',  pr:1.75, shadow:true,       smap:1024, R:5, near:1, treeR:130, flowerR:130, flowerCap:2400, fx:1,    refreshCap:2, refreshMs:3}];
+const QUAL=[{name:'low',   pr:1,    shadow:false, smap:512,  R:3, near:0, treeR:60, flowerR:55, flowerCap:IS_TOUCH?300:450, fx:0.35, refreshCap:1, refreshMs:1.5},
+            {name:'medium',pr:1.25, shadow:true,  smap:1024, R:4, near:1, treeR:90, flowerR:85, flowerCap:IS_TOUCH?700:1100, fx:0.7,  refreshCap:IS_TOUCH?1:2, refreshMs:IS_TOUCH?1.5:2.5},
+            {name:'high',  pr:1.75, shadow:true,  smap:1024, R:5, near:1, treeR:130, flowerR:130, flowerCap:2400, fx:1,    refreshCap:2, refreshMs:3}];
 let lookSaved=null; try{ lookSaved=localStorage.getItem('mori.look'); }catch(e){}
 const lookPick=window.LOOK?{low:0,medium:1,high:2}[LOOK.pick(IS_TOUCH, lookSaved)]:null;
 const PERF={q:lookPick!=null?lookPick:(IS_TOUCH?0:1), max:IS_TOUCH?1:2, budget:IS_TOUCH?33.3:20, ema:16, js:0, step:0, over:0, under:0, cool:2, auto:!lookSaved, changes:[], frames:0, overlay:QS.get('perf')==='1'};
@@ -792,14 +794,25 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 /* ---------- panels ---------- */
 function sheetOpen(){ return !!document.querySelector('.panel.open'); }
 function closeSheets(){ releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); }
-function wornBand(){ return (S.inv||[]).some(i=>i&&i.equipped&&i.fx&&i.fx.zeroKeep); }
 function syncAura(){
   if(!player||!player.model) return;
   const dread=(S.buffs&&S.buffs.dread>0)?S.buffs.dread:0;
-  const on=dread>0||wornBand();
-  player.model.userData.auraLeft=on?(dread>0?dread:0.25):0;
+  player.model.userData.auraLeft=dread;
   const bolts=player.model.userData.hero&&player.model.userData.hero.bolts;
-  if(bolts) bolts.visible=!!on;
+  if(bolts&&!player.model.userData.npcAura) bolts.visible=dread>0;
+}
+function clearStreaks(){
+  if(S.buffs) delete S.buffs.dread;
+  const models=[player&&player.model].concat((typeof comps!=='undefined'?comps:[]).map(c=>c.model));
+  models.forEach(m=>{
+    if(!m) return;
+    m.userData.auraLeft=0;
+    const bolts=m.userData.hero&&m.userData.hero.bolts;
+    if(bolts&&!m.userData.npcAura) bolts.visible=false;
+  });
+  if(typeof crewFx!=='undefined'){
+    for(let i=crewFx.length-1;i>=0;i--){ const f=crewFx[i]; if(f.sc&&f.m) f.sc.remove(f.m); if(f.m&&f.m.geometry) f.m.geometry.dispose(); if(f.m&&f.m.material) f.m.material.dispose(); crewFx.splice(i,1); }
+  }
 }
 function letGo(id, how){
   const it=S.inv.find(i=>i.id===id);
@@ -1359,17 +1372,29 @@ function project(obj3, yOff, el, html){ tmpV.copy(obj3).setY(obj3.y+yOff).projec
   el.style.display='block'; el.style.left=((tmpV.x+1)/2*innerWidth)+'px'; el.style.top=((1-tmpV.y)/2*innerHeight)+'px'; if(el._h!==html){ el.innerHTML=html; el._h=html; } }
 
 /* ---------- day / night ---------- */
-const DAY=240; const cDay=new T.Color('#8ec5ff'), cDusk=new T.Color('#ff9a6a'), cNight=new T.Color('#0b0a22'), skyC=new T.Color();
+const DAY=240; const skyC=new T.Color(); let bright=1; try{ const bv=parseFloat(localStorage.getItem('mori.bright')); if(bv>=0.7&&bv<=1.5) bright=bv; }catch(e){}
+if($('bright')){ $('bright').value=Math.round(bright*100); $('bright').oninput=e=>{ bright=Math.max(0.7, Math.min(1.5, (+e.target.value)/100)); try{ localStorage.setItem('mori.bright', String(bright)); }catch(err){} updateSky(0); }; }
 function updateSky(dt){ const before=S.clock;
   const sky=window.RESEED?RESEED.sky(S.clock, dt):{clock:(Number.isFinite(S.clock)?S.clock:40)+(dt||0), day:1, light:1, sun:2};
   S.clock=sky.clock;
   if(before>200&&S.clock<before&&window.VILLAGE) VILLAGE.onDay(S, atGuild()?'guild':String(curRegion()), atGuild()); const ph=S.clock/240, el=Math.sin(ph*Math.PI*2);
-  const day=sky.day; skyC.copy(cNight).lerp(cDay,day); if(Math.abs(el)<0.3) skyC.lerp(cDusk,(0.3-Math.abs(el))/0.3*0.55);
-  scene.background=skyC; scene.fog.color.copy(skyC); if(skyMesh){ skyMesh.position.set(player.pos.x,0,player.pos.z); if(skyMesh.material&&skyMesh.material.color) skyMesh.material.color.copy(skyC); } hemi.intensity=sky.light; sun.intensity=sky.sun;
-  sun.position.set(player.pos.x+Math.cos(ph*Math.PI*2)*40, Math.max(6,el*50), player.pos.z+12); sun.target.position.set(player.pos.x,0,player.pos.z);
-  stars.material.opacity=1-day; stars.position.set(player.pos.x,0,player.pos.z);
+  const day=sky.day;
+  const g=window.LOOK?LOOK.grade(day, el, bright):{horizon:[0.7,0.85,0.98],zenith:[0.4,0.62,0.95],fog:[0.7,0.85,0.98],fill:0.7,hemi:0.9,sun:1.4,sunColor:[1,0.95,0.8],skyColor:[0.8,0.9,1],groundColor:[0.22,0.26,0.16],exposure:1.15};
+  skyC.setRGB(g.horizon[0], g.horizon[1], g.horizon[2]);
+  scene.background=skyC; scene.fog.color.copy(skyC);
+  if(skyMesh&&window.LOOK) LOOK.paintSky(skyMesh, g.horizon, g.zenith);
+  if(skyMesh) skyMesh.position.set(player.pos.x,0,player.pos.z);
+  hemi.color.setRGB(g.skyColor[0], g.skyColor[1], g.skyColor[2]);
+  hemi.groundColor.setRGB(g.groundColor[0], g.groundColor[1], g.groundColor[2]);
+  hemi.intensity=g.hemi; fill.intensity=g.fill; sun.intensity=g.sun;
+  sun.color.setRGB(g.sunColor[0], g.sunColor[1], g.sunColor[2]);
+  if(renderer.toneMappingExposure!=null) renderer.toneMappingExposure=g.exposure;
+  const moon=day<0.22;
+  sun.position.set(player.pos.x+(moon?-18:Math.cos(ph*Math.PI*2)*40), moon?42:Math.max(10, el*46+12), player.pos.z+(moon?14:12));
+  sun.target.position.set(player.pos.x,0,player.pos.z);
+  stars.material.opacity=Math.max(0, 1-day*1.4); stars.position.set(player.pos.x,0,player.pos.z);
   built.forEach(b=>{ if(b.g.userData.halo) b.g.userData.halo.material.opacity=0.15+0.6*(1-day); });
-  $('sClock').textContent=(day>0.5?'☀ Day':el>-0.2&&el<0.2?'🌆 Dusk':'🌙 Night')+' '+String(Math.floor(ph*24)).padStart(2,'0')+':00';
+  $('sClock').textContent=(day>0.55?'☀ Day':Math.abs(el)<0.22?'🌆 Dusk':'🌙 Night')+' '+String(Math.floor(ph*24)).padStart(2,'0')+':00';
   return day; }
 
 /* ---------- HUD ---------- */
@@ -1454,6 +1479,7 @@ function applySeed(v){ v=String(v||'').trim().slice(0,40); if(!v||v===S.seed) re
 function adoptWorld(next){ if(!window.NEWWORLD) return; NEWWORLD.install(S, next); tfFinishCur(); jobs=[]; if(curJob){ curJob=null; mori.path=[]; } if(window.TF) TF.reset();
   if(!Number.isFinite(S.clock)) S.clock=40;
   if(window.EFFECTS){ EFFECTS.scrub(S.buffs||(S.buffs={})); EFFECTS.rings(S.inv||[]); }
+  clearStreaks();
   if(window.TAGS) TAGS.clear(_itemTag);
   releaseBag();
   PL.setSeed(S.seed||'mori'); guildId=PL.startRegion(); if(!S.worlds) S.worlds={}; WD(); S.at=null; SW.globe.G.sel=guildId; try{ SW.globe.build(); }catch(e){} globeDirty=false;
