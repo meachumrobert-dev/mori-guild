@@ -678,7 +678,11 @@ function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); 
     if(act.intent){
       const res=ROLE.resolve(act, {roll:window.SRD?SRD.d20():10, skill:Math.floor(charLevel()/2), oppose:12});
       if(act.intent==='claim'&&res.ok&&window.LAND){ if(!S.land) S.land={}; if(!S.land.owner) LAND.claim(S.land, playerName()); }
-      if(act.intent==='place'&&res.ok&&window.SNAP){ S.pieces=SNAP.coBuild(SNAP.place(S.pieces||[], {kind:'wall', x:player.pos.x, z:player.pos.z}, 'you')); }
+      if(act.intent==='place'&&res.ok&&window.SNAP){
+        const before=(S.pieces||[]).length;
+        S.pieces=SNAP.coBuild(SNAP.place(S.pieces||[], {kind:'wall', x:player.pos.x+1.2, z:player.pos.z+0.4}, 'you'));
+        S.pieces.slice(before).forEach(showPiece);
+      }
       addChat('mo', res.line+(act.intent==='claim'&&S.land&&S.land.quest?' '+S.land.quest.text:''));
       return;
     }
@@ -898,6 +902,20 @@ function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) re
 if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
 if(QS.get('menu')==='1'){ document.body.classList.add('menu'); paintSheetTabs(); }
 if(QS.get('elder')==='1') setTimeout(()=>{ if(typeof openVillage==='function') openVillage('elderP'); }, 400);
+function showPiece(part){
+  if(!window.SNAP) return;
+  const at=SNAP.snap(part.x||0, part.z||0);
+  const pit=new T.Mesh(new T.BoxGeometry(1, 0.08, 1), new T.MeshStandardMaterial({color:'#5a4632'}));
+  pit.position.set(at.x, 0.04, at.z); scene.add(pit);
+  const wall=new T.Mesh(new T.BoxGeometry(1, 1.7, 0.28), new T.MeshStandardMaterial({color:part.by==='mori'?'#7d6bb5':'#c4b08a'}));
+  wall.position.set(at.x, 0.9, at.z); wall.name='snap-'+(part.by||'you'); scene.add(wall);
+}
+if(QS.get('build')==='1'&&window.SNAP) setTimeout(()=>{
+  S.pieces=SNAP.coBuild(SNAP.place([], {kind:'wall', x:3.2, z:-4}, 'you'));
+  S.pieces.forEach(showPiece);
+  const boat=window.SHIPS?SHIPS.starter():null;
+  if(boat){ const hull=new T.Mesh(new T.BoxGeometry(1.8, 0.35, 0.7), new T.MeshStandardMaterial({color:'#8a5a32'})); hull.position.set(-3.2, 0.35, -2); hull.name='skiff'; scene.add(hull); }
+}, 500);
 addEventListener('resize', refreshPhone); refreshPhone();
 document.addEventListener('gesturestart', e=>{ if(document.body.classList.contains('phone')) e.preventDefault(); });
 document.addEventListener('touchmove', e=>{ if(!document.body.classList.contains('phone')) return; if(e.touches.length>1 && !e.target.closest('#chatLog,.panel .body,.modal .card,#bottom')) e.preventDefault(); }, {passive:false});

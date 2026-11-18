@@ -42,7 +42,7 @@ const dealt=KIN.trade(KIN.TRIBES.wolfkin, 1);
 ok(dealt.ok&&dealt.lore==='hunt-moon'&&dealt.hybrid&&dealt.tech===1, 'a method buys lore and starts a hybrid step');
 ok(KIN.branch('wolfkin','human').hybrid, 'two peoples make a branch, not a replacement');
 
-ok(SPELLS.bySchool('evocation').some(s=>s.id==='fireball')&&SPELLS.byLevel(0).length>=3, 'spells keep school and level');
+ok(SPELLS.SCHOOLS.every(s=>SPELLS.bySchool(s).length>=2), 'each school has more than one spell');
 const cantrip=SPELLS.cast('prestidigitation', 12, {level:1});
 ok(cantrip.ok&&cantrip.effect<=cantrip.cap&&cantrip.flavor==='spark', 'a cantrip lands as flavor, inside a cap');
 const fail=SPELLS.cast('wish', 2, {level:1});
