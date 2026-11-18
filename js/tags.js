@@ -21,6 +21,14 @@ function pickup(tag, id){
   if(tag&&tag.id===id) return clear(tag);
   return tag||fresh();
 }
-root.TAGS={fresh, clear, show, pickup, star:['phone']};
+function release(nodes){
+  (nodes||[]).forEach(n=>{
+    n.title='';
+    if(n.bagTip||n.ghost) n.shown=false;
+  });
+  const visible=(nodes||[]).filter(n=>n.shown&&(n.bagTip||n.ghost||n.title)).length;
+  return {visible};
+}
+root.TAGS={fresh, clear, show, pickup, release, star:['phone']};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.TAGS;
 })(typeof window!=='undefined'?window:globalThis);

@@ -39,7 +39,7 @@ if(window.TROLLS) TROLLS.migrate(S);
 if(window.LEGEND) LEGEND.migrate(S);
 if(window.RECIPES) RECIPES.migrate(S);
 if(window.LEGEND&&window.STOCKPILE){ const prices=LEGEND.prices(); for(const id in prices) STOCKPILE.register(id, prices[id]); }
-if(window.EFFECTS){ if(!S.buffs) S.buffs={}; EFFECTS.scrub(S.buffs); if(S.inv) EFFECTS.rings(S.inv); }
+if(window.EFFECTS){ if(!S.buffs) S.buffs={}; EFFECTS.scrub(S.buffs); if(S.inv){ S.inv.forEach(it=>EFFECTS.price(it)); EFFECTS.rings(S.inv); } }
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -207,7 +207,7 @@ function placeStructure(type, plot, seed, instant, crooked){
 S.structs.forEach(s=>{ if(PLOTS[s.plot]) placeStructure(s.type,s.plot,s.seed,true,s.crooked); });
 
 /* ---------- inventory helpers ---------- */
-function addItem(it){ it.id='i'+(S.nid++); S.inv.push(it); if(['weapon','armor','ring','shield'].includes(it.kind)){ const cur=S.inv.find(x=>x.equipped&&x.kind===it.kind); if(!cur||(itemScore(it)>itemScore(cur))){ if(cur) cur.equipped=false; it.equipped=true; } } else if(it.kind==='wondrous'||it.kind==='charm') it.equipped=true; return it; }
+function addItem(it){ if(window.EFFECTS) EFFECTS.price(it); it.id='i'+(S.nid++); S.inv.push(it); if(['weapon','armor','ring','shield'].includes(it.kind)){ const cur=S.inv.find(x=>x.equipped&&x.kind===it.kind&&x!==it); if(!cur||(itemScore(it)>itemScore(cur))){ if(cur) cur.equipped=false; it.equipped=true; } } else if(it.kind==='wondrous'||it.kind==='charm') it.equipped=true; return it; }
 /* SRD armor: base armor bonus and max Dex by type; shields by type. Masterwork adds no AC (it lowers the check penalty). */
 const ARMOR_SRD=[[/padded/i,'Padded',1,8],[/studded/i,'Studded Leather',3,5],[/leather/i,'Leather',2,6],[/chain ?shirt/i,'Chain Shirt',4,4],[/hide/i,'Hide',3,4],[/scale/i,'Scale Mail',4,3],[/chain ?mail/i,'Chainmail',5,2],[/breastplate/i,'Breastplate',5,3],[/splint/i,'Splint Mail',6,0],[/banded/i,'Banded Mail',6,1],[/half-?plate/i,'Half-Plate',7,0],[/full ?plate/i,'Full Plate',8,1]];
 const SHIELD_SRD=[[/buckler/i,'Buckler',1],[/tower/i,'Tower Shield',4],[/heavy/i,'Heavy Shield',2],[/light/i,'Light Shield',1]];
@@ -419,7 +419,7 @@ function rarity(it){ const b=it.bonus||0, sp=(it.spells||[]).length+(it.special?
   if(b>=1||sp>=1||/^(Potion|Ring|Wondrous Item|Magic|Robert)/.test(it.cat||'')||it.kind==='potion'||it.kind==='charm'||(it.fx&&Object.keys(it.fx).length&&it.cat!=='Equipment'&&!it.mw)) return RARITY[2];
   if(it.mw||/Masterwork/i.test(it.name||'')) return RARITY[1];
   return RARITY[0]; }
-function rName(it,tag){ const r=rarity(it); return '<b style="color:'+r.c+'" title="'+r.name+' · '+(it.cat||'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+'">'+it.name+'</b>'+(tag?' <span class="small" style="color:'+r.c+'">['+r.name+']</span>':''); }
+function rName(it,tag){ const r=rarity(it); return '<b style="color:'+r.c+'" class="bagName">'+it.name+'</b>'+(tag?' <span class="small" style="color:'+r.c+'">['+r.name+']</span>':''); }
 function charLevel(){ return 3+(S.clears||0)+Math.floor((S.qxp||0)/1000); } // v3.5: quest XP, guild pace 1,000 XP per level
 // green-and-up gear starts dropping around character level 4-5: below treasure level 4, magic gear rolls come out as masterwork
 function lootRoll(level){ const t=SRD.rollTreasure(level);
@@ -429,6 +429,7 @@ function lootRoll(level){ const t=SRD.rollTreasure(level);
 function takeTreasure(t){
   if(t.gold){ S.gold+=t.gold; return t.name+' (gold)'; }
   const it={name:t.name, cat:t.cat, kind:t.kind==='armor'&&/Shield|Buckler/i.test(t.name)?'shield':t.kind, bonus:t.bonus||0, special:t.special||'', value:t.value||0, fx:Object.assign({}, t.fx||ROBERT_FX[t.name]||{}), curse:t.curse||'', note:t.note||''};
+  if(window.EFFECTS) EFFECTS.price(it);
   if(t.name==='Template Stylus'){ const nt=TEMPLATES.find(x=>!S.templates.includes(x)); if(nt){ S.templates.push(nt); it.name+=' (taught '+nt+')'; } }
   addItem(it); return it.name; }
 function rollHtml(t){ const r=rarity(t); return '<div class="rollbox" style="border-color:'+r.c+'88"><div class="pct">d% '+t.rolls.map(r=>'<b>'+String(r).padStart(2,'0')+'</b>').join(' → ')+'</div><div><b>'+t.cat+'</b>: '+(t.gold?t.name:rName(t,true))+(t.gated?' <span class="small">(magic gear drops from character level 4+)</span>':'')+(t.value?' <span class="small">('+t.value.toLocaleString()+' gp)</span>':'')+'</div></div>'; }
@@ -452,9 +453,9 @@ function dollShop(){
        c.querySelector('#exAll').onclick=()=>{ const n=Math.floor(S.life/5); S.life-=n*5; S.larpy+=n; log('Traded '+n*5+' Life for '+n+' LARPy.'); dollShop(); };
        c.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{ const g=goods.find(x=>x[0]===b.dataset.buy); if(S.larpy<g[2]){ log('Mori Doll: "Not enough LARPy. Shoo."'); return; } S.larpy-=g[2];
          if(g[0]==='lt'){ S.lawnTokens=(S.lawnTokens||0)+5; log('Mori Doll: "Fine. Five lawn tokens. Stay off my lawn."'); LORE.unlock('npc_doll'); dollShop(); return; }
-         if(g[0]==='ko'||g[0]==='kc'||g[0]==='kr'||g[0]==='ks'){ S.follower=true; S.curses=(S.curses||0)+1; takeTreasure({name:g[1], cat:"Robert's World", kind:'cursed', value:0, curse:'You are now a loyal follower of Delroth', note:'cheap knockoff · curse'});
+         if(g[0]==='ko'||g[0]==='kc'||g[0]==='kr'||g[0]==='ks'){ S.follower=true; S.curses=(S.curses||0)+1; takeTreasure({name:g[1], cat:"Robert's World", kind:'cursed', value:1, curse:'You are now a loyal follower of Delroth', note:'cheap knockoff · curse'});
            modal('<h3>'+g[1]+'</h3><div class="quote">A voice from the tavern whispers:<br><b>"You are now a loyal follower of Delroth."</b></div><div class="small">Curse is cosmetic. Mostly. Mori Doll: "Stay off my lawn."</div>'); LORE.unlock('npc_doll'); return; }
-         takeTreasure({name:g[1], cat:"Robert's World", kind:g[0]==='zr'?'ring':g[0]==='fs'?'charm':'potion', value:0}); log('Bought '+g[1]+'. Mori Doll: "No refunds. Stay off my lawn."'); LORE.unlock('npc_doll'); dollShop(); }); });
+         takeTreasure({name:g[1], cat:"Robert's World", kind:g[0]==='zr'?'ring':g[0]==='fs'?'charm':'potion', value:g[0]==='zr'?8:2, fx:ROBERT_FX[g[1]]||{}}); log('Bought '+g[1]+'. Mori Doll: "No refunds. Stay off my lawn."'); LORE.unlock('npc_doll'); dollShop(); }); });
 }
 function outpostShop(){
   const goods=[['holoTape','Holo Tape +1 Reach',45,'+15 range on swings (and +1 to hit)'],['legionBoots','Legion Boots',60,'you and friends move faster'],['dye','Gothic Rose Dye',20,'unlock the dye for the Template Painter'],['synth','Synth: Hologram',35,'friends hum; shadows flee (unlocks instrument)'],['goldPick','Gold Pick (real value)',80,'Mori mines ore in one swing (+1 ore)']];
@@ -553,7 +554,7 @@ function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(
   h+='<div class="sec">Items ('+S.inv.length+')</div>';
   h+='<div class="q barRow" data-bar-spell="1"><span class="barDrag" title="Spell. Not in the world yet."><b>Spell</b> <span class="small">Placeholder. Drag onto the 1–9 bar.</span></span></div>';
   h+=(S.inv.length?S.inv.map(it=>{ const salve=it.kind==='salve'; const tip=salve?'Salve. Heals over time. No roll.':'Drag onto the action bar'; return '<div class="q barRow" data-bar-id="'+it.id+'"><span class="barDrag" title="'+tip+'">'+(it.equipped?'✅ ':'')+(salve&&!/salve/i.test(it.name)?'Salve: ':'')+rName(it)+' <span class="small">'+rarity(it).name+' · '+(it.cat||'')+(it.spells?' · '+it.spells.join(', ')+(it.meta&&it.meta.length?' ['+it.meta.join(', ')+']':'')+' · '+it.use+(it.craftNote?' · '+it.craftNote:''):'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+(it.durability!=null?' · dur '+it.durability+'/'+it.maxDur+' · life '+((it.lifetime||0)-(it.uses||0))+' left':'')+'</span></span>'+
-    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'<span class="small">quest item</span>':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+(it.value>1&&!it.equipped?'<button data-sell="'+it.id+'" title="SRD: items sell for half their market price">Sell '+Math.floor(it.value/2).toLocaleString()+'</button>':'')+(it.crafted&&!it.equipped?'<button data-treas="'+it.id+'">Treasury buys</button>':'')+'</div>'; }).join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
+    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+'<button data-sell="'+it.id+'">Sell '+Math.max(1, Math.floor((window.EFFECTS?EFFECTS.floor(it):it.value||2)/2))+'</button><button data-drop="'+it.id+'">Drop</button><button data-bin="'+it.id+'">Destroy</button></div>'; }).join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
   h+=GATHERING.bagHTML();
   h+='<div class="sec">Template Painter — '+(ch.locked?'(locked preset: duplicate it in HeroLock to paint)':ch.name)+'</div>';
   h+='<div class="small">Templates owned: '+S.templates.join(', ')+'</div><div class="row">'+
@@ -564,10 +565,12 @@ function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(
   b.innerHTML=h;
   b.querySelectorAll('[data-tablet]').forEach(x=>x.onclick=()=>openTablet());
   b.querySelectorAll('[data-use]').forEach(x=>x.onclick=()=>{ drink(S.inv.find(i=>i.id===x.dataset.use)); renderBag(); });
-  b.querySelectorAll('[data-sell]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.sell); if(!it) return; const g=Math.floor(it.value/2); S.inv.splice(S.inv.indexOf(it),1); S.gold+=g; log('Sold '+it.name+' for '+g.toLocaleString()+' gold (half its '+it.value.toLocaleString()+' gp price). 1 gold = 1 gp.'); save(); renderBag(); });
+  b.querySelectorAll('[data-sell]').forEach(x=>x.onclick=()=>letGo(x.dataset.sell, 'sell'));
+  b.querySelectorAll('[data-drop]').forEach(x=>x.onclick=()=>letGo(x.dataset.drop, 'drop'));
+  b.querySelectorAll('[data-bin]').forEach(x=>x.onclick=()=>letGo(x.dataset.bin, 'bin'));
   b.querySelectorAll('[data-treas]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.treas); if(!it||!window.STATIONS) return; const r=STATIONS.treasuryBuyCrafted(it); if(!r.ok){ log('Treasury: '+ (r.why||'cannot buy')); return; } S.inv.splice(S.inv.indexOf(it),1); log('Guild treasury bought '+it.name+' for '+r.paid+' Mori Marks.'); save(); renderBag(); });
   b.querySelectorAll('[data-rsell]').forEach(x=>x.onclick=()=>{ const id=x.dataset.rsell, nm=GATHERING.R[id].name, n=S.reag[id]; const g=GATHERING.sell(id); log('Sold '+n+'× '+nm+' for '+g+' gold.'); noteCivic('trade', id); save(); renderBag(); });
-  b.querySelectorAll('[data-eq]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.eq); const was=it.equipped; if(!was&&['weapon','armor','ring','shield'].includes(it.kind)) S.inv.forEach(o=>{ if(o.kind===it.kind) o.equipped=false; }); it.equipped=!was; renderBag(); save(); });
+  b.querySelectorAll('[data-eq]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.eq); const was=it.equipped; if(!was&&['weapon','armor','ring','shield'].includes(it.kind)) S.inv.forEach(o=>{ if(o.kind===it.kind) o.equipped=false; }); it.equipped=!was; syncAura(); renderBag(); save(); });
   b.querySelectorAll('[data-tpl]').forEach(x=>x.onclick=()=>{ const [k,v]=x.dataset.tpl.split('|'); const val=v==='true'?true:v; ch[k]=ch[k]===val?(k==='hairStyle'?'short':k==='bootStyle'?'plain':false):val; saveChars(); rebuildPlayer(); renderBag(); });
   b.querySelectorAll('[data-dye]').forEach(x=>x.onclick=()=>{ ch[$('dyeSlot').value]=x.dataset.dye; saveChars(); rebuildPlayer(); renderBag(); });
 }
@@ -737,7 +740,7 @@ function npcApply(d,res){ if(!res) return; S.npcMem[d.id]=res.mem||S.npcMem[d.id
   });
   if($('questP').classList.contains('open')) renderQuests(); save(); return res; }
 function npcSay(text){ const d=NPCS.byId(chatNpc); if(!d) return null; const res=NPCS.npcReply(d,text,npcState(d)); if(res&&typeof res.then==='function'){ res.then(r=>npcApply(d,r)).catch(()=>addChat('npc','…',d)); return null; } return npcApply(d,res); }
-function openNpc(id){ const d=NPCS.byId(id); if(!d) return; if(chatNpc&&chatNpc!==id) endNpc(); const p=$('talkP'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); p.classList.add('open'); if(chatNpc===id) return;
+function openNpc(id){ const d=NPCS.byId(id); if(!d) return; if(chatNpc&&chatNpc!==id) endNpc(); const p=$('talkP'); releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); p.classList.add('open'); if(chatNpc===id) return;
   chatNpc=id; const m=(S.npcMem||(S.npcMem={}))[id]||(S.npcMem[id]={}); m.met=(m.met||0)+1; m.talks=m.talks||0; npcChain=QUESTS.event('talk',id).map(q=>q.id); LORE.meet(id); MEMORY.onTalk(id); const ln=NPCS.liveOf(id); if(ln) ln.talking=true;
   $('talkTitle').textContent='💬 '+d.name; $('npcBar').style.display='flex'; $('npcWho').innerHTML='<b>'+d.role+'</b> · '+QUESTS.PLACE[d.home]+' · <span class="small">voiced by Mori</span>';
   const sh=$('npcShop'); const shops={brakka:['🛡 Shop & quest',()=>CLAN.brakkaUI&&CLAN.brakkaUI()], scribe:['📜 Scrolls',()=>CLAN.scribeUI&&CLAN.scribeUI()], forge:['⚒ Forge jobs',()=>togglePanel('jobsP')]}; const s=shops[d.shop];
@@ -788,9 +791,40 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 
 /* ---------- panels ---------- */
 function sheetOpen(){ return !!document.querySelector('.panel.open'); }
-function closeSheets(){ document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); }
-function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const next=window.SHEETS?SHEETS.openOne(p.classList.contains('open')?id:null, id):(p.classList.contains('open')?null:id); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(next){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!next) endNpc(true); }
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
+function closeSheets(){ releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); }
+function wornBand(){ return (S.inv||[]).some(i=>i&&i.equipped&&i.fx&&i.fx.zeroKeep); }
+function syncAura(){
+  if(!player||!player.model) return;
+  const dread=(S.buffs&&S.buffs.dread>0)?S.buffs.dread:0;
+  const on=dread>0||wornBand();
+  player.model.userData.auraLeft=on?(dread>0?dread:0.25):0;
+  const bolts=player.model.userData.hero&&player.model.userData.hero.bolts;
+  if(bolts) bolts.visible=!!on;
+}
+function letGo(id, how){
+  const it=S.inv.find(i=>i.id===id);
+  if(!it||!window.EFFECTS) return;
+  const yes=how==='sell'||confirm((how==='bin'?'Destroy ':'Drop ')+it.name+'? This cannot be undone.');
+  const r=EFFECTS.dispose(S.inv, id, how==='bin'?'destroy':how, yes);
+  if(!r.ok) return;
+  if(r.gold) S.gold+=r.gold;
+  syncAura();
+  log(how==='sell'?('Sold '+r.item.name+' for '+r.gold+' gold.'):(how==='bin'?'Destroyed ':'Dropped ')+r.item.name+'.');
+  save(); renderBag();
+}
+function releaseBag(){
+  const nodes=[];
+  const ghost=$('barGhost');
+  if(ghost) nodes.push({ghost:true, shown:!ghost.hidden, title:ghost.textContent||'', el:ghost});
+  document.querySelectorAll('#bagBody .bagName, #bagBody .barDrag, #bagBody [title]').forEach(el=>nodes.push({bagTip:true, shown:!el.hidden, title:el.getAttribute('title')||'', el}));
+  if(window.TAGS) TAGS.release(nodes);
+  if(ghost){ ghost.hidden=true; ghost.textContent=''; if(ghost.removeAttribute) ghost.removeAttribute('title'); }
+  document.querySelectorAll('#bagBody [title]').forEach(el=>{ if(el.removeAttribute) el.removeAttribute('title'); });
+  document.querySelectorAll('#bagBody .barRow, #bagBody .bagName, #bagBody .barDrag').forEach(el=>el.remove());
+  barDrag=null;
+}
+function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const next=window.SHEETS?SHEETS.openOne(p.classList.contains('open')?id:null, id):(p.classList.contains('open')?null:id); if(id!=='bagP'||!next) releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(next){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!next) endNpc(true); }
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ if(b.dataset.close==='bagP') releaseBag(); $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
 if($('bElder')) $('bElder').onclick=()=>openVillage('elderP');
 if($('bBoard')) $('bBoard').onclick=()=>openVillage('boardP');
@@ -812,8 +846,8 @@ function bindVillage(root){
   root.querySelectorAll('[data-distill]').forEach(b=>b.onclick=()=>{ if(!window.RECIPES) return; const app=(root.querySelector('#alembic')||{}).value||'distillery'; const r=RECIPES.distill(S.reag, app); log(r.ok?'Distilled '+r.qty+' '+r.name+'.':r.why); save(); renderVillage('elderP'); });
   root.querySelectorAll('[data-taste]').forEach(b=>b.onclick=()=>{ const r=RECIPES.taste(S, b.dataset.taste); log(r.ok?(r.learned?'You taste '+r.learned+'. ('+r.era+')':'You already know what this '+r.era.toLowerCase()+' can tell you.'):r.why); save(); renderVillage('elderP'); });
 }
-$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; if($('bNewWorld')) $('bNewWorld').onclick=()=>{ document.body.classList.remove('menu'); const typed=$('seedIn')&&$('seedIn').value; newWorld(String(typed||S.seed||'').trim()); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
-function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
+$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; if($('bNewWorld')) $('bNewWorld').onclick=()=>{ document.body.classList.remove('menu'); const typed=$('seedIn')&&$('seedIn').value; newWorld(String(typed||S.seed||'').trim()); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ window.__resetting=true; releaseBag(); store.del(SAVE_KEY); location.reload(); } };
+function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')){ const tab={id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:2, end:'store', note:'A dark glassy tablet. The runes wait for a yes.'}; if(window.EFFECTS) EFFECTS.price(tab); S.inv.push(tab); } if(!S.tablet) S.tablet={approved:[]}; }
 let tabletDraft=null, tabletResult=null;
 function tabletSlots(){ const h=hereCity(); return {ruler:h.ruler||'The Guild Charter (Seedkeeper Mori)', name:h.name||'Guildhold', motto:h.motto||'', gov:h.govName||'Guild Charter', race:h.race||'', region:h.region||'', arts:''}; }
 function moriDraft(){ return {note:'one vocab finger', fingers:[
@@ -837,7 +871,7 @@ function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.ta
   $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(tabletDraft.note==='tinker persona') S.tablet.wear='tinker'; applyWorn(); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
   $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length){ const gone=S.tablet.approved.pop(); if(gone&&gone.note==='tinker persona') S.tablet.wear='mori'; } applyWorn(); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
 }
-function openTablet(){ ensureTablet(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
+function openTablet(){ ensureTablet(); releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
  '<li><b>Move</b>: WASD / arrows (phones: left-thumb joystick). <b>Look</b>: drag to orbit, wheel / pinch to zoom.</li>'+
  '<li><b>Loot rarity:</b> '+RARITY.map(r=>'<span style="color:'+r.c+'">■ '+r.name+'</span>').join(' · ')+'. Magic gear starts dropping around character level 4–5 (level = 3 + full dungeon clears). A full clear is the boss portal home. Clearing one room does not raise it.</li>'+
@@ -903,7 +937,7 @@ if($('turnGo')) $('turnGo').onclick=async()=>{ try{ if(document.documentElement.
 if(window.visualViewport) visualViewport.addEventListener('resize', ()=>{ if(typeof resize==='function') resize(); });
 function codexHTML(){ if(!S.codex) S.codex=CODEX.fresh(); const cats=Object.keys(CODEX.CATS); return '<div class="sec">Codex</div><div class="small">A page stays dark until the world has shown it to you. '+CODEX.hidden(S.codex)+' still hidden.</div>'+cats.map(id=>{ const rows=CODEX.list(S.codex, id); return '<div class="small"><b>'+CODEX.CATS[id].label+'</b> — '+(rows.length?rows.map(p=>p.name).join(', '):'nothing seen yet')+'</div>'; }).join(''); }
 function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) return; const phone=document.body.classList.contains('phone')&&document.body.classList.contains('menu'); box.hidden=!phone; if(!phone){ document.querySelectorAll('#bottom button').forEach(b=>{ b.style.display=''; }); return; }
-  const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ box.dataset.grp=b.dataset.grp; paintSheetTabs(); }); }
+  const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ const next=b.dataset.grp; const ids=SHEETS.showIds(next); if(ids.indexOf('bBag')<0&&$('bagP')&&$('bagP').classList.contains('open')){ releaseBag(); $('bagP').classList.remove('open'); } box.dataset.grp=next; paintSheetTabs(); }); }
 if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
 if(QS.get('menu')==='1'){ document.body.classList.add('menu'); const box=$('sheetTabs'); if(box&&QS.get('tab')) box.dataset.grp=QS.get('tab'); paintSheetTabs(); setTimeout(()=>{ const m=$('modal'); if(m) m.classList.remove('open'); }, 600); }
 if(QS.get('elder')==='1') setTimeout(()=>{ if(typeof openVillage==='function') openVillage('elderP'); }, 400);
@@ -1049,7 +1083,7 @@ function updatePlayer(dt){
   // tavern floor/stage
   if(mode==='world'&&tav.userData.inside(player.pos.x,player.pos.z)) player.pos.y=Math.max(player.pos.y, tav.userData.floorY||0.15);
   player.model.position.copy(player.pos); if(player.sit) player.model.position.y-=0.42; player.model.rotation.y=lerpAngle(player.model.rotation.y,player.face,Math.min(1,dt*12));
-  if(player.model) player.model.userData.auraLeft=(S.buffs&&S.buffs.dread)||0;
+  syncAura();
   HERO.animate(player.model, clockT, moving?Math.min(1.4,len*(1+stats().speed)):0);
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
   // companions walk their own slots and swing on their own timers
@@ -1421,6 +1455,7 @@ function adoptWorld(next){ if(!window.NEWWORLD) return; NEWWORLD.install(S, next
   if(!Number.isFinite(S.clock)) S.clock=40;
   if(window.EFFECTS){ EFFECTS.scrub(S.buffs||(S.buffs={})); EFFECTS.rings(S.inv||[]); }
   if(window.TAGS) TAGS.clear(_itemTag);
+  releaseBag();
   PL.setSeed(S.seed||'mori'); guildId=PL.startRegion(); if(!S.worlds) S.worlds={}; WD(); S.at=null; SW.globe.G.sel=guildId; try{ SW.globe.build(); }catch(e){} globeDirty=false;
   if(S.greet) addChat('mo', S.greet); log(S.greet||'The world is set.'); travelTo(guildId, true); try{ refreshFrameAt(); }catch(e){ log('The ground layer stumbled. A lit floor stays under you.'); } if(globeOpen) renderSeedPanel(); }
 function newWorld(v){ if(!window.NEWWORLD) return; v=String(v||'').trim(); if(!v){ log('Type a seed name first.'); return; }
@@ -1578,7 +1613,7 @@ if(S.blue){ $('bBlue').textContent='☀ Wake Mori'; }
 setTownVisible(atGuild()); SW.update(player.pos.x,player.pos.z,999);
 (S.jobs||[]).forEach(j=>{ if(j&&j.kind&&j.what) jobs.push({kind:j.kind,what:j.what,id:S.nid++}); });
 if(!store.get(SAVE_KEY)) setTimeout(help,400);
-addEventListener('beforeunload',()=>{ tfFinishCur(); save(); }); document.addEventListener('visibilitychange',()=>{ if(document.hidden){ tfFinishCur(); if(window.IDLEBUILD) IDLEBUILD.stampSeen(); save(); } else { if(window.IDLEBUILD) IDLEBUILD.stampSeen(); } });
+addEventListener('beforeunload',()=>{ if(window.__resetting) return; tfFinishCur(); save(); }); document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(window.__resetting) return; tfFinishCur(); if(window.IDLEBUILD) IDLEBUILD.stampSeen(); save(); } else { if(window.IDLEBUILD) IDLEBUILD.stampSeen(); } });
 requestAnimationFrame(frame);
 
 /* test hook */
