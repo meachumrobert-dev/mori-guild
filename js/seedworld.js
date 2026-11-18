@@ -9,7 +9,7 @@ const MTon=!!(window.MT&&MT.on), TX=(kind,hex,scale,o)=>MTon?MT.M(kind,hex,scale
 const smooth=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
 const CH=64; // chunk size in metres
 let opt=null, scene=null, root=null, chunkRoot=null, siteRoot=null, water=null;
-const F={ id:-1, guild:false, O:[0,0,1], E:[1,0,0], Nn:[0,1,0], e0:0, stage:0, seaY:null, A:{x:0,z:0}, L:{x:0,z:8}, roads:[], curve:[], bridges:[], flats:[], targets:[], colliders:{segs:[],circles:[]}, info:null };
+const F={ id:-1, guild:false, O:[0,0,1], E:[1,0,0], Nn:[0,1,0], e0:0, stage:0, seaY:null, A:{x:0,z:0}, L:{x:0,z:8}, roads:[], curve:[], bridges:[], gradeLines:[], flats:[], targets:[], colliders:{segs:[],circles:[]}, info:null };
 const corner=new Map(); // "ix,iz" -> {e, rough, col:[r,g,b], reg}
 const chunks=new Map(); // key -> {lod, obj, reg}
 const settling=[]; // chunks fading or geomorphing toward their final surface
@@ -78,7 +78,9 @@ function sampleGround(x,z){ const r=rawH(x,z); let h=r.v?0:r.h;
   if(!r.v){ for(const f of F.flats){ const k=1-smooth(f.r0,f.r1,Math.hypot(x-f.x,z-f.z)); if(k>0) h=h*(1-k)+f.h*k; }
     if(F.guild&&opt&&opt.v2height){ const k=smooth(110,200,Math.hypot(x,z)); h=opt.v2height(x,z)*(1-k)+h*k; } }
   return {h, r:r.r, g:r.g, b:r.b, v:!!r.v}; }
-function heightAt(x,z){ const h=baseHeightAt(x,z); return TFD?h+TFD(x,z):h; }
+function heightAt(x,z){ let h=baseHeightAt(x,z); if(TFD) h+=TFD(x,z);
+  if(F.gradeLines&&F.gradeLines.length&&window.ROADS&&roadDist(x,z)<ROADS.SHOULDER) return ROADS.earth(x,z,h,F.gradeLines).h;
+  return h; }
 function baseHeightAt(x,z){ return sampleGround(x,z).h; }
 function colorAt(x,z){ const g=sampleGround(x,z); return [g.r, g.g, g.b]; }
 function normalAt(x,z){ const hL=heightAt(x-NORM_E,z), hR=heightAt(x+NORM_E,z), hD=heightAt(x,z-NORM_E), hU=heightAt(x,z+NORM_E);
@@ -101,7 +103,7 @@ function seam(ix,iz,seg,side,neighborSeg){ const n=seg+1, seams={e:0,w:0,n:0,s:0
 function slopeGap(x,z,dx,dz){ const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L; const e=2;
   const h0=heightAt(x-dx*e,z-dz*e), h1=heightAt(x,z), h2=heightAt(x+dx*e,z+dz*e); return Math.abs((h2-h1)-(h1-h0))/e; }
 function study(id, stageFn){ if(stageFn||!opt) opt={stage:stageFn||(()=>1), mobile:false, guildId:()=>id, explored:()=>false, v2height:null, tf:null};
-  clearField(); corner.clear(); F.id=id; F.guild=false; F.stage=stageOf(id)||1; F.roads=[]; F.curve=[]; F.bridges=[]; F.flats=[]; F.seaY=null; F.A={x:0,z:0}; F.L={x:0,z:8};
+  clearField(); corner.clear(); F.id=id; F.guild=false; F.stage=stageOf(id)||1; F.roads=[]; F.curve=[]; F.bridges=[]; F.gradeLines=[]; F.flats=[]; F.seaY=null; F.A={x:0,z:0}; F.L={x:0,z:8};
   const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(E[0],E[1],E[2])<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
   F.e0=P.elevation(O[0],O[1],O[2]); F.d0=0; F.d0=rawH(0,0).h; }
 function roadDist(x,z){ const segs=(F.curve&&F.curve.length)?F.curve:F.roads; let best=1e9; for(const s of segs){ const [x1,z1,x2,z2]=s; const vx=x2-x1, vz=z2-z1, L=vx*vx+vz*vz; let t=((x-x1)*vx+(z-z1)*vz)/L; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(x-(x1+vx*t),z-(z1+vz*t)); if(d<best) best=d; } return best; }
@@ -200,15 +202,16 @@ function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
   const bcol=new Float32Array(n*n*3), target=new Float32Array(n*n), morph=new Float32Array(n*n);
   let moving=false;
   for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const lx=i/seg*CH, lz=j/seg*CH, x=ix*CH+lx, z=iz*CH+lz, v=j*n+i, k=v*3;
-    const gnd=sampleGround(x,z), edge=edgeFor(i,j,seg,seams), dd=TFD?TFD(x,z):0;
-    const h=edge?stitchHeight(x,z,edge.axis,edge.step):(gnd.h+dd);
+    const gnd=sampleGround(x,z), edge=edgeFor(i,j,seg,seams);
+    let h=edge?stitchHeight(x,z,edge.axis,edge.step):heightAt(x,z);
     const y0=morphFrom?morphFrom(lx,lz):h;
     target[v]=h; morph[v]=y0; if(Math.abs(y0-h)>0.02) moving=true;
     pos[k]=lx; pos[k+1]=y0; pos[k+2]=lz;
     let r=gnd.r, gg=gnd.g, bb=gnd.b;
     const nz=(Math.sin(x*0.37)*Math.cos(z*0.29)+Math.sin(x*0.11+z*0.07))*0.03; r+=nz; gg+=nz; bb+=nz*0.5;
     if(F.guild&&Math.hypot(x,z)<120){ const t=1-smooth(60,120,Math.hypot(x,z)); r=r*(1-t)+0.33*t; gg=gg*(1-t)+0.5*t; bb=bb*(1-t)+0.24*t; }
-    bcol[k]=r; bcol[k+1]=gg; bcol[k+2]=bb; finishColor(col,k,bcol,dd,h); }
+    if(window.LOOK){ const sh=LOOK.shade(r, gg, bb, LOOK.slope(baseHeightAt, x, z)); r=sh[0]; gg=sh[1]; bb=sh[2]; }
+    bcol[k]=r; bcol[k+1]=gg; bcol[k+2]=bb; finishColor(col,k,bcol,TFD?TFD(x,z):0,h); }
   if(!geo){ geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(pos,3)); geo.setAttribute('color',new T.BufferAttribute(col,3)); geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); geo.setIndex(new T.BufferAttribute(idxFor(seg),1)); geo.userData.seg=seg; }
   else { geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; }
   writeNormals(geo.attributes.normal.array,ix,iz,seg); geo.attributes.normal.needsUpdate=true; geo.computeBoundingSphere();
@@ -287,7 +290,9 @@ function frameHouse(plot, biome, thatch){ const h=heightAt(plot.x,plot.z); const
   const pitch=window.GROUNDED?GROUNDED.pitchFor(biome,rnd()).rad:34*Math.PI/180;
   const spec=GROUNDED.cottageFrame({w:plot.w, d:plot.d, wallH:plot.wallH||2.5, pitch, overhang:0.4, doorW:plot.role==='work'?1.15:0.95});
   GROUNDED.attachFrame(T, g, spec, {stone:TX('stone_block','#8d8a80',1.2), timber:TX('wood_planks','#5a3d28',1.2), wall:TX('plaster',wall,2.5), roof:TX(thatch?'cornfield':'roof_shingle',roofC,1.5), door:TX('wood_planks','#4a3020',1), window:M('#ffd27a',{e:'#ffb020',ei:0.55})}, {fit:MTon&&MT.fit, shadow:!opt.mobile});
-  F.colliders.circles.push({x:plot.x,z:plot.z,r:Math.max(plot.w,plot.d)*0.42});
+  F.colliders.circles.push({x:plot.x,z:plot.z,r:0.4});
+  if(!F.colliders.boxes) F.colliders.boxes=[];
+  F.colliders.boxes.push({x:plot.x, z:plot.z, hw:plot.w/2, hd:plot.d/2, yaw:plot.yaw||0, name:'house'});
   g.userData.card={cell:opt.houseCell?opt.houseCell(plot.x,plot.z):4, w:Math.max(plot.w,plot.d)*1.1, h:(g.userData.h||4), tint:wall, role:plot.role};
   return g; }
 function layFarm(f){ const h=heightAt(f.x,f.z); const g=new T.Group(); g.position.set(f.x,h,f.z); g.rotation.y=f.yaw||0; siteRoot.add(g);
@@ -302,23 +307,19 @@ function layRoadWorks(id, A){
   const nbs=P.neighbors(id).filter(n=>P.regionInfo(n).isLand).map(n=>({id:n, name:P.regionInfo(n).name, land:true}));
   const stones=PORTALS.ends(id, Math.min(F.roads.length, 3), nbs, P.seed);
   F.bridges=[]; F.curve=[];
+  const placed=[];
   F.roads.slice(0,3).forEach((seg,i)=>{
-    const laid=ROADS.lay(seg, {heightAt, seaY:F.seaY, step:8, sway:16+((id+i)%5)*3, cap:120, gap:6});
-    const rib=roadRibbon(laid.points); if(rib) siteRoot.add(rib);
-    for(let k=1;k<laid.points.length;k++){ const a=laid.points[k-1], b=laid.points[k]; F.curve.push([a.x,a.z,b.x,b.z]); }
-    let run=null;
-    const flush=()=>{ if(!run||run.n<2){ run=null; return; }
-      const b={id:'br-'+id+'-'+i+'-'+F.bridges.length, x:run.x, z:run.z, y:run.y, span:Math.max(6, run.n*8), r:8};
-      F.bridges.push(b);
-      const deck=new T.Mesh(new T.BoxGeometry(2.2,0.16,b.span), new T.MeshLambertMaterial({color:'#6a4a2a', polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2, depthWrite:true, transparent:false, side:T.FrontSide}));
-      deck.position.set(b.x, b.y+ROADS.LIFT, b.z); deck.name='bridge'; deck.userData.terrain=true; siteRoot.add(deck);
-      run=null; };
-    laid.points.forEach(p=>{
-      if(!p.bridge){ flush(); return; }
-      if(!run) run={x:p.x,z:p.z,y:p.y,n:1};
-      else { run.x=(run.x*run.n+p.x)/(run.n+1); run.z=(run.z*run.n+p.z)/(run.n+1); run.y=Math.max(run.y,p.y); run.n++; }
+    const built=ROADS.build([seg], heightAt, {seaY:F.seaY, step:8, sway:16+((id+i)%5)*3, cap:120, gap:6, tech:F.stage>=4?2:0, id:()=>'road-'+id+'-'+i});
+    built.meshes.forEach(spec=>{
+      if(spec.kind==='ribbon'){
+        const rib=roadRibbon(spec); if(rib){ rib.userData.road=spec.id; siteRoot.add(rib); placed.push(spec); }
+        if(spec.points) F.gradeLines.push({pts:spec.points});
+        (spec.points||[]).forEach((p,k)=>{ if(!k) return; const a=spec.points[k-1]; F.curve.push([a.x,a.z,p.x,p.z]); });
+      } else if(spec.kind==='bridge'&&spec.mesh){
+        F.bridges.push(spec);
+        placeBridge(spec);
+      }
     });
-    flush();
     const dest=stones.filter(s=>s.road===i)[0];
     if(!dest) return;
     [[seg[0],seg[1]],[seg[2],seg[3]]].forEach(([x,z])=>{
@@ -335,16 +336,26 @@ function layRoadWorks(id, A){
     if(hive){ mk(new T.BoxGeometry(0.8,0.6,0.8), M('#e2b84a'), hive.x, heightAt(hive.x,hive.z)+1.2, hive.z); F.targets.push({x:hive.x, z:hive.z, r:2.4, label:'🐝 '+hive.name, kind:'hive', rid:'royal_honey'}); }
   }
 }
-function roadRibbon(points){
-  if(!points||points.length<2) return null;
-  const spec=ROADS.ribbon(points);
+function roadRibbon(spec){
+  if(!spec||!spec.pos||spec.pos.length<9) return null;
   const g=new T.BufferGeometry();
   g.setAttribute('position', new T.Float32BufferAttribute(spec.pos,3));
   g.setAttribute('normal', new T.Float32BufferAttribute(spec.nor,3));
   g.setAttribute('color', new T.Float32BufferAttribute(spec.col,3));
   g.setIndex(spec.idx);
   const mat=new T.MeshLambertMaterial({vertexColors:true, side:T.FrontSide, depthWrite:true, transparent:false, polygonOffset:true, polygonOffsetFactor:spec.material.polygonOffsetFactor, polygonOffsetUnits:spec.material.polygonOffsetUnits});
-  const mesh=new T.Mesh(g, mat); mesh.name='roadRibbon'; mesh.userData.terrain=true; mesh.receiveShadow=true; return mesh;
+  const mesh=new T.Mesh(g, mat); mesh.name='roadRibbon'; mesh.userData.terrain=true; mesh.userData.road=spec.id; mesh.receiveShadow=true; return mesh;
+}
+function placeBridge(b){
+  const spec=ROADS.bridgeGeom({span:b.span, width:(ROADS.HALF||1.45)*2, tech:b.tech|0, style:b.style});
+  const g=new T.BufferGeometry();
+  g.setAttribute('position', new T.Float32BufferAttribute(spec.pos,3));
+  g.setIndex(spec.idx);
+  g.computeVertexNormals();
+  const mat=new T.MeshLambertMaterial({color:spec.style==='arch'?'#8a877c':'#6a4a2a', depthWrite:true, transparent:false, side:T.FrontSide});
+  const mesh=new T.Mesh(g, mat);
+  mesh.position.set(b.x, b.y+ROADS.LIFT, b.z); mesh.rotation.y=b.yaw||0;
+  mesh.name='bridge'; mesh.userData.bridge=spec.style; mesh.userData.terrain=true; siteRoot.add(mesh);
 }
 function buildSite(){
   const id=F.id, st=F.stage, inf=F.info; const rnd=P.rngFor(P.seed,'site',id); const A=F.A;
@@ -380,6 +391,18 @@ function buildSite(){
     plan.paths.forEach(p=>{ if(Math.hypot(p[2]-p[0],p[3]-p[1])>1.5) F.roads.push(p); });
     if(Math.hypot(plan.civic.x-A.x,plan.civic.z-A.z)>4) F.flats.push({x:plan.civic.x,z:plan.civic.z,r0:8,r1:14,h:baseHeightAt(plan.civic.x,plan.civic.z)});
     plan.plots.forEach(p=>frameHouse(p, inf.biome, prof.thatch));
+    if(window.HOUSES){
+      const lanes=(plan.paths||[]).filter(p=>Math.hypot(p[2]-p[0],p[3]-p[1])<80);
+      const laid=HOUSES.along(lanes, rnd, {blocks:[{x:plan.civic.x,z:plan.civic.z,r:8}]});
+      laid.plots.forEach(p=>frameHouse(p, inf.biome, prof.thatch));
+      laid.fences.forEach(f=>{
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{
+          const c=Math.cos(f.yaw||0), s=Math.sin(f.yaw||0);
+          const lx=sx*f.hw, lz=sz*f.hd;
+          mk(new T.CylinderGeometry(0.08,0.1,0.7,5), TX('bark','#5a3a22',1), f.x+lx*c-lz*s, heightAt(f.x,f.z)+0.35, f.z+lx*s+lz*c);
+        });
+      });
+    }
     plan.farms.forEach(layFarm);
     if(prof.beast==='brush-kin'){ const bx=plan.civic.x+22, bz=plan.civic.z-16; frameHouse({x:bx,z:bz,yaw:0.4,w:3.2,d:2.8,wallH:2.2,role:'camp'}, inf.biome, true);
       F.targets.push({x:bx,z:bz+2,r:3,label:'brush-kin camp',kind:'camp'}); }
@@ -390,8 +413,9 @@ function buildSite(){
     if(st<4) F.targets.push({x:plan.civic.x,z:plan.civic.z+2.5,r:4,label:'🏘 '+nm+' · '+who,kind:'village'});
     plan.farms.forEach(f=>F.targets.push({x:f.x,z:f.z,r:3.2,label:'🌾 '+f.crop+' · water probe '+f.waterM+' m · haul '+f.haul+' m',kind:'farm'}));
   }
-  if(MTon&&mains.length) MT.road(siteRoot,mains,heightAt,{width:4.6,step:4,scale:4,lift:0.09});
-  if(MTon){ const paths=F.roads.slice(mains.length); if(paths.length) MT.road(siteRoot,paths,heightAt,{width:2.2,step:3,scale:3,lift:0.08}); }
+  const lanes=F.roads.slice(mains.length);
+  if(lanes.length&&window.ROADS){ const built=ROADS.build(lanes, heightAt, {step:6, cap:40, sway:0, gap:100, seaY:F.seaY, id:(s,i)=>'lane-'+id+'-'+i});
+    built.meshes.forEach(spec=>{ if(spec.kind==='ribbon'){ const rib=roadRibbon(spec); if(rib) siteRoot.add(rib); } }); }
   // city-state
   if(st>=4){ const cs=P.cityState(id,opt.guildId()); const stone=TX('stone_castle','#9a958a',3), dark=TX('stone_castle','#6e6a62',3); const h0=heightAt(A.x,A.z); const RW=72, segs=28;
     const gates=F.roads.filter(r=>r[0]===A.x&&r[1]===A.z).map(r=>Math.atan2(r[3]-r[1],r[2]-r[0]));
@@ -415,7 +439,7 @@ function buildSite(){
 /* ---------- frames ---------- */
 function setFrame(id, guild){
   clearChunks(); tlCache.clear(); while(siteRoot.children.length){ const o=siteRoot.children.pop(); o.traverse(q=>{ if(q.geometry) q.geometry.dispose(); }); }
-  F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.curve=[]; F.bridges=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null; F.settlement=null;
+  F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.curve=[]; F.bridges=[]; F.gradeLines=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[],boxes:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null; F.settlement=null;
   const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(...E)<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
   F.e0=F.stage>0?P.elevation(O[0],O[1],O[2]):0; F.d0=0; F.d0=F.stage>0?(rawH(0,0).h):0;
   const inf=F.info; F.seaY=(F.stage>0&&F.e0<400)?-F.e0:null;

@@ -22,6 +22,7 @@ const view=O.viewOffset(100000, 80000, 100010, 80005);
 ok(view.shifted && Math.abs(view.cx)<20 && Math.abs(view.cz)<20, 'the render origin pulls a far camera back near zero');
 const rel=Math.hypot(100010-100000, 80005-80000);
 ok(Math.abs(Math.hypot(view.cx, view.cz)-rel)<1e-6, 'rebasing keeps the camera-to-player distance');
+ok(O.exempt({name:'ore_copper_ore', userData:{}}), 'an ore node is never hidden by occlusion');
 
 const L=load('js/lexicon.js');
 const E=load('js/english.js');

@@ -170,8 +170,8 @@ async function browser(){
     while(g.S.hp===20 && guard++<40) g.foeAttack({m:{name:'Wolf', atk:40, dmg:'1d4', dmgBonus:3, type:'animal', ac:10, size:1}, raid:true});
     return {hp:g.S.hp, log:document.getElementById('log').textContent};
   });
-  ok(hit.hp<20 && hit.hp>=0, 'a bandit-raid wolf can hit');
-  ok(/Bandit raid/.test(hit.log) && /Wolf/.test(hit.log) && /HP/.test(hit.log), 'the hit is logged with a cause: '+hit.log);
+  ok(hit.hp<20 && hit.hp>=0, 'a beast-raid wolf can hit');
+  ok(/Beast raid/.test(hit.log) && /Wolf/.test(hit.log) && /HP/.test(hit.log), 'the hit is logged with a cause: '+hit.log);
   ok(!errs.length, 'no page errors: '+errs.join(' | '));
   await browser.close();
   console.log('tests_playtest browser: passed');

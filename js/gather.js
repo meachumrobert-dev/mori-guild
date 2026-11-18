@@ -261,12 +261,17 @@ function update(dt){ if(!X) return; const g=G(); g.t+=dt; const mode=X.mode();
   if(chips.parent!==X.cur()) X.cur().add(chips); chips.count=k; chips.instanceMatrix.needsUpdate=true; if(chips.instanceColor) chips.instanceColor.needsUpdate=true;
   for(let i=pops.length-1;i>=0;i--){ const o=pops[i]; o.t+=dt; o.s.position.y=o.y0+o.t*0.9; o.s.material.opacity=1; if(o.t>1.6){ o.par.remove(o.s); pops.splice(i,1); } }
   for(let i=carc.length-1;i>=0;i--){ const c=carc[i]; c.t+=dt; if(c.skinned) c.g.position.y-=dt*0.3; if(c.t>c.life){ if(c.inDun) c.g.visible=false; else { X.scene.remove(c.g); const ci=crit.indexOf(c.mob); if(ci>=0) crit.splice(ci,1); } carc.splice(i,1); } }
-  if(ring){ const t=X.target&&X.target(); ring.visible=!!(t&&t.gnode&&mode==='world'); if(ring.visible){ ring.position.set(t.x,t.gnode.y+0.08,t.z); ring.scale.setScalar(1+Math.sin(X.clock()*5)*0.06); } }
+  if(ring){ const t=X.target&&X.target(); ring.visible=!!(highlightFor(t)&&mode==='world'); if(ring.visible){ ring.position.set(t.x,(t.gnode.y||0)+0.08,t.z); ring.scale.setScalar(1+Math.sin(X.clock()*5)*0.06); } }
   if(beams&&beams.count){ beams.material.opacity=0.2+Math.sin(X.clock()*3)*0.08; }
 }
 /* targets offered to game.js (E / tap) */
+function highlightFor(t){
+  if(!t||!t.gnode) return false;
+  if(t.spent||t.gnode.depleted||t.gnode.ready===false) return false;
+  return true;
+}
 function targets(){ const out=[]; if(!X||X.mode()==='globe') return out; const p=X.player.pos;
-  if(X.mode()==='world') nodes.concat(extraTrees()).forEach(n=>{ const d=Math.abs(n.x-p.x)+Math.abs(n.z-p.z); if(d>6) return; const r=R[n.rid], sk=SKILL_OF[n.type], lv=skillLv(sk), rd=ready(n); if(!r) return;
+  if(X.mode()==='world') nodes.concat(extraTrees()).forEach(n=>{ const d=Math.abs(n.x-p.x)+Math.abs(n.z-p.z); if(d>6) return; const r=R[n.rid], sk=SKILL_OF[n.type], lv=skillLv(sk), rd=ready(n); if(!r||!rd) return;
     const verb={herb:'🌿 Pick',ore:'⛏ Mine',stone:'⛏ Quarry',wood:'🪓 Chop'}[n.type];
     out.push({x:n.x,z:n.z,r:2.4,gnode:n,label:!rd?'⏳ '+r.name+' (regrows in '+Math.ceil(G().dep[n.key]-G().t)+'s)':lv<n.req?'🔒 '+r.name+' — '+cap(sk)+' '+n.req+' (you '+lv+')':verb+' '+r.name+' · '+TIER[r.tier].n,act:()=>gather(n)}); });
   carc.forEach(c=>{ if(c.skinned) return; if(Math.abs(c.x-p.x)+Math.abs(c.z-p.z)>6) return; if(c.inDun!==(X.mode()==='dungeon')) return; out.push({x:c.x,z:c.z,r:2.3,label:'🔪 Skin the '+c.mob.m.name+' (Skinning '+skillLv('skinning')+')',act:()=>skin(c)}); });
@@ -326,7 +331,7 @@ function mill(inputId){ if(!window.LUMBER) return {ok:false, why:'no lumber tabl
 
 window.GATHERING={ R, TIER, REQ, RESPAWN, SKILLS, PARTS, CELL, HERBS, ORES:ORE_BIO, WOODS,
   init(o){ X=o; G(); buildMeshes(); registerWarm(); if(window.SEEDWORLD&&SEEDWORLD.setTreeGate) SEEDWORLD.setTreeGate(key=>{ const d=G().dep[key]; return !!(d>G().t); }); },
-  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, notePlace, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, mill, iconURL, skillLv, level, xpFor,
+  update, targets, gather, skin, addCarcass, clearDungeon, partsFor, where, whereNamed, notePlace, reagentMention, biomesFor, pickHerb, planRun, suggest, count, stand, spendKey, clean, weight, bagHTML, sell, mill, iconURL, skillLv, level, xpFor, highlightFor,
   spawnHostile(kind,x,z){ try{ const m=SRD.makeMonster(kind); const g=critMesh(m); g.position.set(x,X.SW.heightAt(x,z),z); g.name='raid_'+kind; g.userData.sw=true; X.scene.add(g);
       const c={key:'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), kind, m, g, x, z, hx:x, hz:z, alive:true, ag:true, cd:0.8, hit:0, wt:0, tx:x, tz:z, critter:true, room:-1, raid:true}; crit.push(c); return c; }catch(e){ return null; } },
   get nodes(){ return nodes; }, get crit(){ return crit; }, get carc(){ return carc; }, get act(){ return act; }, get run(){ return run; }, stats, ready, toolMesh,

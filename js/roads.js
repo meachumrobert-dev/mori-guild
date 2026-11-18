@@ -3,7 +3,7 @@
    Water and a steep gap become a bridge. */
 (function(root){
 'use strict';
-const MAX_SLOPE=0.12, FILL=0.2, CUT=2.2, DECK=1.5, LIFT=0.06, HALF=1.45;
+const MAX_SLOPE=0.12, FILL=0.2, CUT=2.2, DECK=1.5, LIFT=0.06, HALF=1.45, SHOULDER=HALF*2.6;
 function bend(x1, z1, x2, z2, sway){
   const mx=(x1+x2)/2, mz=(z1+z2)/2;
   const dx=x2-x1, dz=z2-z1, len=Math.hypot(dx,dz)||1;
@@ -47,10 +47,6 @@ function grade(pts, opt){
     const bridge=!!(water||ravine);
     let y=ys[i];
     if(bridge) y=Math.max(y, (water&&sea!=null?sea:Math.max(p.ground, prev))+DECK);
-    else {
-      if(y>p.ground+FILL) y=p.ground+FILL*0.5;
-      if(y<p.ground-CUT) y=p.ground-CUT;
-    }
     const cut=p.ground-y;
     const row={x:p.x, z:p.z, y, ground:p.ground, cut, bank:Math.max(0, cut), bridge};
     if(bridge) bridges.push({id:'br-'+i, x:p.x, z:p.z, y, span:step, r:7});
@@ -77,7 +73,7 @@ function ribbon(points, opt){
   for(let i=0;i<points.length;i++){
     const p=points[i], q=points[Math.min(points.length-1,i+1)], r=points[Math.max(0,i-1)];
     let tx=q.x-r.x, tz=q.z-r.z, len=Math.hypot(tx,tz)||1; tx/=len; tz/=len;
-    const y=(p.bridge?p.y:p.ground)+lift;
+    const y=p.y+lift;
     across.forEach(([s,c])=>{
       pos.push(p.x+(-tz)*half*s, y, p.z+tx*half*s);
       nor.push(0,1,0);
@@ -108,6 +104,100 @@ function sample(mesh, eye){
   }
   return out;
 }
-root.ROADS={MAX_SLOPE, FILL, CUT, LIFT, HALF, MAT, bend, at, samples, grade, lay, ribbon, sample};
+/* One ribbon per segment. A second gravel pass, a shoulder, or a verge is a stray.
+   Bridge rows are real decks, and only those rows. */
+const STRAY=/shoulder|verge|gravel|bank|slab|mtroad|cutwall|decal/i;
+function build(segs, heightAt, opt){
+  opt=opt||{};
+  const height=heightAt||function(){ return 0; };
+  const meshes=[], bridges=[];
+  (segs||[]).forEach((seg,i)=>{
+    const laid=lay(seg, Object.assign({heightAt:height}, opt));
+    const id=opt.id?opt.id(seg,i):('road-'+i);
+    const rib=ribbon(laid.points, opt);
+    meshes.push({id, kind:'ribbon', seg, points:laid.points, pos:rib.pos, nor:rib.nor, col:rib.col, idx:rib.idx, material:rib.material});
+    let run=null;
+    const flush=()=>{
+      if(!run||run.n<2){ run=null; return; }
+      const yaw=Math.atan2(run.x1-run.x0, run.z1-run.z0);
+      const b={id:'br-'+id+'-'+bridges.length, kind:'bridge', mesh:true, road:id, x:run.x, z:run.z, y:run.y, span:Math.max(6, run.n*(opt.step||24)), r:8, yaw, tech:opt.tech|0, style:bridgeStyle(opt.tech|0)};
+      bridges.push(b);
+      meshes.push(b);
+      run=null;
+    };
+    laid.points.forEach(p=>{
+      if(!p.bridge){ flush(); return; }
+      if(!run) run={x:p.x,z:p.z,y:p.y,n:1,x0:p.x,z0:p.z,x1:p.x,z1:p.z};
+      else { run.x=(run.x*run.n+p.x)/(run.n+1); run.z=(run.z*run.n+p.z)/(run.n+1); run.y=Math.max(run.y,p.y); run.n++; run.x1=p.x; run.z1=p.z; }
+    });
+    flush();
+  });
+  return {meshes, bridges};
+}
+function audit(list){
+  const seen={}, bad=[];
+  (list||[]).forEach(m=>{
+    const kind=String(m.kind||''), name=String(m.name||'');
+    if(STRAY.test(kind)||STRAY.test(name)) bad.push(m.id||kind||name);
+    if(kind==='ribbon'){
+      if(seen[m.id]) bad.push('dup:'+m.id);
+      seen[m.id]=1;
+    }
+    if(kind==='bridge'&&!m.mesh) bad.push('bridge-without-mesh:'+(m.id||''));
+  });
+  return {ok:!bad.length, ribbons:Object.keys(seen).length, bad};
+}
+function bridgeStyle(tech){ return (tech|0)>=2?'arch':'trestle'; }
+function earth(x, z, ground, lines){
+  if(!lines||!lines.length) return {h:ground, t:0, cut:0, fill:0};
+  let best=null;
+  for(let n=0;n<lines.length;n++){
+    const pts=lines[n].pts||lines[n];
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1], b=pts[i];
+      if(a.bridge||b.bridge) continue;
+      const vx=b.x-a.x, vz=b.z-a.z, L2=vx*vx+vz*vz||1;
+      let t=((x-a.x)*vx+(z-a.z)*vz)/L2; t=t<0?0:t>1?1:t;
+      const px=a.x+vx*t, pz=a.z+vz*t, d=Math.hypot(x-px, z-pz);
+      if(!best||d<best.d) best={d, y:a.y+(b.y-a.y)*t};
+    }
+  }
+  if(!best||best.d>=SHOULDER) return {h:ground, t:0, cut:0, fill:0};
+  const inner=HALF*0.9;
+  let k=1;
+  if(best.d>inner){ const u=(best.d-inner)/(SHOULDER-inner); k=1-u*u*(3-2*u); }
+  const h=ground*(1-k)+best.y*k;
+  return {h, t:k, cut:Math.max(0, ground-h), fill:Math.max(0, h-ground)};
+}
+function pushBox(pos, idx, x, y, z, sx, sy, sz){
+  const b=pos.length/3, hx=sx/2, hy=sy/2, hz=sz/2;
+  [[-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],[-hx,-hy,hz],[hx,-hy,hz],[hx,hy,hz],[-hx,hy,hz]].forEach(c=>pos.push(x+c[0], y+c[1], z+c[2]));
+  [[0,1,2,0,2,3],[4,6,5,4,7,6],[0,4,5,0,5,1],[2,6,7,2,7,3],[0,3,7,0,7,4],[1,5,6,1,6,2]].forEach(f=>f.forEach(i=>idx.push(b+i)));
+}
+function bridgeGeom(b){
+  b=b||{};
+  const style=b.style||bridgeStyle(b.tech);
+  const span=Math.max(4, b.span||8), w=b.width||HALF*2;
+  const pos=[], idx=[];
+  pushBox(pos, idx, 0, 0, 0, w, 0.16, span);
+  if(style==='arch'){
+    const rise=Math.min(2.4, span*0.28), n=6;
+    for(let i=0;i<n;i++){
+      const t=(i+0.5)/n, z=-span/2+t*span, arch=Math.sin(Math.PI*t)*rise;
+      pushBox(pos, idx, 0, -rise+arch, z, w*0.7, 0.2, span/n*0.8);
+    }
+    pushBox(pos, idx, 0, -rise*0.45, -span/2, w*0.92, rise*0.9, 0.5);
+    pushBox(pos, idx, 0, -rise*0.45, span/2, w*0.92, rise*0.9, 0.5);
+  } else {
+    for(let i=0;i<3;i++){
+      const z=-span*0.32+i*span*0.32;
+      pushBox(pos, idx, -w*0.36, -0.85, z, 0.16, 1.5, 0.16);
+      pushBox(pos, idx, w*0.36, -0.85, z, 0.16, 1.5, 0.16);
+      pushBox(pos, idx, 0, -0.16, z, w*0.86, 0.12, 0.14);
+    }
+  }
+  return {style, pos, idx, span, width:w};
+}
+root.ROADS={MAX_SLOPE, FILL, CUT, LIFT, HALF, SHOULDER, MAT, bend, at, samples, grade, lay, ribbon, sample, build, audit, earth, bridgeStyle, bridgeGeom};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.ROADS;
 })(typeof window!=='undefined'?window:globalThis);
