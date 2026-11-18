@@ -54,7 +54,7 @@ function exempt(obj){
     const u=o.userData||{};
     if(u.sw||u.noCull||u.terrain||u.ground||u.card||u.frame) return true;
     const name=o.name||'';
-    if(name.indexOf('frame_')===0||name==='gatherNodes') return true;
+    if(name.indexOf('frame_')===0||name.indexOf('ore_')===0||name==='gatherNodes') return true;
     o=o.parent; n++;
   }
   return false;

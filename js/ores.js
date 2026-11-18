@@ -125,6 +125,11 @@ function whereLine(ask, opt){
   const region=n.region||opt.region||'this region';
   return hit.name.toLowerCase()+' is '+d+' m '+dirTo(n.x-x, n.z-z)+', in '+region+'.';
 }
-root.ORES={KINDS, STARTER, kind, starter, nameOf, worldLabel, prompt, tip, gatherLine, reagents, migrate, mention, whereLine, dirTo, isGeneric};
+function swatch(id){
+  const k=kind(id);
+  return {id:id||'ore', col:k?k.col:'#7a7f86', name:'ore_'+(id||'ore'), noCull:true, visible:!!k};
+}
+function swatches(){ return Object.keys(KINDS).map(swatch); }
+root.ORES={KINDS, STARTER, kind, starter, nameOf, worldLabel, prompt, tip, gatherLine, reagents, migrate, mention, whereLine, dirTo, isGeneric, swatch, swatches};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.ORES;
 })(typeof window!=='undefined'?window:globalThis);

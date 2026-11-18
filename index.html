@@ -143,7 +143,8 @@ body.phone.wide:not(.land) .panel{left:auto;right:max(160px,env(safe-area-inset-
 body.phone.wide.land .panel{left:max(148px,calc(env(safe-area-inset-left) + 128px));right:max(200px,env(safe-area-inset-right));width:auto;bottom:calc(76px + env(safe-area-inset-bottom))}
 body.phone #talkP{font-size:16px}
 body.phone #tabletP button{min-width:48px;min-height:48px}
-body.phone #talkP h3{min-height:48px;touch-action:none;cursor:grab}
+body.phone #crRight button, body.phone #crLeft button{min-height:48px;min-width:48px}
+body.phone #crCode{min-height:48px;font-size:16px}
 body.phone #chatFold{display:inline-flex;min-width:48px;min-height:36px;align-items:center;justify-content:center}
 body.phone #chatLog{font-size:16px;line-height:1.4;min-height:96px}
 body.phone #chatIn,#chatSend{min-height:48px;font-size:16px}
@@ -217,7 +218,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <div id="bottom">
   <button id="bHero">🧬 HeroLock</button><button id="bJobs">🔨 Mori's Jobs</button><button id="bBag">🎒 Bag &amp; Painter</button>
   <button id="bTalk">💬 Talk</button><button id="bQuests">📜 Quests</button><button id="bElder">Elder</button><button id="bBoard">Board</button><button id="bRep">Rep</button><button id="bLore">🃏 Lore</button><button id="bMem">💛 Memory</button><button id="bPersona">🪪 Persona</button><button id="bBeat">🥁 Beat</button><button id="bBlue">🟦 Blue room</button>
-  <button id="bGlobe">🌍 Globe</button><button id="bTablet">🪨 Tablet</button><button id="bCull" type="button">👁 Cull</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
+  <button id="bGlobe">🌍 Globe</button><button id="bLook" type="button">☀ Look</button><button id="bTablet">🪨 Tablet</button><button id="bCull" type="button">👁 Cull</button><button id="bHelp">❔ How to play</button><button id="bReset">↺ Reset</button>
 </div>
 
 <div class="panel" id="questP"><h3>📜 Quest log <button data-close="questP">✕</button></h3><div class="body" id="questBody"></div></div>
@@ -276,7 +277,10 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <script src="js/workshop.js"></script>
 <script src="js/village.js"></script>
 <script src="js/portals.js"></script>
+<script src="js/look.js"></script>
 <script src="js/roads.js"></script>
+<script src="js/collide.js"></script>
+<script src="js/items.js"></script>
 <script src="js/trolls.js"></script>
 <script src="js/recipes.js"></script>
 <script src="js/legend.js"></script>

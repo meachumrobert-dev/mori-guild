@@ -48,5 +48,9 @@ const gone=O.whereLine('where do I find nickel', {nodes:[], x:0, z:0});
 ok(/nickel ore/.test(gone) && /mountain/.test(gone), 'a missing node still names the ore and a region: '+gone);
 ok(O.whereLine('who rules here')==null, 'a rule question is not an ore question');
 ok(O.mention('where do I find clay').id==='clay', 'clay is its own yield');
+const colors=O.swatches();
+const seen={};
+colors.forEach(s=>{ ok(s.visible&&s.noCull&&s.name.indexOf('ore_')===0&&s.col, s.id+' has a visible swatch'); seen[s.col]=1; });
+ok(Object.keys(seen).length===colors.length, 'every ore type has its own color');
 
 console.log('tests_ore: '+n+' checks passed');

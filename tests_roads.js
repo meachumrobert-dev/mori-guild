@@ -34,7 +34,7 @@ const bridge=wet.points.filter(p=>p.bridge);
 ok(bridge.length>0&&bridge.every(p=>p.y>0), 'water gets a bridge above the sea');
 const cut=ROADS.grade([{x:0,z:0,ground:0},{x:20,z:0,ground:30},{x:40,z:0,ground:0}], {step:20, maxSlope:0.1, gap:100});
 const mid=cut.points[1];
-ok(mid.y<=mid.ground+ROADS.FILL&&mid.y>=mid.ground-ROADS.CUT-0.02&&mid.cut>0, 'a steep hill is cut, not floated over or buried');
+ok(mid.cut>10&&mid.y<mid.ground&&mid.y<=2.1, 'a steep hill is cut down to the slope limit');
 
 ok(TROLLS.chance(1)<TROLLS.chance(8)&&TROLLS.chance(40)===TROLLS.CAP, 'trolls are more common in a higher region, and the chance is capped');
 ok(TROLLS.toll(4)>TROLLS.toll(1), 'the toll scales with the region');
@@ -49,8 +49,9 @@ ok(won.ok&&won.drop==='troll_blood', 'staring the troll down leaves a vial of bl
 const lost=TROLLS.resolve({choice:'fight', level:2, rng:()=>0});
 ok(!lost.ok&&lost.hurt<=6, 'a lost staring match only bonks you');
 const state={};
-const bridges=[{id:'br1', x:0, z:0, r:5}];
+const bridges=[{id:'br1', x:0, z:0, r:5, mesh:true}];
 ok(TROLLS.enter({x:1,z:1}, bridges, state)&&TROLLS.enter({x:1,z:1}, bridges, state)===null, 'one crossing rolls once');
+ok(TROLLS.enter({x:1,z:1}, [{id:'ghost', x:0, z:0, r:5}], {})===null, 'a bridge without a deck does not wake a troll');
 
 ok(RECIPES.era('gather',0)==='Herbalism'&&RECIPES.era('gather',5)==='Apothecary'&&RECIPES.era('gather',10)==='Botany', 'plant skill walks Herbalism, Apothecary, Botany');
 ok(RECIPES.era('mix',0)==='Alchemy'&&RECIPES.era('mix',5)==='Chymistry'&&RECIPES.era('mix',10)==='Chemistry', 'mixing skill walks Alchemy, Chymistry, Chemistry');
@@ -103,5 +104,28 @@ for(let i=0;i<left.length;i++) for(let k=0;k<3;k++) if(Math.abs(left[i][k]-right
 ok(same&&left.every(c=>c[3]>0), 'shoulder color matches from either camera, and the faces point up');
 const slope=ROADS.grade([{x:0,z:0,ground:1},{x:24,z:0,ground:2.2},{x:48,z:0,ground:3.4}], {step:24, gap:6});
 ok(slope.bridges.length===0, 'a gentle hill is not a bridge');
+
+const built=ROADS.build([[0,0,80,0],[0,0,0,60]], ()=>2, {sway:0, step:20, cap:6, gap:100});
+const ribbons=built.meshes.filter(m=>m.kind==='ribbon');
+ok(ribbons.length===2 && ROADS.audit(built.meshes).ok, 'each segment is one ribbon and the audit agrees');
+ok(!ROADS.audit(built.meshes.concat([{id:ribbons[0].id, kind:'ribbon'}])).ok, 'a second mesh on the same segment fails');
+ok(!ROADS.audit(built.meshes.concat([{id:'s', kind:'shoulder', name:'verge'}])).ok, 'a shoulder or verge is stray');
+ok(!ROADS.audit(built.meshes.concat([{id:'g', kind:'gravel', name:'mtRoad'}])).ok, 'the old gravel pass is stray');
+const wetRoad=ROADS.build([[0,0,90,0]], x=>x<40?-1:3, {seaY:0, step:30, gap:100, cap:4, sway:0});
+ok(wetRoad.bridges.length>0&&wetRoad.bridges.every(b=>b.mesh&&b.style==='trestle'), 'water grows a timber trestle');
+const arch=ROADS.bridgeGeom({span:12, width:3, tech:2});
+const trestle=ROADS.bridgeGeom({span:12, width:3, tech:0});
+ok(arch.style==='arch'&&trestle.style==='trestle'&&arch.idx.length>24&&trestle.idx.length>24, 'stone arches and timber trestles are both real meshes');
+const bed=[{pts:[{x:0,z:0,y:2,bridge:false},{x:30,z:0,y:2,bridge:false}]}];
+const bank=ROADS.earth(10, 0, 6, bed);
+ok(bank.cut>1&&bank.h<=2.05&&bank.h>1.5, 'a high bank is cut down toward the graded bed');
+const fill=ROADS.earth(10, 0.3, 0, bed);
+ok(fill.fill>0&&fill.h>0&&fill.h<2.2, 'a dip is filled up toward the graded bed');
+ok(ROADS.earth(10, 30, 6, bed).t===0, 'ground far from the road is left alone');
+ok(ROADS.earth(5, 0, -1, [{pts:[{x:0,z:0,y:3,bridge:true},{x:12,z:0,y:3,bridge:true}]}]).h===-1, 'a bridge span does not fill the river');
+const bumpy=ROADS.lay([0,0,80,0], {heightAt:x=>Math.sin(x*0.35)*2.5+5, step:10, sway:0, cap:12});
+let overSlope=false;
+for(let i=1;i<bumpy.points.length;i++){ const a=bumpy.points[i-1], b=bumpy.points[i]; if(a.bridge||b.bridge) continue; const run=Math.hypot(b.x-a.x,b.z-a.z)||1; if(Math.abs(b.y-a.y)/run>ROADS.MAX_SLOPE+0.03) overSlope=true; }
+ok(!overSlope, 'the graded bed stays inside the slope limit');
 
 console.log('tests_roads: '+n+' checks passed');
