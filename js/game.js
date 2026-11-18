@@ -151,6 +151,19 @@ const COMP_P=[
   Object.assign(HERO.params('halfling'),{name:'Kit', hair:'#ff4d6d', top:'#facc15', armor:'#6b4a2b', boots:'#3a2412', hairStyle:'wolfcut', corset:true})];
 const comps=COMP_P.map((p,i)=>({name:p.name, model:makeChar(p), pos:new T.Vector3(player.pos.x-1-i,0,player.pos.z+1+i), hp:20, max:20, slot:i}));
 comps.forEach(c=>scene.add(c.model));
+(function markTrades(){
+  if(!window.TRADES||!window.T) return;
+  const lay=TRADES.layout({x:0,z:0,wind:'east',stream:{x:14,z:6}}, 16);
+  const col={tannery:'#6b4a32', stables:'#8a7048', barracks:'#5c6470', granary:'#c2a36b', mill:'#7f8c4a', washhouse:'#d7d2c8', bakery:'#e0b060', tavern:'#8d4a3a'};
+  lay.forEach(b=>{
+    const h=b.stilts?2.4:1.6;
+    const m=new T.Mesh(new T.BoxGeometry(b.place==='stream'?2.4:1.8, h, 1.6), new T.MeshStandardMaterial({color:col[b.id]||'#888'}));
+    m.position.set(b.x, h/2+(b.stilts?0.6:0), b.z); m.castShadow=true; m.name='trade-'+b.id; scene.add(m);
+    if(b.stilts){ const leg=new T.Mesh(new T.BoxGeometry(0.2,0.8,0.2), new T.MeshStandardMaterial({color:'#4a3424'})); leg.position.set(b.x,0.4,b.z); scene.add(leg); }
+    const c=document.createElement('canvas'); c.width=256; c.height=64; const g=c.getContext('2d'); g.fillStyle='#1a140c'; g.fillRect(0,0,256,64); g.fillStyle='#f4efe4'; g.font='28px sans-serif'; g.fillText(b.id, 12, 42);
+    const tex=new T.CanvasTexture(c); const s=new T.Sprite(new T.SpriteMaterial({map:tex, transparent:true, depthWrite:false})); s.position.set(b.x, h+1.2, b.z); s.scale.set(3.2,0.8,1); scene.add(s);
+  });
+})();
 const trail=[]; // breadcrumb trail for follow-in-line
 const delroth={model:makeChar(HERO.PRESETS.delroth), line:0, t:0};
 { const sw=tav.userData.stageWorld; delroth.model.position.set(sw[0],1.1,sw[1]); delroth.model.rotation.y=Math.PI/2; scene.add(delroth.model); }
@@ -988,6 +1001,10 @@ function updatePlayer(dt){
   const moving=Math.hypot(dx,dz)>0.05;
   if(moving){ player.sit=null; const nx=player.pos.x+dx*sp*dt, nz=player.pos.z+dz*sp*dt; if(mode==='world'){ player.pos.x=nx; player.pos.z=nz; collide(player.pos,0.45); } else dungeonMove(player.pos,nx,nz,0.4); player.face=Math.atan2(dx,dz); }
   else if(player.sit){ player.pos.x=player.sit.x; player.pos.z=player.sit.z; }
+  if(moving&&window.MILL&&mode==='world'){
+    const mill=window.TRADES?TRADES.site('mill',{x:0,z:0,wind:'east',stream:{x:14,z:6}}):{x:14,z:6};
+    if(Math.hypot(player.pos.x-mill.x, player.pos.z-mill.z)<6){ if(!S.mill) S.mill={endurance:0}; MILL.walk(S.mill, 1); }
+  }
   player.pos.y=mode==='world'?groundY(player.pos.x,player.pos.z):0;
   // tavern floor/stage
   if(mode==='world'&&tav.userData.inside(player.pos.x,player.pos.z)) player.pos.y=Math.max(player.pos.y, tav.userData.floorY||0.15);

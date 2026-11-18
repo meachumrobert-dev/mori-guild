@@ -104,7 +104,23 @@ function onDay(save, id, hasHall){
       root.TRADES.produce(staffed.assignment, t);
       t.services=staffed.open;
       if(staffed.missing.length) notes.push('no '+staffed.missing[0]);
+      if(!staffed.open.smith) notes.push('no repairs');
     }
+  }
+  if(root.HAMLETS){
+    if(!save.village.hamlets) save.village.hamlets=[root.HAMLETS.fresh('Briar','human')];
+    save.village.hamlets.forEach(h=>{
+      const y=root.HAMLETS.year(h);
+      t.items=t.items||{};
+      t.items.grain=(t.items.grain|0)+y.tithe;
+      notes.push('tithe '+y.tithe);
+    });
+  }
+  if(root.RUMOR&&t.gossip){
+    const tell={id:'wash', text:'news from the washhouse', weight:1};
+    const step=root.RUMOR.carry(tell, Math.min(30, day*4), day);
+    t.rumor=step.faded?'':step.text;
+    if(step.faded) notes.push('rumor faded');
   }
   T().apply(t);
   ensureContract(save, id, hasHall);
@@ -143,7 +159,10 @@ function elderHTML(save, id, hasHall){
     const folk=save.village&&save.village.folk&&save.village.folk[String(id)];
     const staffed=root.TRADES.staff(folk||[], (t.pop|0)||(folk?folk.length:10));
     const gap=staffed.missing.slice(0,4);
-    h+='<div class="sec">Town work</div><p class="small">'+(gap.length?('Nobody covers '+gap.join(', ')+', so those services are not in this town.'):'Every trade this town can ask for has someone.')+'</p>';
+    const lay=root.TRADES.layout({x:0,z:0,wind:'east',stream:{x:14,z:6}}, Math.max(16, (folk&&folk.length)||(t.pop|0)||16));
+    const places=lay.map(b=>b.id+' '+b.place).join(', ');
+    const rung=root.LADDER?root.LADDER.next(0):null;
+    h+='<div class="sec">Town work</div><p class="small">Tier '+staffed.tier.name+'. '+(gap.length?('Nobody covers '+gap.join(', ')+'. No smith means no repairs.'):'Every trade this town can ask for has someone.')+'</p><p class="small">'+places+'.</p>'+(rung?'<p class="small">Next station: '+rung.name+' at skill '+rung.skill+'.</p>':'');
   }
   h+='<div class="sec">Sell into the stockpile</div>';
   const reag=save.reag||{};

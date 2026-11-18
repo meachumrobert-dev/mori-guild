@@ -20,6 +20,18 @@ function carry(rumor, miles, days){
   return {faded:false, text, miles, days, legend, bends};
 }
 function mori(){ return {omniscient:true}; }
-root.RUMOR={witness, knows, carry, mori, star:['mundane','connected']};
+function along(rumor, stops){
+  let cur={id:rumor.id, text:rumor.text, weight:rumor.weight||1};
+  const heard=[];
+  (stops||[]).forEach(stop=>{
+    const step=carry(cur, stop.miles|0, stop.days|0);
+    cur.text=step.text; cur.faded=step.faded; cur.bends=step.bends;
+    if(step.faded) return;
+    if(stop.who) witness(stop.who, {id:rumor.id, text:step.text, weight:rumor.weight||1, day:stop.days|0});
+    heard.push({miles:stop.miles|0, text:step.text});
+  });
+  return {faded:!!cur.faded, text:cur.faded?'':cur.text, heard, bends:cur.bends||0};
+}
+root.RUMOR={witness, knows, carry, along, mori, star:['mundane','connected']};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.RUMOR;
 })(typeof window!=='undefined'?window:globalThis);

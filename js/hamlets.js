@@ -4,6 +4,10 @@
 'use strict';
 const SPAN={human:80, dwarf:400, elf:1000, halfling:150, orc:70};
 const FLOOR=8;
+function record(race, age, year){
+  const span=SPAN[race]||SPAN.human;
+  return {race:race||'human', age:age|0, born:(year|0)-(age|0), alive:(age|0)<=span, span};
+}
 function fresh(name, race){
   const people=[];
   for(let i=0;i<FLOOR;i++) people.push({race:race||'human', age:16+i, alive:true, job:i%2?'farmer':'miller'});
@@ -30,6 +34,6 @@ function year(hamlet){
   hamlet.year=(hamlet.year|0)+1;
   return {alive:live.length, born, tithe:due, floor:FLOOR};
 }
-root.HAMLETS={SPAN, FLOOR, fresh, year, star:['mundane','connected']};
+root.HAMLETS={SPAN, FLOOR, record, fresh, year, star:['mundane','connected']};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.HAMLETS;
 })(typeof window!=='undefined'?window:globalThis);

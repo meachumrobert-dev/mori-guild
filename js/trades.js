@@ -81,6 +81,38 @@ function produce(assignment, town){
 function service(staffed, job){
   return !!(staffed.open&&staffed.open[job]);
 }
-root.TRADES={JOBS, PORTS, TIERS, PLACE, tierFor, jobsFor, site, staff, produce, service, star:['mundane','connected']};
+const BUILDINGS=[
+  {id:'washhouse', place:'square', job:'washerwoman', tier:0},
+  {id:'granary', place:'stilts', job:'farmer', tier:1},
+  {id:'mill', place:'stream', job:'miller', tier:1},
+  {id:'bakery', place:'square', job:'baker', tier:1},
+  {id:'tavern', place:'square', job:'innkeeper', tier:1},
+  {id:'tannery', place:'downwind', job:'tanner', tier:2},
+  {id:'stables', place:'gate', job:'stablehand', tier:2},
+  {id:'barracks', place:'gate', job:'guard', tier:2}
+];
+function layout(town, pop){
+  const tier=tierFor(pop).id;
+  return BUILDINGS.filter(b=>b.tier<=tier).map(b=>{
+    const at=site(b.id==='stables'?'stable':b.id, town);
+    return {id:b.id, job:b.job, place:b.place, tier:b.tier, x:at.x, z:at.z, stilts:!!at.stilts};
+  });
+}
+function ports(pop){
+  if(tierFor(pop).id<3) return [];
+  return PORTS.map((id,i)=>({id, x:8+((i%4)*6), z:42+Math.floor(i/4)*5, tier:3}));
+}
+function chain(start){
+  const goods=root.GOODS&&root.GOODS.ITEMS;
+  const seen={}, out=[];
+  function walk(id){
+    if(!goods||!goods[id]||seen[id]) return;
+    seen[id]=1; out.push(id);
+    (goods[id].uses||[]).forEach(walk);
+  }
+  walk(start);
+  return out;
+}
+root.TRADES={JOBS, PORTS, TIERS, PLACE, BUILDINGS, tierFor, jobsFor, site, staff, produce, service, layout, ports, chain, star:['mundane','connected']};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.TRADES;
 })(typeof window!=='undefined'?window:globalThis);

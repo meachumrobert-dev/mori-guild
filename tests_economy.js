@@ -68,5 +68,18 @@ ok(KNOW.teach(sage, pupil, 'ruin').ok&&pupil.known.indexOf('ruin')>=0, 'a lesson
 KNOW.hoard(sage,'ruin');
 ok(!KNOW.teach(sage, {}, 'ruin').ok&&!KNOW.sell(sage, {}, 'ruin', 20).ok, 'a hoarded method is not taught or sold');
 
-if(made) ok(true, 'production ran');
+ok(audit.single.length===0, 'every good has two uses or an end: '+audit.single.join(','));
+const grain=TRADES.chain('grain');
+const hide=TRADES.chain('hide');
+ok(grain.indexOf('flour')>=0&&grain.indexOf('loaf')>=0&&grain.indexOf('tavern_meal')>=0, 'grain runs mill, bakery, tavern');
+ok(hide.indexOf('leather')>=0&&hide.indexOf('armor')>=0, 'a hide becomes leather, then armor');
+const lay=TRADES.layout({x:0,z:0,wind:'east',stream:{x:14,z:6}}, 20);
+ok(lay.some(b=>b.id==='tannery'&&b.place==='downwind')&&lay.some(b=>b.id==='granary'&&b.stilts)&&lay.some(b=>b.id==='mill'&&b.place==='stream'), 'buildings sit where the wind, the gate, and the stream say');
+ok(TRADES.ports(10).length===0&&TRADES.ports(30).length===TRADES.PORTS.length, 'a port arrives with the port tier');
+ok(MILL.shaft('capstan').power===MILL.shaft('horse').power, 'a capstan turns like a horse mill');
+const legs={endurance:0}; MILL.walk(legs, 10); ok(legs.endurance>0, 'walking the treadwheel builds endurance');
+ok(HAMLETS.record('dwarf', 20, 100).span===400&&HAMLETS.record('elf', 20, 100).born===80, 'a person keeps race, age, and span');
+const road=RUMOR.along({id:'wolf', text:'wolves at the gate', weight:6}, [{miles:10, days:2, who:{id:'a'}},{miles:30, days:8, who:{id:'b'}}]);
+ok(!road.faded&&road.heard.length===2&&road.bends>=1, 'a legend walks the road and bends');
+ok(!RUMOR.knows({seen:[]}, 'wolf'), 'a person who was not there does not know it');
 console.log('tests_economy: '+n+' checks passed');
