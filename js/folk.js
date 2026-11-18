@@ -33,7 +33,9 @@ function roster(town, pop){
   const people=[];
   for(let i=0;i<n;i++){
     const career=CAREERS[i%CAREERS.length];
-    people.push({id:String(town)+'-'+i, town:String(town), career, name:nameAt(town, i), lod:'abstract'});
+    const race=['human','human','dwarf','elf','halfling'][i%5];
+    const span=race==='dwarf'?400:race==='elf'?1000:race==='halfling'?150:80;
+    people.push({id:String(town)+'-'+i, town:String(town), career, name:nameAt(town, i), lod:'abstract', race, age:16+(i*3)%40, span});
   }
   return people;
 }

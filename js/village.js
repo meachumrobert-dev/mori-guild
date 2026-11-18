@@ -92,16 +92,38 @@ function onDay(save, id, hasHall){
   save.village.day=(save.village.day||0)+1;
   const day=save.village.day;
   const t=town(save, id);
+  const notes=[];
   W().list().forEach(r=>{ if(!r.cap) S().produce(t, r); });
   if(root.FOLK){
     const key=String(id);
     if(!save.village.folk) save.village.folk={};
     if(!save.village.folk[key]) save.village.folk[key]=root.FOLK.roster(key, t.pop||36);
     root.FOLK.tick(save.village.folk[key], t, (day*8)%24, false);
+    if(root.TRADES){
+      const staffed=root.TRADES.staff(save.village.folk[key], t.pop||save.village.folk[key].length);
+      root.TRADES.produce(staffed.assignment, t);
+      t.services=staffed.open;
+      if(staffed.missing.length) notes.push('no '+staffed.missing[0]);
+      if(!staffed.open.smith) notes.push('no repairs');
+    }
+  }
+  if(root.HAMLETS){
+    if(!save.village.hamlets) save.village.hamlets=[root.HAMLETS.fresh('Briar','human')];
+    save.village.hamlets.forEach(h=>{
+      const y=root.HAMLETS.year(h);
+      t.items=t.items||{};
+      t.items.grain=(t.items.grain|0)+y.tithe;
+      notes.push('tithe '+y.tithe);
+    });
+  }
+  if(root.RUMOR&&t.gossip){
+    const tell={id:'wash', text:'news from the washhouse', weight:1};
+    const step=root.RUMOR.carry(tell, Math.min(30, day*4), day);
+    t.rumor=step.faded?'':step.text;
+    if(step.faded) notes.push('rumor faded');
   }
   T().apply(t);
   ensureContract(save, id, hasHall);
-  const notes=[];
   save.village.contracts.forEach(c=>{
     if(c.town!==String(id)) return;
     const run=C().runCaravan(t, c, day);
@@ -133,6 +155,15 @@ function elderHTML(save, id, hasHall){
   if(rumor) h+='<p>'+rumor+'</p>';
   if(adv) h+='<p>'+adv.text+'</p>';
   h+='<div class="sec">What next</div><ul>'+steps.map(s=>'<li>'+s+'</li>').join('')+'</ul>';
+  if(root.TRADES){
+    const folk=save.village&&save.village.folk&&save.village.folk[String(id)];
+    const staffed=root.TRADES.staff(folk||[], (t.pop|0)||(folk?folk.length:10));
+    const gap=staffed.missing.slice(0,4);
+    const lay=root.TRADES.layout({x:0,z:0,wind:'east',stream:{x:14,z:6}}, Math.max(16, (folk&&folk.length)||(t.pop|0)||16));
+    const places=lay.map(b=>b.id+' '+b.place).join(', ');
+    const rung=root.LADDER?root.LADDER.next(0):null;
+    h+='<div class="sec">Town work</div><p class="small">Tier '+staffed.tier.name+'. '+(gap.length?('Nobody covers '+gap.join(', ')+'. No smith means no repairs.'):'Every trade this town can ask for has someone.')+'</p><p class="small">'+places+'.</p>'+(rung?'<p class="small">Next station: '+rung.name+' at skill '+rung.skill+'.</p>':'');
+  }
   h+='<div class="sec">Sell into the stockpile</div>';
   const reag=save.reag||{};
   const ids=Object.keys(reag).filter(k=>reag[k]>0);
