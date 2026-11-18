@@ -136,6 +136,41 @@ Races, the shape of a d20 attack, armor class, treasure bands, and the idea of c
 
 `js/srd.js` and `js/craft.js` hold the SRD-derived numbers: attack rolls, AC, item prices, feats, and spell names used as crafting ingredients. Races on the HeroLock screen match the SRD list plus Robert's catfolk and undead catfolk. Monster names used in raids and the undercroft follow the SRD list where they overlap (dire rat, skeleton, zombie, gray ooze). Product identity stays out: no book prose, no setting names from those books. `docs/skill-tree.md` says which checks are still dice.
 
+## Dying Light — parkour, momentum, and a skill you earn by moving
+
+**Read**
+
+- GDC Vault, Bartosz Kulon, Techland, "Parkour: How to Improve Freedom of Movement in First-Person Games in 20 Simple Steps": https://gdcvault.com/play/1025208/Parkour-How-to-Improve-Freedom
+- GDC speaker notes on ledge tests and jump timing: https://gdconf.com/article/speaker-q-a-dying-light-dev-bartosz-kulon-on-making-first-person-movement-feel-good/
+- PlayStation Blog, Techland on natural movement (climb, jump, slide, wall-run chosen from the ground in front of you): https://blog.playstation.com/archive/2014/12/04/challenges-implementing-natural-movement-dying-light
+- Dying Light Outpost, dev blog on reading ledges instead of hand-placed grab points: https://outpost.dyinglightgame.com/news/dev-blog-11
+- Dying Light Wiki, Agility skills (what use unlocks, and that freerunning itself grants the points): https://dyinglight.wiki.gg/wiki/Agility_Skills
+- Dying Light Wiki, Vault: https://dyinglight.wiki.gg/wiki/Vault
+- Dying Light Wiki, Slide: https://dyinglight.wiki.gg/wiki/Slide
+- Dying Light Wiki, Tic Tac (run up a wall): https://dyinglight.wiki.gg/wiki/Tic_Tac
+- Dying Light 2 Wiki, Parkour skills (stamina gates the longer climbs and wall runs; proficiency comes from doing the moves): https://dyinglight.wiki.gg/wiki/Skills_(Dying_Light_2_Stay_Human)
+
+**Take**
+
+Movement is a chain, not a teleport. Speed you already have carries into the next action. A ledge grab catches a lip you would otherwise miss. A vault clears a low obstacle or a body without stopping. A climb is hands on a face, spending stamina as you go up. A wall run is a short vertical or diagonal sprint, then a push off. A slide keeps momentum through a low gap and is a place to catch your breath. Stamina is the gate: when it is gone, the chain ends and you hang, drop, or walk. The skill grows because you did the moves. Early moves are grab, climb, and slide. Later moves are vault, longer runs, and wall run. Nothing here is a combat trick copied from their trees.
+
+**Mori**
+
+Design only. Parkour is already on the backlog. No grab, vault, climb, wall run, or slide is in the game yet.
+
+When it is built, it should be a small module with a stable interface, in the same spirit as `js/skills.js`:
+
+- One use-based skill, `parkour`, on the gathering or combat branch. Level is still the square root of uses. Doing a grab, vault, climb, wall run, or slide is what adds a use. Buying the skill with a point is not the path.
+- Stamina is a short bar that refills when you are on the ground and walking. Climb and wall run spend it. Slide spends less, or none, so it can be the breath in the chain. At empty stamina the chain stops. You do not fall through the world.
+- Momentum is horizontal speed kept across a vault, a slide, and the first moment of a climb. Stopping, or missing a grab, sheds it.
+- The ground decides the move from what is in front of the body: a lip in reach is a grab, a low block is a vault, a tall face is a climb, a wall while you still have speed and stamina is a wall run, a crouch at speed is a slide. Hand-placed grab points are a last resort for a gate or a roof that must be reliable.
+- The camera stays the third-person orbit Mori already uses. Phone keeps the stick and the existing action buttons. Jump and crouch choose the move from context. No new cluster of buttons.
+- Town walls, palisades, and roofs from `js/townplan.js` and `js/houses.js` are the first surfaces. Wilderness cliffs can wait.
+
+**Still to do**
+
+Leave it unbuilt until the backlog item is picked up. Do not add ray-cast climb code, animation sets, or a stamina HUD in this pass.
+
 ## Checklist for this upgrade
 
 Use this list when reviewing the upgrade. A row is done when the Mori column exists and the "do not" column was respected.
@@ -150,3 +185,4 @@ Use this list when reviewing the upgrade. A row is done when the Mori column exi
 | Light No Fire | 1,536 regions, 3,185 km, saves survive, a new seed keeps a backup. |
 | Roblox | Phone layout and a Low graphics default. The ground is not a stack of slabs. |
 | D&D 3.5 SRD | Open rules only, notice kept in `CREDITS.md`. No closed-book text. |
+| Dying Light | Design only. Ledge grab, vault, climb, wall run, slide, momentum, and a stamina-gated parkour skill that grows by use. No movement code in this pass. The work stays on the backlog. |
