@@ -35,7 +35,20 @@ The SRD-derived mechanics in `js/srd.js` and `js/craft.js` are Open Game Content
 ## Mori's lexicon
 `js/lexicon.js` is original wording for this game. The common vocabulary in `data/dict.json` is a subset of WordNet 3.1 (Princeton University, 2011), built by `tools/build-dict.js` from the semantic-concordance tag counts. License: permission to use, copy, modify, and distribute for any purpose without fee, with the copyright notice kept. The notice is in `data/WORDNET-LICENSE.txt`. WordNet 3.1 Copyright 2011 by Princeton University. All rights reserved. The function words added so sentences stay readable are original and not from WordNet.
 
-## Grounded world pass
+## HeroLock look
+
+The Black Desert Beauty Album (https://www.naeu.playblackdesert.com/en-US/BeautyAlbum/Home/Rank) was used as a style reference for the character creator only: sliders, hair, skin, presets, and a gallery of faces you can share. No images, meshes, or other assets were downloaded or copied from that site.
+
+When HeroLock grows real materials, the sources to use are freely licensed, with credit kept in this file:
+
+- Poly Haven (https://polyhaven.com/) — CC0 models and textures.
+- Kenney (https://kenney.nl/) — CC0 game assets.
+- Quaternius (https://quaternius.com/) — CC0 models.
+- ambientCG (https://ambientcg.com/) — CC0 textures.
+- three.js examples and docs (https://threejs.org/) — MIT, same license as the bundled r170 build.
+
+None of those files are bundled yet. The faces in the game are still procedural primitives in `js/hero.js`. The share gallery in `js/gallery.js` stores text codes only. The roadmap is `docs/herolock.md`. The full design checklist, one section per inspiration, is `docs/inspirations.md`.
+
 Rules behind `js/grounded.js` are original code. The references were read for general ideas only; no textbook text, figures, Bannerlord data, or real-place names are included. Full URLs and licenses are in `GROUNDING.md`.
 - OpenStax, *Algebra and Trigonometry 2e* (Jay Abramson and co-authors, Rice University), CC BY-NC-SA 4.0. Roof pitch uses tan and cos.
 - Dorrell, Henderson, and co-authors, *Introduction to Human Geography* 2e, University System of Georgia, CC BY 4.0. Clustered, linear, and dispersed hamlets.
