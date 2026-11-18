@@ -16,6 +16,7 @@ ok(SHEETS.shouldHold(true)&&!SHEETS.shouldHold(null), 'an open sheet holds the f
 const play=SHEETS.showIds('play');
 ok(play.indexOf('bBag')>=0&&play.indexOf('bLore')<0, 'the phone play tab does not show the book');
 ok(SHEETS.showIds('book').indexOf('bLore')>=0, 'lore lives on the book tab');
+ok(SHEETS.showIds('world').indexOf('bNewWorld')>=0&&SHEETS.showIds('play').indexOf('bNewWorld')<0, 'New World sits on the World tab');
 
 const gate={x:0,z:20};
 const walker=RAID.place(gate, 18, 0, 1);

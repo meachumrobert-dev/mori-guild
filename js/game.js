@@ -808,7 +808,7 @@ function bindVillage(root){
   root.querySelectorAll('[data-distill]').forEach(b=>b.onclick=()=>{ if(!window.RECIPES) return; const app=(root.querySelector('#alembic')||{}).value||'distillery'; const r=RECIPES.distill(S.reag, app); log(r.ok?'Distilled '+r.qty+' '+r.name+'.':r.why); save(); renderVillage('elderP'); });
   root.querySelectorAll('[data-taste]').forEach(b=>b.onclick=()=>{ const r=RECIPES.taste(S, b.dataset.taste); log(r.ok?(r.learned?'You taste '+r.learned+'. ('+r.era+')':'You already know what this '+r.era.toLowerCase()+' can tell you.'):r.why); save(); renderVillage('elderP'); });
 }
-$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
+$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; if($('bNewWorld')) $('bNewWorld').onclick=()=>{ document.body.classList.remove('menu'); const typed=$('seedIn')&&$('seedIn').value; newWorld(String(typed||S.seed||'').trim()); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
 function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
 let tabletDraft=null, tabletResult=null;
 function tabletSlots(){ const h=hereCity(); return {ruler:h.ruler||'The Guild Charter (Seedkeeper Mori)', name:h.name||'Guildhold', motto:h.motto||'', gov:h.govName||'Guild Charter', race:h.race||'', region:h.region||'', arts:''}; }
@@ -901,8 +901,9 @@ function codexHTML(){ if(!S.codex) S.codex=CODEX.fresh(); const cats=Object.keys
 function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) return; const phone=document.body.classList.contains('phone')&&document.body.classList.contains('menu'); box.hidden=!phone; if(!phone){ document.querySelectorAll('#bottom button').forEach(b=>{ b.style.display=''; }); return; }
   const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ box.dataset.grp=b.dataset.grp; paintSheetTabs(); }); }
 if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
-if(QS.get('menu')==='1'){ document.body.classList.add('menu'); paintSheetTabs(); }
+if(QS.get('menu')==='1'){ document.body.classList.add('menu'); const box=$('sheetTabs'); if(box&&QS.get('tab')) box.dataset.grp=QS.get('tab'); paintSheetTabs(); setTimeout(()=>{ const m=$('modal'); if(m) m.classList.remove('open'); }, 600); }
 if(QS.get('elder')==='1') setTimeout(()=>{ if(typeof openVillage==='function') openVillage('elderP'); }, 400);
+if(QS.get('globe')==='1') setTimeout(()=>{ if(typeof openGlobe==='function') openGlobe(); const m=$('modal'); if(m) m.classList.remove('open'); }, 700);
 function showPiece(part){
   if(!window.SNAP) return;
   const at=SNAP.snap(part.x||0, part.z||0);
@@ -1371,7 +1372,8 @@ function noteCivic(via, hint){ if(!window.GROUNDED||via==='level') return null; 
 function cityModal(id){ if(!SW.globe.G.mesh) SW.globe.build(); else if(globeDirty){ SW.globe.refresh(); globeDirty=false; } const cs=PL.cityState(id,guildId); const rels=cityRels(id);
   modal('<h3>⚑ '+cs.name+'</h3><div class="row"><span class="chip" style="background:'+cs.banner[0]+';color:'+cs.banner[1]+'">banner</span><b>'+cs.govName+'</b></div><div>Ruled by <b>'+cs.ruler+'</b></div><div class="quote">“'+cs.motto+'”</div><div class="small">Power '+cs.power+'/10 · '+PL.regionInfo(id).name+'</div>'+civicHTML(id)+'<div class="sec">Relations</div>'+(rels.length?rels.map(r=>'<div>'+r.w+' <b>'+r.name+'</b></div>').join(''):'<div class="small">No neighbours close enough to care yet.</div>')+CLAN.cityHTML(id)); }
 function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.globe.G; const sel=G.sel; const n=programmedCount(); const cities=(G.cities||[]); const ex=Object.keys(WD().exp).length;
-  let h='<div class="sec">World Seed</div><div class="row"><input id="seedIn" type="text" value="'+String(S.seed).replace(/"/g,'')+'" style="flex:1;min-width:0"><button id="seedApply">Apply</button><button id="seedRand">🎲 Randomize</button></div>';
+  let h='<div class="sec">World Seed</div><div class="row"><button id="seedNew" class="pri">New World</button><button id="seedRevert">Revert world</button></div>';
+  h+='<div class="row"><input id="seedIn" type="text" value="'+String(S.seed).replace(/"/g,'')+'" style="flex:1;min-width:0"><button id="seedApply">Apply</button><button id="seedRand">🎲 Randomize</button></div>';
   h+='<div class="small">Same seed → same planet, every time. Radius <b>3,185 km</b> (¼ of Earth\'s surface area). '+PL.COUNT+' regions of ~'+Math.round(PL.RADIUS_KM*Math.PI/2/PL.N)+' km. Only the seed and Mori\'s progress are saved; terrain, biomes and names are recomputed.</div>';
   h+='<div class="row small"><span class="chip">🌱 '+n+'/'+PL.COUNT+' programmed ('+(n/PL.COUNT*100).toFixed(1)+'%)</span><span class="chip">▦ '+(PL.COUNT-n)+' void</span><span class="chip">⚑ '+cities.length+' city-states</span><span class="chip">👣 '+ex+' explored</span></div>';
   if(sel>=0){ const inf=PL.regionInfo(sel), st=stageOf(sel); const own=G.own&&G.own.get(sel);
@@ -1384,7 +1386,6 @@ function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.glo
   if(window.IDLEBUILD) h+=IDLEBUILD.settingsHTML();
   if(window.POWER) h+=POWER.settingsHTML();
   if(window.PHONE) h+=PHONE.settingsHTML(document.body.classList.contains('phone'));
-  h+='<div class="row"><button id="seedNew">New World</button><button id="seedRevert">Revert world</button></div>';
   h+='<div class="row"><button id="seedHome">🏛 Return to the Guild</button><button id="seedClose">✕ Close globe</button></div>';
   b.innerHTML=h;
   if(window.IDLEBUILD) IDLEBUILD.bindSettings(b);

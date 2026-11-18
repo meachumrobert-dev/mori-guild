@@ -3,7 +3,7 @@
 'use strict';
 const GROUPS=[
   {id:'play', label:'Play', ids:['bHero','bTalk','bBag','bJobs']},
-  {id:'world', label:'World', ids:['bQuests','bElder','bBoard','bRep','bGlobe','bTablet']},
+  {id:'world', label:'World', ids:['bQuests','bElder','bBoard','bRep','bGlobe','bNewWorld','bTablet']},
   {id:'book', label:'Book', ids:['bLore','bMem','bPersona','bBeat','bHelp']}
 ];
 function openOne(current, id){
