@@ -88,4 +88,20 @@ ok(LEGEND.onKill(save, RECIPES.dragon(), 'guild', 1).spawn===false, 'a dragon ki
 ok(LEGEND.prices().dragon_scale>=200&&LEGEND.prices().troll_blood>=40, 'monster parts are worth a lot in town');
 ok(save.gold===11, 'the legend does not spend the purse');
 
+const road=ROADS.lay([0,0,80,0], {heightAt:()=>2, step:20, sway:12, cap:6});
+const rib=ROADS.ribbon(road.points);
+ok(rib.material.transparent===false&&rib.material.depthWrite&&rib.material.side==='front'&&rib.material.polygonOffset, 'the ribbon is opaque, writes depth, faces front, and offsets');
+let liftOk=true, wall=0;
+for(let i=0;i<rib.nor.length;i+=3) if(rib.nor[i+1]<0.9) wall++;
+road.points.forEach((p,i)=>{ if(p.bridge) return; const stride=rib.pos.length/road.points.length; const y=rib.pos[i*stride+1]; if(Math.abs(y-(p.ground+ROADS.LIFT))>0.02) liftOk=false; });
+ok(liftOk&&wall===0, 'the ribbon sits a small lift above the ground and has no cut walls');
+const left=ROADS.sample(rib,{x:-30,y:12,z:20});
+const right=ROADS.sample(rib,{x:30,y:12,z:20});
+ok(left.length>0&&left.length===right.length, 'both sides of the road see the same faces');
+let same=true;
+for(let i=0;i<left.length;i++) for(let k=0;k<3;k++) if(Math.abs(left[i][k]-right[i][k])>1e-6) same=false;
+ok(same&&left.every(c=>c[3]>0), 'shoulder color matches from either camera, and the faces point up');
+const slope=ROADS.grade([{x:0,z:0,ground:1},{x:24,z:0,ground:2.2},{x:48,z:0,ground:3.4}], {step:24, gap:6});
+ok(slope.bridges.length===0, 'a gentle hill is not a bridge');
+
 console.log('tests_roads: '+n+' checks passed');

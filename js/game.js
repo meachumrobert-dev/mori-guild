@@ -914,8 +914,8 @@ function regionAct(t){ if(t.kind==='globe') openGlobe(); else if(t.kind==='porta
 function ridePortal(id){ const fade=$('roadFade'); if(fade) fade.classList.add('on'); const wait=window.PORTALS?Math.min(400, PORTALS.FADE_MS):300;
   setTimeout(()=>{ travelTo(id); save(); setTimeout(()=>{ if(fade) fade.classList.remove('on'); }, window.PORTALS?PORTALS.FADE_MS:700); }, wait); }
 function takeHive(t){ if(!S.reag) S.reag={}; S.reag.royal_honey=(S.reag.royal_honey||0)+1; log('The hive gives up a jar of Royal Ironwood Bee Honey.'); t.kind='spent'; save(); }
-function sitOn(t){ player.sit={x:t.x,z:t.z,name:t.name}; player.pos.x=t.x; player.pos.z=t.z; log(t.name+'. '+(t.flavor||'')); }
-function worldTargets(){ const furn=window.FURNITURE?FURNITURE.targets().map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(resourceTargets(),NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
+function sitOn(t){ if(!t.sit){ log((t.verb||'Use')+': '+t.name+'. '+(t.flavor||'')); return; } player.sit={x:t.x,z:t.z,name:t.name}; player.pos.x=t.x; player.pos.z=t.z; log(t.name+'. '+(t.flavor||'')); }
+function worldTargets(){ const furn=(window.FURNITURE&&atGuild())?FURNITURE.targets('guild').map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(resourceTargets(),NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
 function resourceTargets(){ return nodes.filter(n=>n.rid&&window.ORES&&ORES.kind(n.rid)).map(n=>({x:n.x,z:n.z,r:2.6,label:n.ready?ORES.prompt(n.rid):'⏳ '+ORES.nameOf(n.rid),tip:ORES.tip(n.rid),act:()=>gatherNode(n)})); }
 function gatherNode(n){ if(!n||!n.ready) return; const q=YIELD()+(n.type==='ore'&&S.outpost.goldPick?1:0); n.ready=false; n.crown.visible=false; n.stump.visible=true; if(n.label) n.label.visible=false; n.regrow=40;
   if(n.rid&&window.ORES&&ORES.kind(n.rid)){ if(!S.reag) S.reag={}; S.reag[n.rid]=(S.reag[n.rid]||0)+q; log(ORES.gatherLine(n.rid, q, n.place)); return; }
@@ -1181,7 +1181,7 @@ function tfFinishCur(){ if(curJob&&curJob.kind==='tf'&&curJob.plan){ TF.finishNo
 function travelTo(id, quiet){ if(mode==='dungeon'||crOpen) return; id=+id; tfFinishCur(); S.at=id===guildId?null:id; refreshFrameAt();
   if(id===guildId) LORE.unlockFlag('visit_guild'); else if(window.CLAN&&CLAN.site){ if(CLAN.site.kind==='clan') LORE.unlockFlag('visit_clan'); if(CLAN.site.kind==='haven'){ LORE.unlockFlag('visit_haven'); if(CLAN.pct&&CLAN.pct()>0) LORE.unlockFlag('see_blight'); } }
   const L=atGuild()?{x:W.STATIONS.hall.x,z:W.STATIONS.hall.z+8}:SW.landing(); player.pos.set(L.x,0,L.z); comps.forEach((c,i)=>c.pos.set(L.x-1-i,0,L.z+1+i)); trail.length=0; camYaw=0;
-  WD().exp[id]=1; setTownVisible(atGuild()); globeDirty=true; const inf=PL.regionInfo(id); const st=stageOf(id);
+  WD().exp[id]=1; setTownVisible(atGuild()); if(window.FURNITURE) FURNITURE.show(atGuild()); globeDirty=true; const inf=PL.regionInfo(id); const st=stageOf(id);
   if(!quiet) log(atGuild()?'🌱 Back at the Guild — the planet\'s starting point.':'🗿 You step out of the waystone into '+inf.name+' · '+(st?PL.BIOMES[inf.biome].name+' · '+STAGES[st]:'unprogrammed void')+'.');
   closeGlobe(); save(); GATHERING.reset&&GATHERING.reset();
   if(!quiet&&!atGuild()) setTimeout(()=>{ if(curRegion()!==id) return; if(CLAN.isSister(id)) addChat('mo','this is havenwall. the purple stuff is the coilblight. '+CLAN.pct()+'% of the ground. press E on it to purge, or ask me to cleanse!'); else if(CLAN.isClan(id)) addChat('mo','gravenmoor! the demon clan lives here. legion is the smoke. be polite to the death of earth if you see it.'); else { const g=GATHERING.suggest(); if(g) addChat('mo',g); } },2600); }

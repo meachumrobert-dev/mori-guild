@@ -9,7 +9,7 @@ const MTon=!!(window.MT&&MT.on), TX=(kind,hex,scale,o)=>MTon?MT.M(kind,hex,scale
 const smooth=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
 const CH=64; // chunk size in metres
 let opt=null, scene=null, root=null, chunkRoot=null, siteRoot=null, water=null;
-const F={ id:-1, guild:false, O:[0,0,1], E:[1,0,0], Nn:[0,1,0], e0:0, stage:0, seaY:null, A:{x:0,z:0}, L:{x:0,z:8}, roads:[], flats:[], targets:[], colliders:{segs:[],circles:[]}, info:null };
+const F={ id:-1, guild:false, O:[0,0,1], E:[1,0,0], Nn:[0,1,0], e0:0, stage:0, seaY:null, A:{x:0,z:0}, L:{x:0,z:8}, roads:[], curve:[], bridges:[], flats:[], targets:[], colliders:{segs:[],circles:[]}, info:null };
 const corner=new Map(); // "ix,iz" -> {e, rough, col:[r,g,b], reg}
 const chunks=new Map(); // key -> {lod, obj, reg}
 const settling=[]; // chunks fading or geomorphing toward their final surface
@@ -101,10 +101,10 @@ function seam(ix,iz,seg,side,neighborSeg){ const n=seg+1, seams={e:0,w:0,n:0,s:0
 function slopeGap(x,z,dx,dz){ const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L; const e=2;
   const h0=heightAt(x-dx*e,z-dz*e), h1=heightAt(x,z), h2=heightAt(x+dx*e,z+dz*e); return Math.abs((h2-h1)-(h1-h0))/e; }
 function study(id, stageFn){ if(stageFn||!opt) opt={stage:stageFn||(()=>1), mobile:false, guildId:()=>id, explored:()=>false, v2height:null, tf:null};
-  clearField(); corner.clear(); F.id=id; F.guild=false; F.stage=stageOf(id)||1; F.roads=[]; F.flats=[]; F.seaY=null; F.A={x:0,z:0}; F.L={x:0,z:8};
+  clearField(); corner.clear(); F.id=id; F.guild=false; F.stage=stageOf(id)||1; F.roads=[]; F.curve=[]; F.bridges=[]; F.flats=[]; F.seaY=null; F.A={x:0,z:0}; F.L={x:0,z:8};
   const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(E[0],E[1],E[2])<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
   F.e0=P.elevation(O[0],O[1],O[2]); F.d0=0; F.d0=rawH(0,0).h; }
-function roadDist(x,z){ let best=1e9; for(const s of F.roads){ const [x1,z1,x2,z2]=s; const vx=x2-x1, vz=z2-z1, L=vx*vx+vz*vz; let t=((x-x1)*vx+(z-z1)*vz)/L; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(x-(x1+vx*t),z-(z1+vz*t)); if(d<best) best=d; } return best; }
+function roadDist(x,z){ const segs=(F.curve&&F.curve.length)?F.curve:F.roads; let best=1e9; for(const s of segs){ const [x1,z1,x2,z2]=s; const vx=x2-x1, vz=z2-z1, L=vx*vx+vz*vz; let t=((x-x1)*vx+(z-z1)*vz)/L; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(x-(x1+vx*t),z-(z1+vz*t)); if(d<best) best=d; } return best; }
 
 /* ---------- chunks ---------- */
 let matLand, matVoid, matVoidLine, voidPlaneG, voidLineG, treeG, trunkG, treeM, trunkM, CROWNS;
@@ -208,7 +208,6 @@ function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
     let r=gnd.r, gg=gnd.g, bb=gnd.b;
     const nz=(Math.sin(x*0.37)*Math.cos(z*0.29)+Math.sin(x*0.11+z*0.07))*0.03; r+=nz; gg+=nz; bb+=nz*0.5;
     if(F.guild&&Math.hypot(x,z)<120){ const t=1-smooth(60,120,Math.hypot(x,z)); r=r*(1-t)+0.33*t; gg=gg*(1-t)+0.5*t; bb=bb*(1-t)+0.24*t; }
-    if(F.roads.length){ const rd=roadDist(x,z); if(rd<3.2){ const t=1-smooth(1.8,3.2,rd); r=r*(1-t)+0.5*t; gg=gg*(1-t)+0.4*t; bb=bb*(1-t)+0.27*t; } }
     bcol[k]=r; bcol[k+1]=gg; bcol[k+2]=bb; finishColor(col,k,bcol,dd,h); }
   if(!geo){ geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(pos,3)); geo.setAttribute('color',new T.BufferAttribute(col,3)); geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); geo.setIndex(new T.BufferAttribute(idxFor(seg),1)); geo.userData.seg=seg; }
   else { geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; }
@@ -302,20 +301,24 @@ function layRoadWorks(id, A){
   if(!window.ROADS||!window.PORTALS) return;
   const nbs=P.neighbors(id).filter(n=>P.regionInfo(n).isLand).map(n=>({id:n, name:P.regionInfo(n).name, land:true}));
   const stones=PORTALS.ends(id, Math.min(F.roads.length, 3), nbs, P.seed);
-  F.bridges=[];
-  const dirt=new T.MeshLambertMaterial({color:'#8a7352'});
+  F.bridges=[]; F.curve=[];
   F.roads.slice(0,3).forEach((seg,i)=>{
-    const laid=ROADS.lay(seg, {heightAt, seaY:F.seaY, step:28, sway:16+((id+i)%5)*3, cap:22});
+    const laid=ROADS.lay(seg, {heightAt, seaY:F.seaY, step:8, sway:16+((id+i)%5)*3, cap:120, gap:6});
+    const rib=roadRibbon(laid.points); if(rib) siteRoot.add(rib);
+    for(let k=1;k<laid.points.length;k++){ const a=laid.points[k-1], b=laid.points[k]; F.curve.push([a.x,a.z,b.x,b.z]); }
+    let run=null;
+    const flush=()=>{ if(!run||run.n<2){ run=null; return; }
+      const b={id:'br-'+id+'-'+i+'-'+F.bridges.length, x:run.x, z:run.z, y:run.y, span:Math.max(6, run.n*8), r:8};
+      F.bridges.push(b);
+      const deck=new T.Mesh(new T.BoxGeometry(2.2,0.16,b.span), new T.MeshLambertMaterial({color:'#6a4a2a', polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2, depthWrite:true, transparent:false, side:T.FrontSide}));
+      deck.position.set(b.x, b.y+ROADS.LIFT, b.z); deck.name='bridge'; deck.userData.terrain=true; siteRoot.add(deck);
+      run=null; };
     laid.points.forEach(p=>{
-      const bed=mk(new T.BoxGeometry(3.2,0.28,3.2), dirt, p.x, p.y+0.1, p.z); bed.userData.terrain=true;
-      if(p.bank>0.4){ mk(new T.BoxGeometry(0.6, Math.min(1.6, p.bank), 2.4), TX('stone_rubble','#9a907c',1), p.x+1.6, p.y+p.bank*0.5, p.z); }
+      if(!p.bridge){ flush(); return; }
+      if(!run) run={x:p.x,z:p.z,y:p.y,n:1};
+      else { run.x=(run.x*run.n+p.x)/(run.n+1); run.z=(run.z*run.n+p.z)/(run.n+1); run.y=Math.max(run.y,p.y); run.n++; }
     });
-    laid.bridges.forEach(b=>{
-      b.id='br-'+id+'-'+i+'-'+b.id; F.bridges.push(b);
-      const deck=mk(new T.BoxGeometry(3.4,0.35,b.span||6), TX('wood_planks','#6a4a2a',1), b.x, b.y, b.z); deck.name='bridge';
-      mk(new T.BoxGeometry(0.4,1.4,0.4), TX('wood_planks','#4a3020',1), b.x-1.6, b.y+0.6, b.z);
-      mk(new T.BoxGeometry(0.4,1.4,0.4), TX('wood_planks','#4a3020',1), b.x+1.6, b.y+0.6, b.z);
-    });
+    flush();
     const dest=stones.filter(s=>s.road===i)[0];
     if(!dest) return;
     [[seg[0],seg[1]],[seg[2],seg[3]]].forEach(([x,z])=>{
@@ -332,6 +335,17 @@ function layRoadWorks(id, A){
     if(hive){ mk(new T.BoxGeometry(0.8,0.6,0.8), M('#e2b84a'), hive.x, heightAt(hive.x,hive.z)+1.2, hive.z); F.targets.push({x:hive.x, z:hive.z, r:2.4, label:'🐝 '+hive.name, kind:'hive', rid:'royal_honey'}); }
   }
 }
+function roadRibbon(points){
+  if(!points||points.length<2) return null;
+  const spec=ROADS.ribbon(points);
+  const g=new T.BufferGeometry();
+  g.setAttribute('position', new T.Float32BufferAttribute(spec.pos,3));
+  g.setAttribute('normal', new T.Float32BufferAttribute(spec.nor,3));
+  g.setAttribute('color', new T.Float32BufferAttribute(spec.col,3));
+  g.setIndex(spec.idx);
+  const mat=new T.MeshLambertMaterial({vertexColors:true, side:T.FrontSide, depthWrite:true, transparent:false, polygonOffset:true, polygonOffsetFactor:spec.material.polygonOffsetFactor, polygonOffsetUnits:spec.material.polygonOffsetUnits});
+  const mesh=new T.Mesh(g, mat); mesh.name='roadRibbon'; mesh.userData.terrain=true; mesh.receiveShadow=true; return mesh;
+}
 function buildSite(){
   const id=F.id, st=F.stage, inf=F.info; const rnd=P.rngFor(P.seed,'site',id); const A=F.A;
   // the waystone you arrive at
@@ -345,7 +359,6 @@ function buildSite(){
     if(!dirs.length) dirs.push([1,0],[-0.3,-0.95]);
     dirs.forEach(([dx,dz])=>F.roads.push([A.x,A.z,A.x+dx*900,A.z+dz*900]));
     if(F.guild) F.roads.push([0,22,A.x,A.z]);
-    F.roads.forEach(([x1,z1,x2,z2])=>{ const L=Math.hypot(x2-x1,z2-z1); if(L<80) return; for(let s=90;s<L;s+=120){ const x=x1+(x2-x1)*s/L+3, z=z1+(z2-z1)*s/L; mk(new T.BoxGeometry(0.6,1.2,0.4),TX('stone_rubble','#8d8a80',1),x,heightAt(x,z)+0.5,z); } });
     layRoadWorks(id, A);
     }
   // barrow dungeon
@@ -402,7 +415,7 @@ function buildSite(){
 /* ---------- frames ---------- */
 function setFrame(id, guild){
   clearChunks(); tlCache.clear(); while(siteRoot.children.length){ const o=siteRoot.children.pop(); o.traverse(q=>{ if(q.geometry) q.geometry.dispose(); }); }
-  F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.bridges=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null; F.settlement=null;
+  F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.curve=[]; F.bridges=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null; F.settlement=null;
   const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(...E)<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
   F.e0=F.stage>0?P.elevation(O[0],O[1],O[2]):0; F.d0=0; F.d0=F.stage>0?(rawH(0,0).h):0;
   const inf=F.info; F.seaY=(F.stage>0&&F.e0<400)?-F.e0:null;
