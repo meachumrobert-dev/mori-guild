@@ -132,6 +132,12 @@ body.phone #ctx #bInteract{display:flex;opacity:.45}
 body.phone #ctx #bInteract.hot{opacity:1}
 #roadFade{position:fixed;inset:0;background:#0e0b16;opacity:0;pointer-events:none;transition:opacity .35s;z-index:40}
 #roadFade.on{opacity:1}
+#crewStance{position:fixed;z-index:7;right:8px;bottom:78px;display:flex;gap:4px}
+#crewStance button{min-height:36px;padding:4px 8px;font-size:12px;opacity:.72}
+#crewStance button.on{opacity:1;outline:2px solid #a3ff12}
+body.phone #crewStance{right:max(8px,env(safe-area-inset-right));bottom:calc(var(--chrome-bottom, 212px) + 8px)}
+body.phone #crewStance button{min-width:48px;min-height:40px}
+#phoneMenu{display:none}
 body.phone #phoneMenu{display:flex;position:fixed;z-index:8;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:48px;min-height:48px;width:48px;height:48px;padding:0;align-items:center;justify-content:center;font-size:22px}
 body.phone #bottom{display:none}
 body.phone.menu #bottom{display:flex;flex-wrap:wrap;top:calc(var(--hud-top, 96px) + 8px);left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:auto;max-height:calc(100dvh - var(--hud-top, 96px) - var(--chrome-bottom, 212px));overflow:auto;background:rgba(14,11,22,.94);border:1px solid rgba(163,255,18,.3);border-radius:14px;z-index:8;padding:8px}
@@ -210,6 +216,7 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <div id="joy"><i></i></div>
 <div id="dpad" aria-label="Move"><button type="button" data-pad="n" aria-label="Forward">▲</button><button type="button" data-pad="w" aria-label="Left">◀</button><button type="button" data-pad="e" aria-label="Right">▶</button><button type="button" data-pad="s" aria-label="Back">▼</button></div>
 <button type="button" id="padMode" aria-label="Switch between joystick and D-pad">✥</button>
+<div id="crewStance" role="group" aria-label="Crew stance"><button type="button" data-stance="aggressive">Agg</button><button type="button" data-stance="defensive">Def</button><button type="button" data-stance="passive">Pass</button></div>
 <button type="button" id="phoneMenu" aria-label="Open the menu">☰</button>
 <div id="ctx"><button id="bInteract">E · Interact</button><button id="bBandage" title="Bandage. Heal check, then healing over time.">Bandage</button><button id="bSalve" title="Salve. Heals over time. No roll.">Salve</button><button id="bPotion" title="Potion">🧪 Potion</button><button id="bAttack">⚔ Attack</button></div>
 <div id="hotbar" aria-label="Action bar">

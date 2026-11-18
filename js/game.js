@@ -149,7 +149,8 @@ const COMP_P=[
   Object.assign(HERO.params('elf'),{name:'Lyra', hair:'#d6c7ff', top:'#8b5cf6', armor:'#ff8af0', boots:'#2a1e36', hairStyle:'long', height:0.92}),
   Object.assign(HERO.params('halforc'),{name:'Juno', hair:'#1a1a1f', top:'#22d3ee', armor:'#1a1a1f', boots:'#121212', pauldron:true, bootStyle:'stomper', height:0.95}),
   Object.assign(HERO.params('halfling'),{name:'Kit', hair:'#ff4d6d', top:'#facc15', armor:'#6b4a2b', boots:'#3a2412', hairStyle:'wolfcut', corset:true})];
-const comps=COMP_P.map((p,i)=>({name:p.name, model:makeChar(p), pos:new T.Vector3(player.pos.x-1-i,0,player.pos.z+1+i), hp:20, max:20, slot:i}));
+const roles=['support','tank','ranged'];
+const comps=COMP_P.map((p,i)=>({name:p.name, role:roles[i], model:makeChar(p), pos:new T.Vector3(player.pos.x-1.6+i*1.6,0,player.pos.z+1.8), hp:20, max:20, slot:i, cd:0, healCd:0, buffCd:0, spellCd:0}));
 comps.forEach(c=>scene.add(c.model));
 (function markTrades(){
   if(!window.TRADES||!window.T) return;
@@ -1040,18 +1041,85 @@ function updatePlayer(dt){
   player.model.position.copy(player.pos); if(player.sit) player.model.position.y-=0.42; player.model.rotation.y=lerpAngle(player.model.rotation.y,player.face,Math.min(1,dt*12));
   HERO.animate(player.model, clockT, moving?Math.min(1.4,len*(1+stats().speed)):0);
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
-  // breadcrumbs for the companions
-  const last=trail[0]; if(!last||Math.hypot(last.x-player.pos.x,last.z-player.pos.z)>0.35){ trail.unshift({x:player.pos.x,z:player.pos.z}); if(trail.length>60) trail.pop(); }
-  comps.forEach((c,i)=>{ let crumb=trail[Math.min(trail.length-1,(i+1)*5)]||player.pos;
-    if(window.CREW){ const pool=mode==='dungeon'?mobs:(window.GATHERING?GATHERING.crit:[]); const foes=(pool||[]).filter(m=>m.alive&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14).map(m=>({id:m.key||m.kind,x:m.x,z:m.z})); const ord=CREW.order(c,{foes, player:{x:player.pos.x,z:player.pos.z}, mode:c.guard?'guard':''}); if(ord.act!=='follow') crumb={x:ord.x,z:ord.z}; }
-    const ddx=crumb.x-c.pos.x, ddz=crumb.z-c.pos.z, d=Math.hypot(ddx,ddz); let mv=0;
-    if(d>0.15){ const s=Math.min(d, sp*1.05*dt*(d>3?1.6:1)); c.pos.x+=ddx/d*s; c.pos.z+=ddz/d*s; c.model.rotation.y=lerpAngle(c.model.rotation.y,Math.atan2(ddx,ddz),Math.min(1,dt*10)); mv=1; }
-    if(d>14){ c.pos.x=crumb.x; c.pos.z=crumb.z; }
-    c.pos.y=mode==='world'?groundY(c.pos.x,c.pos.z):0; c.model.position.copy(c.pos); HERO.animate(c.model, clockT+i, mv);
-    if(c.atkT>0){ c.atkT-=dt; c.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(c.atkT/0.35*Math.PI); } });
+  // companions walk their own slots and swing on their own timers
+  const crewPack=comps.map(c=>({name:c.name, role:c.role, x:c.pos.x, z:c.pos.z, hp:c.hp, max:c.max, cd:c.cd||0, healCd:c.healCd||0, buffCd:c.buffCd||0, spellCd:c.spellCd||0, bless:c.bless||0, target:c.target||null}));
+  const you={id:'you', x:player.pos.x, z:player.pos.z, hp:S.hp, max:stats().maxHp};
+  let crewEvents=[];
+  if(window.CREW){
+    const pool=mode==='dungeon'?mobs:(window.GATHERING?GATHERING.crit:[]);
+    const foes=[];
+    (pool||[]).forEach(m=>{
+      if(!m.alive||!m.m||m.m.hp<=0) return;
+      if(!m._cid) m._cid=m.key||('mob'+(m.idx!=null?m.idx:m.kind)+':'+Math.round(m.x)+':'+Math.round(m.z));
+      foes.push({id:m._cid, x:m.x, z:m.z, hp:m.m.hp, max:m.m.max||m.m.hp, threat:m.threat||0, ref:m});
+    });
+    const blockers=[];
+    if(mode==='world'&&SW.F&&SW.F.colliders){
+      (SW.F.colliders.circles||[]).forEach(b=>{ if(Math.hypot(b.x-player.pos.x,b.z-player.pos.z)<22) blockers.push({x:b.x,z:b.z,r:b.r||1}); });
+      (SW.F.colliders.boxes||[]).forEach(b=>{ if(Math.hypot(b.x-player.pos.x,b.z-player.pos.z)<22) blockers.push({x:b.x,z:b.z,hw:b.hw!=null?b.hw:b.w/2,hd:b.hd!=null?b.hd:b.d/2}); });
+    }
+    const sim=CREW.tick(crewPack, {dt, stance:S.crewStance||'aggressive', player:you, foes, allies:[you].concat(crewPack), blockers});
+    crewEvents=sim.events||[];
+    if(you.hp!==S.hp) S.hp=Math.max(0, Math.min(stats().maxHp, you.hp));
+    foes.forEach(f=>{
+      if(!f.ref||!f.ref.alive) return;
+      if(f.hp<f.ref.m.hp){ f.ref.m.hp=f.hp; f.ref.threat=f.threat||0; f.ref.hit=0.25; if(f.ref.m.hp<=0) killMob(f.ref, mode==='dungeon'); }
+    });
+  }
+  crewPack.forEach((p,i)=>{
+    const c=comps[i];
+    const dx=p.x-c.pos.x, dz=p.z-c.pos.z, d=Math.hypot(dx,dz);
+    c.pos.x=p.x; c.pos.z=p.z; c.hp=p.hp; c.max=p.max; c.cd=p.cd; c.healCd=p.healCd; c.buffCd=p.buffCd; c.spellCd=p.spellCd; c.bless=p.bless; c.target=p.target;
+    if(mode==='dungeon'&&dun&&dun.walk&&!dun.walk(c.pos.x, c.pos.z)){ c.pos.x-=dx; c.pos.z-=dz; }
+    c.pos.y=mode==='world'?groundY(c.pos.x,c.pos.z):0;
+    c.model.position.copy(c.pos);
+    if(d>0.02) c.model.rotation.y=lerpAngle(c.model.rotation.y, Math.atan2(dx,dz), Math.min(1,dt*10));
+    HERO.animate(c.model, clockT+i, d>0.02?1:0);
+    if(c.atkT>0){ c.atkT-=dt; const arm=c.model.userData.hero&&c.model.userData.hero.limbs&&c.model.userData.hero.limbs.armR; if(arm) arm.rotation.x=-2.2*Math.sin(c.atkT/0.35*Math.PI); }
+  });
+  crewEvents.forEach(ev=>{
+    if(ev.type==='hit'){ const who=comps.find(c=>c.name===ev.mate); if(who) who.atkT=0.35; crewMark(ev); }
+    else if(ev.type==='heal'){ crewMark(ev); if(ev.who!=='you'){ const a=comps.find(c=>c.name===ev.who); if(a) a.hp=Math.max(a.hp, (crewPack.find(p=>p.name===ev.who)||a).hp); } }
+    else if(ev.type==='bless'){ S.buffs.bless=Math.max(S.buffs.bless||0, 6); crewMark(ev); }
+  });
 }
 
-/* ---------- dungeon ---------- */
+const crewFx=[];
+function crewMark(ev){
+  const sc=mode==='dungeon'&&dun?dun.scene:scene;
+  if(!sc||!window.T) return;
+  if(ev.kind==='shot'||ev.kind==='missile'){
+    const bolt=new T.Mesh(new T.SphereGeometry(ev.kind==='missile'?0.14:0.08, 6, 6), new T.MeshBasicMaterial({color:ev.kind==='missile'?'#9ecbff':'#f0e2b0'}));
+    bolt.position.set(ev.from.x, 1.2, ev.from.z); sc.add(bolt);
+    crewFx.push({kind:'bolt', m:bolt, sc, from:ev.from, to:ev.to, t:0, life:0.32});
+  }
+  if(ev.type==='hit'||ev.type==='heal'||ev.type==='bless'){
+    const c=document.createElement('canvas'); c.width=160; c.height=64; const g=c.getContext('2d');
+    g.font='bold 40px sans-serif'; g.fillStyle=ev.type==='heal'?'#8dff9a':ev.type==='bless'?'#ffe08a':'#ffd0a0';
+    g.fillText(ev.type==='heal'?'+'+ev.n:ev.type==='bless'?'Bless':String(ev.dmg), 8, 46);
+    const tex=new T.CanvasTexture(c); const s=new T.Sprite(new T.SpriteMaterial({map:tex, transparent:true, depthWrite:false}));
+    const at=ev.at||ev.to||{x:player.pos.x,z:player.pos.z};
+    s.position.set(at.x, 1.9, at.z); s.scale.set(1.2, 0.5, 1); sc.add(s);
+    crewFx.push({kind:'num', m:s, sc, t:0, life:0.7});
+  }
+}
+function crewFxTick(dt){
+  for(let i=crewFx.length-1;i>=0;i--){
+    const f=crewFx[i]; f.t+=dt;
+    if(f.kind==='bolt'){ const k=Math.min(1, f.t/f.life); f.m.position.set(f.from.x+(f.to.x-f.from.x)*k, 1.2, f.from.z+(f.to.z-f.from.z)*k); }
+    else f.m.position.y+=dt*0.7;
+    if(f.t>=f.life){ f.sc.remove(f.m); if(f.m.geometry) f.m.geometry.dispose(); if(f.m.material){ if(f.m.material.map) f.m.material.map.dispose(); f.m.material.dispose(); } crewFx.splice(i,1); }
+  }
+}
+function paintStance(){
+  const box=$('crewStance'); if(!box) return;
+  const cur=S.crewStance||'aggressive';
+  box.querySelectorAll('[data-stance]').forEach(b=>b.classList.toggle('on', b.dataset.stance===cur));
+}
+function setStance(name){
+  if(!window.CREW||CREW.STANCES.indexOf(name)<0) return;
+  S.crewStance=name; paintStance(); save();
+}
 let dun=null, mobs=[], chests=[], dunLvl=1;
 let dunRet=null, dunName='The Undercroft';
 function enterDungeon(o){ o=o&&o.ret?o:null;
@@ -1102,15 +1170,15 @@ function castSpellFx(target){ if(!(window.MT&&MT.on)) return; const w=S.inv.find
   const to=target?new T.Vector3(target.x,(target.g?target.g.position.y:0)+0.9,target.z):new T.Vector3(player.pos.x+f*7,player.pos.y+1.1,player.pos.z+c*7); MT.cast(sc,from,to,MT.kindFor(w.spells)); }
 function attack(){ if(crOpen||atkCd>0) return;
   if(window.SHEETS&&SHEETS.onAttack(sheetOpen()).close) closeSheets();
-  atkCd=0.55; player.atkT=0.35; comps.forEach((c,i)=>setTimeout(()=>{ c.atkT=0.35; },80+i*90));
+  atkCd=0.55; player.atkT=0.35;
   const st=stats(); let best=null, bd=1e9; (mode==='dungeon'?mobs:GATHERING.crit).forEach(m=>{ if(!m.alive) return; const d=Math.hypot(m.x-player.pos.x,m.z-player.pos.z)-m.m.size*0.5; if(d<st.reach&&d<bd){ bd=d; best=m; } });
   if(!best){ castSpellFx(null); return; } player.face=Math.atan2(best.x-player.pos.x,best.z-player.pos.z); castSpellFx(best);
-  const fl=comps.length?2:0, r=SRD.d20(), tot=r+st.atk+fl; const hit=r===20||(r!==1&&tot>=best.m.ac); const ab=st.atk+(fl?'+2 flank':'');
-  if(!hit){ showRoll(r,'d20 '+r+' + '+ab+' = '+tot+' vs AC '+best.m.ac+' — <b>miss</b>'+(r===1?' (natural 1)':''),'miss'); return; }
-  let dmg=SRD.dice('1d8')+st.dmg; if(r===20) dmg*=2; const friends=comps.length; dmg+=friends;
-  best.m.hp-=dmg; best.hit=0.25;
+  const r=SRD.d20(), tot=r+st.atk; const hit=r===20||(r!==1&&tot>=best.m.ac);
+  if(!hit){ showRoll(r,'d20 '+r+' + '+st.atk+' = '+tot+' vs AC '+best.m.ac+' — <b>miss</b>'+(r===1?' (natural 1)':''),'miss'); return; }
+  let dmg=SRD.dice('1d8')+st.dmg; if(r===20) dmg*=2;
+  best.m.hp-=dmg; best.hit=0.25; best.threat=(best.threat||0)+1;
   if(window.STATIONS){ const w=S.inv.find(i=>i.equipped&&i.kind==='weapon'); if(w) STATIONS.wearItem(w,1); }
-  showRoll(r,'d20 '+r+' + '+ab+' = '+tot+' vs AC '+best.m.ac+' — <b>'+(r===20?'CRITICAL! ':'hit')+'</b> '+dmg+' dmg (Lyra, Juno & Kit copy: +'+friends+')',r===20?'crit':'');
+  showRoll(r,'d20 '+r+' + '+st.atk+' = '+tot+' vs AC '+best.m.ac+' — <b>'+(r===20?'CRITICAL! ':'hit')+'</b> '+dmg+' dmg',r===20?'crit':'');
   if(best.m.hp<=0) killMob(best, mode==='dungeon');
 }
 function killMob(best, inDun){ best.alive=false; GATHERING.addCarcass(best, inDun); const g=SRD.rnd(6)*best.m.xp; S.gold+=g;
@@ -1385,6 +1453,7 @@ function tickMarch(){
 }
 let phaseN=0;
 function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phaseN):{world:true,audio:true,build:true,chunk:4,bgMs:1.5}}; if(window.TWOSPEED&&heavy.plan.bgMs!=null) TWOSPEED.budget=heavy.plan.bgMs;
+  crewFxTick(dt);
   mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // flame frames stay on the render clock; new audio buffers do not
   clockT+=dt; updateCrafting(dt); for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
   if(logT>0){ logT-=dt; if(logT<=0) $('log').style.opacity=0.35; } if(rollT>0){ rollT-=dt; if(rollT<=0) $('roll').className=''; }
@@ -1457,6 +1526,15 @@ HERBAL.init({ S:()=>S, save, log, showRoll, stats });
 STATIONS.init({ S:()=>S, save, log });
 DREADLORD.init({ scene, delroth, log, showRoll });
 LORE.unlockFlag('visit_guild', true); LORE.unlock('npc_mori', true);
+if($('crewStance')) $('crewStance').querySelectorAll('[data-stance]').forEach(b=>b.onclick=()=>setStance(b.dataset.stance));
+paintStance();
+if(QS.get('fight')==='1'&&window.GATHERING&&GATHERING.spawnHostile){
+  S.crewStance='aggressive'; paintStance();
+  const w=GATHERING.spawnHostile('wolf', (S.player.x||0)+1.4, (S.player.z||8)-5.5);
+  if(w&&w.m){ w.m.hp=80; w.m.max=80; }
+  const shut=()=>{ const m=$('modal'); if(m) m.classList.remove('open'); };
+  setTimeout(shut, 400); setTimeout(shut, 1200);
+}
 TREASURY.init({ S:()=>S, log, mode:()=>mode });
 IDLEBUILD.init({
   S:()=>S, save, log, modal, addChat, player, PL, WD:()=>WD(), STAGES, PERF,
