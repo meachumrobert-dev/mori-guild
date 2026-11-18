@@ -873,6 +873,7 @@ function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) re
   const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ box.dataset.grp=b.dataset.grp; paintSheetTabs(); }); }
 if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
 if(QS.get('menu')==='1'){ document.body.classList.add('menu'); paintSheetTabs(); }
+if(QS.get('elder')==='1') setTimeout(()=>{ if(typeof openVillage==='function') openVillage('elderP'); }, 400);
 addEventListener('resize', refreshPhone); refreshPhone();
 document.addEventListener('gesturestart', e=>{ if(document.body.classList.contains('phone')) e.preventDefault(); });
 document.addEventListener('touchmove', e=>{ if(!document.body.classList.contains('phone')) return; if(e.touches.length>1 && !e.target.closest('#chatLog,.panel .body,.modal .card,#bottom')) e.preventDefault(); }, {passive:false});
