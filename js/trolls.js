@@ -13,7 +13,7 @@ function meet(rng, level){
 }
 function enter(pos, bridges, state){
   state=state||{};
-  const on=(bridges||[]).find(b=>Math.hypot(pos.x-b.x, pos.z-b.z)<(b.r||7));
+  const on=(bridges||[]).find(b=>b&&b.mesh&&Math.hypot(pos.x-b.x, pos.z-b.z)<(b.r||7));
   if(!on){ state.bridge=null; return null; }
   if(state.bridge===on.id) return null;
   state.bridge=on.id;

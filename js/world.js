@@ -228,16 +228,15 @@ function resources(scene, colliders){
     const sp=window.LUMBER?LUMBER.pick('forest', woodR):'oak';
     const rid=window.LUMBER&&LUMBER.species(sp)?LUMBER.species(sp).log:'oak_log';
     nodes.push({type:'timber', rid, x, z, g, crown, stump, ready:true, regrow:0, place:'Old Wood'}); colliders.circles.push({x,z,r:0.5}); }
-  const rockM=M('#7a7f86'), oreM=M('#2dd4bf',{e:'#0f766e',ei:0.6}), goldM=M('#facc15',{e:'#a16207',ei:0.5});
   for(let i=0;i<16;i++){ const x=-30-R()*32, z=-26+R()*52; const y=height(x,z);
     const rid=window.ORES?ORES.starter(i):'bog_iron_ore';
-    const spec=window.ORES?ORES.kind(rid):null;
-    const fleck=spec?M(spec.col,{e:spec.col,ei:0.45}):oreM;
-    const g=new T.Group(); g.position.set(x,y,z); g.name='ore_'+rid; scene.add(g); const crown=new T.Group(); g.add(crown);
-    const r=mesh(new T.DodecahedronGeometry(1.1,0),rockM,0,0.6,0,crown); r.scale.set(1.2,0.8,1); r.rotation.y=R()*6;
-    for(let k=0;k<4;k++){ const sh=mesh(new T.OctahedronGeometry(0.22),k%2?fleck:goldM,(R()-0.5)*1.4,0.9+R()*0.3,(R()-0.5)*1.2,crown); sh.rotation.set(R(),R(),R()); }
-    const stump=mesh(new T.DodecahedronGeometry(0.5,0),rockM,0,0.2,0,g); stump.visible=false;
-    const label=oreSprite(window.ORES?ORES.worldLabel(rid):'Bog Iron Ore', spec&&spec.col);
+    const sw=window.ORES?ORES.swatch(rid):{col:'#6b4428', name:'ore_'+rid, noCull:true, visible:true};
+    const body=M(sw.col,{e:sw.col,ei:0.55});
+    const g=new T.Group(); g.position.set(x,y,z); g.name=sw.name; g.userData.noCull=true; g.visible=true; scene.add(g); const crown=new T.Group(); g.add(crown);
+    const r=mesh(new T.DodecahedronGeometry(1.25,0),body,0,0.85,0,crown); r.scale.set(1.25,0.9,1.1); r.rotation.y=R()*6; r.name=sw.name;
+    for(let k=0;k<3;k++){ const sh=mesh(new T.OctahedronGeometry(0.28),body,(R()-0.5)*1.3,1.05+R()*0.35,(R()-0.5)*1.1,crown); sh.rotation.set(R(),R(),R()); sh.name=sw.name; }
+    const stump=mesh(new T.DodecahedronGeometry(0.5,0),body,0,0.2,0,g); stump.visible=false;
+    const label=oreSprite(window.ORES?ORES.worldLabel(rid):'Bog Iron Ore', sw.col);
     g.add(label);
     g.userData.tip=window.ORES?ORES.tip(rid):'Bog Iron Ore.';
     nodes.push({type:'ore', rid, x, z, g, crown, stump, label, ready:true, regrow:0, place:'Grey Quarry'}); colliders.circles.push({x,z,r:1.1}); }
@@ -410,8 +409,51 @@ function bench(scene){
   mesh(new T.BoxGeometry(0.08,1,0.08),M('#3a2412'),-1.2,1.4,-0.6,g); mesh(new T.BoxGeometry(0.08,1,0.08),M('#3a2412'),1.2,1.4,-0.6,g);
   g.userData.rune=rune; return g;
 }
-/* Mori Templates: gravel road ribbons through the four gates and up to the dungeon (pack only; nothing is added without it) */
-function roads(scene,hf){ if(!MTon) return null; return MT.road(scene,[[0,FENCE+8,0,4.2],[FENCE+8,0,4.2,0],[-FENCE-8,0,-4.2,0],[0,-FENCE-8,0,-43],[0,-FENCE+1,0,-FENCE-8]],hf||((x,z)=>window.WORLD.height(x,z)),{width:3.6,step:1.5,scale:3,lift:0.05}); }
+/* Town streets use the same ribbon as the wilderness road. One mesh each. No second gravel pass. */
+function roads(scene,hf){
+  if(!window.ROADS||!window.TOWNPLAN) return null;
+  const plan=TOWNPLAN.guild();
+  const built=ROADS.build(plan.streets, hf||height, {step:4, cap:20, sway:0, gap:100, id:(s,i)=>'town-'+i});
+  const g=new T.Group(); g.name='townRoads'; scene.add(g);
+  built.meshes.forEach(spec=>{
+    if(spec.kind!=='ribbon') return;
+    const geo=new T.BufferGeometry();
+    geo.setAttribute('position', new T.Float32BufferAttribute(spec.pos,3));
+    geo.setAttribute('normal', new T.Float32BufferAttribute(spec.nor,3));
+    geo.setAttribute('color', new T.Float32BufferAttribute(spec.col,3));
+    geo.setIndex(spec.idx);
+    const mat=new T.MeshLambertMaterial({vertexColors:true, side:T.FrontSide, depthWrite:true, transparent:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+    const mesh=new T.Mesh(geo, mat); mesh.name='roadRibbon'; mesh.userData.road=spec.id; mesh.userData.terrain=true; mesh.receiveShadow=true; g.add(mesh);
+  });
+  return g;
+}
+function expandTown(scene){
+  if(!window.TOWNPLAN) return null;
+  const plan=TOWNPLAN.guild();
+  const wood=TX('wood_planks','#6a4628',1.2), plaster=TX('plaster','#e6d7b0',2);
+  const elder=plan.elder;
+  const eg=new T.Group(); eg.position.set(elder.x, height(elder.x,elder.z), elder.z); eg.name='elderHouse'; scene.add(eg);
+  if(window.GROUNDED){
+    const spec=GROUNDED.cottageFrame({w:elder.w, d:elder.d, wallH:2.4, pitch:0.55, overhang:0.35, doorW:0.9});
+    GROUNDED.attachFrame(T, eg, spec, {stone:TX('stone_block','#8d8a80',1.2), timber:wood, wall:plaster, roof:TX('cornfield','#c2a15a',1.4), door:TX('wood_planks','#4a3020',1), window:M('#ffd27a',{e:'#ffb020',ei:0.4})}, {fit:MTon?MT.fit:null, shadow:true});
+  } else mesh(new T.BoxGeometry(elder.w,2.2,elder.d),plaster,0,1.1,0,eg);
+  const es=new T.Mesh(new T.PlaneGeometry(2.4,0.4),new T.MeshBasicMaterial({map:signTex("ELDER'S HOUSE",256,64,'#2a1a0c','#f4e2c2','#facc15'), side:T.DoubleSide}));
+  es.position.set(0,2.4,elder.d*0.5+0.1); eg.add(es);
+  plan.farms.forEach(f=>{
+    const fg=new T.Group(); fg.position.set(f.x, height(f.x,f.z), f.z); fg.name='farmField'; scene.add(fg);
+    mesh(new T.BoxGeometry(f.w,0.08,f.d),TX('soil','#6a4a28',2),0,0.05,0,fg);
+    mesh(new T.BoxGeometry(f.w*0.8,0.06,0.3),TX('cornfield','#c2a15a',2),0,0.12,0,fg);
+  });
+  plan.watches.forEach(w=>{
+    const p=mesh(new T.CylinderGeometry(0.28,0.34,4.2,6),TX('bark','#5a3a22',1),w.x,2.1,w.z); p.name='watchPost'; scene.add(p);
+    const top=mesh(new T.BoxGeometry(1.4,0.2,1.4),wood,w.x,4.2,w.z); top.name='watchPost'; scene.add(top);
+  });
+  const c=plan.choke;
+  [-1.6,1.6].forEach(s=>{ const p=mesh(new T.CylinderGeometry(0.22,0.28,3.2,6),TX('bark','#3a2414',1),c.x+s,1.6,c.z); p.name='choke'; scene.add(p); });
+  const sq=new T.Mesh(new T.CircleGeometry(5.5,6), new T.MeshLambertMaterial({color:'#cbb892', polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1, depthWrite:true, transparent:false, side:T.FrontSide}));
+  sq.rotation.x=-Math.PI/2; sq.position.set(plan.square.x, height(plan.square.x,plan.square.z)+0.04, plan.square.z); sq.name='townSquare'; scene.add(sq);
+  return plan;
+}
 
 function enchantForge(scene){
   const g=new T.Group(); g.position.set(STATIONS.enchantForge.x,0,STATIONS.enchantForge.z); scene.add(g);
@@ -429,5 +471,5 @@ function enchantCircle(scene){
   g.userData.ring=ring; return g;
 }
 
-window.WORLD={roads, bench, height, FENCE, GATE, STATIONS, terrain, fence, guildHall, moriDoll, outpost, alchemy, forge, enchantForge, enchantCircle, tavern, dungeonEntrance, resources, STRUCTS, buildStructure, plots, buildDungeon, creatureMesh, chestMesh, signTex, goblin};
+window.WORLD={roads, expandTown, bench, height, FENCE, GATE, STATIONS, terrain, fence, guildHall, moriDoll, outpost, alchemy, forge, enchantForge, enchantCircle, tavern, dungeonEntrance, resources, STRUCTS, buildStructure, plots, buildDungeon, creatureMesh, chestMesh, signTex, goblin};
 })();

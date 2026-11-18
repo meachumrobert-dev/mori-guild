@@ -37,7 +37,10 @@ ok(craft.CRAFT.titledName('cloak','Light')==='Cloak of Light', 'a cloak is title
 
 const furn=load('js/furniture.js');
 ok(furn.FURNITURE.proportions('bench').seat===0.45 && furn.FURNITURE.proportions('table').top===0.74, 'seats and tables use grounded heights');
-ok(furn.FURNITURE.list().some(p=>p.name==="Robert's Strider Armor"&&p.kind==='bench'&&/fastest bench/.test(p.flavor)), 'the Strider Armor joke is a sittable bench');
+ok(furn.FURNITURE.list().some(p=>p.name==="Robert's Strider Armor"&&p.kind==='stand'), 'the Strider Armor is an armor stand');
+ok(furn.FURNITURE.targets('guild').some(t=>t.name==="Robert's Strider Armor"&&t.verb==='Armor stand'&&!t.sit&&!/Sit:/.test(t.label)), 'the armor stand is not a Sit spot');
+ok(furn.FURNITURE.targets('guild').some(t=>t.name==='Guild chair'&&t.sit&&/Sit:/.test(t.label)), 'a chair is still a Sit spot');
+ok(furn.FURNITURE.targets('away').length===0, 'guild furniture anchors do not travel to another land');
 
 function Ctor(){}
 const g=load('js/gather.js', {THREE:{Object3D:Ctor, Color:Ctor}, TWOSPEED:{}});
