@@ -27,6 +27,7 @@ function apply(save, seed, opt){
   next.at=null;
   next.jobs=[];
   next.player={x:0, z:8, yaw:0};
+  next.clock=40;
   next.worldBackup=backup;
   next.greet=greeting(seed, false);
   next.vWorld=1;

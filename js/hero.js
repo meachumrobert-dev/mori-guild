@@ -152,7 +152,7 @@ function delrothKit(p, U, torso, body){
     for(let k=0;k<3;k++){ const lg=mesh(new T.BoxGeometry(0.05,0.006,0.006), sm, s*0.04,-0.02+k*0.025,0, sc); lg.rotation.z=s*(0.4-k*0.3); } });
   // necrotic lightning aura (green bolts, re-rolled in animate)
   const bolts=new T.LineSegments(new T.BufferGeometry(), new T.LineBasicMaterial({color:'#5dff7a', transparent:true, opacity:0.85, blending:T.AdditiveBlending, depthWrite:false}));
-  bolts.geometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(6*12*3),3)); body.add(bolts); U.bolts=bolts; U.boltT=0; U.kitWisp=true;
+  bolts.geometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(6*12*3),3)); body.add(bolts); bolts.visible=false; U.bolts=bolts; U.boltT=0.2; U.kitWisp=true;
 }
 function rollBolts(U){ const a=U.bolts.geometry.attributes.position; let k=0;
   for(let b=0;b<6;b++){ const ang=Math.random()*Math.PI*2, r=0.35+Math.random()*0.25; let x=Math.cos(ang)*r, y=0.2+Math.random()*1.4, z=Math.sin(ang)*r;
@@ -306,7 +306,7 @@ function animate(root, t, speed){
   if(U.irisMat && U.glow>0.4) U.irisMat.emissiveIntensity=0.6+U.glow*0.9+Math.sin(t*3)*0.25;
   if(U.hat){ const r=U.hat.userData.rose; const bl=(t%3.2)<0.14; r.userData.eye.forEach(e=>e.scale.y=bl?0.12:1);
     U.hat.userData.tag.rotation.z=Math.sin(t*2.5)*0.25; }
-  if(U.bolts){ U.boltT-=1/60; if(U.boltT<=0){ U.boltT=0.08+Math.random()*0.12; rollBolts(U); } U.bolts.material.opacity=0.4+Math.random()*0.5; }
+  if(U.bolts){ const allow=!!root.userData.npcAura||(root.userData.auraLeft>0); U.bolts.visible=allow; if(allow){ U.boltT-=1/60; if(!(U.boltT>0)){ U.boltT=0.12; rollBolts(U); } U.bolts.material.opacity=0.4+Math.random()*0.5; } }
   if(U.crystal){ U.crystal.rotation.y=t*1.5; U.crystal.material.emissiveIntensity=0.9+Math.sin(t*4)*0.3; }
 }
 

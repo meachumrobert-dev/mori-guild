@@ -13,7 +13,33 @@ function pick(phone, saved){
   return phone?'low':'medium';
 }
 function preset(name){ return PRESET[name]||PRESET.low; }
-function fog(name){ const p=preset(name); return {near:p.near, far:p.far}; }
+function fog(name){ const p=preset(name); return {near:Math.round(p.near*0.85), far:p.far}; }
+function mix3(a,b,t){ return [a[0]*(1-t)+b[0]*t, a[1]*(1-t)+b[1]*t, a[2]*(1-t)+b[2]*t]; }
+/* day is 0 at night and 1 at noon. elev is the sun's sine, near 0 at dusk.
+   Night stays blue and lifted so a face is never a black silhouette.
+   The fog color is the horizon, so the ground fades into the sky. */
+function grade(day, elev, bright){
+  day=Math.max(0, Math.min(1, day));
+  const dusk=Math.max(0, 1-Math.abs(elev==null?1:elev)/0.35);
+  const nightH=[0.18,0.26,0.48], nightZ=[0.06,0.10,0.24];
+  const dayH=[0.74,0.86,0.98], dayZ=[0.38,0.62,0.96];
+  const duskH=[0.90,0.50,0.40], duskZ=[0.32,0.26,0.50];
+  let horizon=mix3(nightH, dayH, day), zenith=mix3(nightZ, dayZ, day);
+  horizon=mix3(horizon, duskH, dusk*0.5);
+  zenith=mix3(zenith, duskZ, dusk*0.22);
+  const k=bright==null?1:Math.max(0.7, Math.min(1.5, bright));
+  return {
+    horizon, zenith, fog:horizon.slice(),
+    fill:(0.62+0.22*day)*k,
+    hemi:(0.72+0.4*day)*k,
+    sun:(0.7+1.35*day)*k,
+    sunColor:mix3([0.62,0.76,1],[1,0.95,0.8], day),
+    skyColor:mix3([0.5,0.64,0.98],[0.86,0.92,1], day),
+    groundColor:[0.22,0.26,0.16],
+    exposure:(1.15+(1-day)*0.32)*k,
+    day, dusk
+  };
+}
 function slope(heightAt, x, z){
   const e=2;
   const dx=heightAt(x+e,z)-heightAt(x-e,z), dz=heightAt(x,z+e)-heightAt(x,z-e);
@@ -31,17 +57,26 @@ function applyRenderer(renderer, T, name){
   if(T&&T.SRGBColorSpace!=null&&renderer.outputColorSpace!=null) renderer.outputColorSpace=T.SRGBColorSpace;
   return p;
 }
-function makeSky(T){
-  const geo=new T.SphereGeometry(400, 10, 6);
-  const pos=geo.attributes.position, col=new Float32Array(pos.count*3);
+function paintSky(mesh, horizon, zenith){
+  if(!mesh||!mesh.geometry||!mesh.geometry.attributes.color) return;
+  const pos=mesh.geometry.attributes.position, attr=mesh.geometry.attributes.color;
+  const h=horizon||[0.74,0.86,0.98], z=zenith||[0.38,0.62,0.96];
   for(let i=0;i<pos.count;i++){
-    const k=Math.max(0, Math.min(1, pos.getY(i)/400*0.5+0.5));
-    col[i*3]=0.42+k*0.28; col[i*3+1]=0.58+k*0.24; col[i*3+2]=0.78+k*0.18;
+    const y=pos.getY(i);
+    const k=Math.max(0, Math.min(1, (y+30)/430));
+    const t=k*k*(3-2*k);
+    attr.setXYZ(i, h[0]*(1-t)+z[0]*t, h[1]*(1-t)+z[1]*t, h[2]*(1-t)+z[2]*t);
   }
+  attr.needsUpdate=true;
+}
+function makeSky(T){
+  const geo=new T.SphereGeometry(400, 16, 10);
+  const pos=geo.attributes.position, col=new Float32Array(pos.count*3);
   geo.setAttribute('color', new T.Float32BufferAttribute(col,3));
   const mat=new T.MeshBasicMaterial({vertexColors:true, side:T.BackSide, fog:false, depthWrite:false});
   const mesh=new T.Mesh(geo, mat);
   mesh.name='sky'; mesh.frustumCulled=false; mesh.userData.sw=true;
+  paintSky(mesh, [0.74,0.86,0.98], [0.38,0.62,0.96]);
   return mesh;
 }
 function scatter(T, heightAt, opt, origin){
@@ -69,6 +104,6 @@ function scatter(T, heightAt, opt, origin){
   fill(opt.rocks|0, new T.DodecahedronGeometry(0.22, 0), new T.MeshLambertMaterial({color:'#8a8478'}), false);
   return g;
 }
-root.LOOK={PRESET, pick, preset, fog, slope, shade, applyRenderer, makeSky, scatter};
+root.LOOK={PRESET, pick, preset, fog, grade, slope, shade, applyRenderer, makeSky, paintSky, scatter};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.LOOK;
 })(typeof window!=='undefined'?window:globalThis);

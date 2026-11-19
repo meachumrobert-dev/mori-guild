@@ -92,13 +92,50 @@ function edgeFor(i,j,seg,seams){ let step=0, axis=null;
   const consider=(on,nb,ax)=>{ if(!on||!(nb>0)||nb>=seg) return; const st=CH/nb; if(st>step){ step=st; axis=ax; } };
   consider(i===seg, seams&&seams.e, 'z'); consider(i===0, seams&&seams.w, 'z'); consider(j===seg, seams&&seams.s, 'x'); consider(j===0, seams&&seams.n, 'x');
   return step?{axis,step}:null; }
-function displayedHeight(x,z,edge){ return edge?stitchHeight(x,z,edge.axis,edge.step):heightAt(x,z); }
+function bandBlend(i,j,seg,seams){
+  let best=0, axis=null, step=0;
+  const take=(dist,nb,ax)=>{
+    if(!(nb>0)||nb>=seg) return;
+    const span=Math.max(1, Math.round(seg/nb));
+    if(dist>span) return;
+    const w=1-dist/span;
+    if(w>best){ best=w; axis=ax; step=CH/nb; }
+  };
+  take(seg-i, seams&&seams.e, 'z');
+  take(i, seams&&seams.w, 'z');
+  take(seg-j, seams&&seams.s, 'x');
+  take(j, seams&&seams.n, 'x');
+  return best?{w:best, axis, step}:null;
+}
+function meshHeight(x,z,i,j,seg,seams){
+  const h=heightAt(x,z);
+  const b=bandBlend(i,j,seg,seams);
+  if(!b) return h;
+  return h*(1-b.w)+stitchHeight(x,z,b.axis,b.step)*b.w;
+}
+function vertexColor(x,z,h){
+  const gnd=sampleGround(x,z);
+  let r=gnd.r, g=gnd.g, b=gnd.b;
+  const nz=(Math.sin(x*0.37)*Math.cos(z*0.29)+Math.sin(x*0.11+z*0.07))*0.03;
+  r+=nz; g+=nz; b+=nz*0.5;
+  if(F.guild&&Math.hypot(x,z)<120){ const t=1-smooth(60,120,Math.hypot(x,z)); r=r*(1-t)+0.33*t; g=g*(1-t)+0.5*t; b=b*(1-t)+0.24*t; }
+  if(typeof window!=='undefined'&&window.LOOK){ const sh=LOOK.shade(r, g, b, LOOK.slope(baseHeightAt, x, z)); r=sh[0]; g=sh[1]; b=sh[2]; }
+  const col=[r,g,b];
+  const d=TFD?TFD(x,z):0;
+  if(d){
+    if(d>4){ const t=smooth(4,26,d); col[0]+=(0.47-col[0])*t; col[1]+=(0.45-col[1])*t; col[2]+=(0.42-col[2])*t;
+      if(d>30){ const u=smooth(30,46,d); col[0]+=(0.94-col[0])*u; col[1]+=(0.95-col[1])*u; col[2]+=(0.98-col[2])*u; } }
+    else if(d<-0.7){ const t=smooth(0.7,2.6,-d)*0.85; col[0]+=(0.40-col[0])*t; col[1]+=(0.34-col[1])*t; col[2]+=(0.24-col[2])*t; }
+  }
+  if(F.seaY!=null&&h<F.seaY+1.2){ col[0]=col[0]*0.5+0.43; col[1]=col[1]*0.5+0.4; col[2]=col[2]*0.5+0.27; }
+  return col;
+}
 /* Edge samples a built tile would use. side is e/w/n/s. neighborSeg is the neighbour's segment count
    (smaller means coarser). Tests compare these without a WebGL context. */
 function seam(ix,iz,seg,side,neighborSeg){ const n=seg+1, seams={e:0,w:0,n:0,s:0}; seams[side]=neighborSeg||0; const out=[];
   for(let i=0;i<n;i++){ const ii=(side==='e')?seg:(side==='w'?0:i), jj=(side==='s')?seg:(side==='n'?0:i);
-    const x=ix*CH+ii/seg*CH, z=iz*CH+jj/seg*CH, edge=edgeFor(ii,jj,seg,seams), h=displayedHeight(x,z,edge), N=normalAt(x,z);
-    out.push({x,z,h,nx:N[0],ny:N[1],nz:N[2]}); }
+    const x=ix*CH+ii/seg*CH, z=iz*CH+jj/seg*CH, h=meshHeight(x,z,ii,jj,seg,seams), N=normalAt(x,z), C=vertexColor(x,z,h);
+    out.push({x,z,h,nx:N[0],ny:N[1],nz:N[2],r:C[0],g:C[1],b:C[2]}); }
   return out; }
 function slopeGap(x,z,dx,dz){ const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L; const e=2;
   const h0=heightAt(x-dx*e,z-dz*e), h1=heightAt(x,z), h2=heightAt(x+dx*e,z+dz*e); return Math.abs((h2-h1)-(h1-h0))/e; }
@@ -182,11 +219,11 @@ function skirtGeo(seg){ const n=seg+1, verts=4*n*2, pos=new Float32Array(verts*3
   const g=new T.BufferGeometry(); g.setAttribute('position',new T.BufferAttribute(pos,3)); g.setAttribute('color',new T.BufferAttribute(col,3)); g.setAttribute('normal',new T.BufferAttribute(nor,3)); g.setIndex(idx); return g; }
 function writeSkirt(geo,landPos,landCol,seg){ const n=seg+1, pos=geo.attributes.position.array, col=geo.attributes.color.array, nor=geo.attributes.normal.array;
   const edges=[{pick:k=>k*n,nx:-1,nz:0},{pick:k=>k*n+seg,nx:1,nz:0},{pick:k=>k,nx:0,nz:-1},{pick:k=>seg*n+k,nx:0,nz:1}];
-  edges.forEach((ed,e)=>{ const inv=1/Math.hypot(ed.nx,0.25,ed.nz), nx=ed.nx*inv, ny=0.25*inv, nz=ed.nz*inv;
+  edges.forEach((ed,e)=>{ 
     for(let k=0;k<n;k++){ const src=ed.pick(k)*3, dst=(e*n*2+k*2)*3;
-      pos[dst]=landPos[src]; pos[dst+1]=landPos[src+1]; pos[dst+2]=landPos[src+2];
+      pos[dst]=landPos[src]; pos[dst+1]=landPos[src+1]-0.08; pos[dst+2]=landPos[src+2];
       pos[dst+3]=landPos[src]; pos[dst+4]=landPos[src+1]-SKIRT; pos[dst+5]=landPos[src+2];
-      for(let t=0;t<2;t++){ col[dst+t*3]=landCol[src]; col[dst+t*3+1]=landCol[src+1]; col[dst+t*3+2]=landCol[src+2]; nor[dst+t*3]=nx; nor[dst+t*3+1]=ny; nor[dst+t*3+2]=nz; } } });
+      for(let t=0;t<2;t++){ col[dst+t*3]=landCol[src]; col[dst+t*3+1]=landCol[src+1]; col[dst+t*3+2]=landCol[src+2]; nor[dst+t*3]=0; nor[dst+t*3+1]=1; nor[dst+t*3+2]=0; } } });
   geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; geo.attributes.normal.needsUpdate=true; geo.computeBoundingSphere(); }
 function coarseY(x,z,step){ const x0=Math.floor((x+1e-6)/step)*step, z0=Math.floor((z+1e-6)/step)*step;
   const tx=Math.max(0,Math.min(1,(x-x0)/step)), tz=Math.max(0,Math.min(1,(z-z0)/step));
@@ -202,16 +239,13 @@ function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
   const bcol=new Float32Array(n*n*3), target=new Float32Array(n*n), morph=new Float32Array(n*n);
   let moving=false;
   for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const lx=i/seg*CH, lz=j/seg*CH, x=ix*CH+lx, z=iz*CH+lz, v=j*n+i, k=v*3;
-    const gnd=sampleGround(x,z), edge=edgeFor(i,j,seg,seams);
-    let h=edge?stitchHeight(x,z,edge.axis,edge.step):heightAt(x,z);
+    const gndH=meshHeight(x,z,i,j,seg,seams);
+    let h=gndH;
     const y0=morphFrom?morphFrom(lx,lz):h;
     target[v]=h; morph[v]=y0; if(Math.abs(y0-h)>0.02) moving=true;
     pos[k]=lx; pos[k+1]=y0; pos[k+2]=lz;
-    let r=gnd.r, gg=gnd.g, bb=gnd.b;
-    const nz=(Math.sin(x*0.37)*Math.cos(z*0.29)+Math.sin(x*0.11+z*0.07))*0.03; r+=nz; gg+=nz; bb+=nz*0.5;
-    if(F.guild&&Math.hypot(x,z)<120){ const t=1-smooth(60,120,Math.hypot(x,z)); r=r*(1-t)+0.33*t; gg=gg*(1-t)+0.5*t; bb=bb*(1-t)+0.24*t; }
-    if(window.LOOK){ const sh=LOOK.shade(r, gg, bb, LOOK.slope(baseHeightAt, x, z)); r=sh[0]; gg=sh[1]; bb=sh[2]; }
-    bcol[k]=r; bcol[k+1]=gg; bcol[k+2]=bb; finishColor(col,k,bcol,TFD?TFD(x,z):0,h); }
+    const paint=vertexColor(x,z,h);
+    bcol[k]=paint[0]; bcol[k+1]=paint[1]; bcol[k+2]=paint[2]; col[k]=paint[0]; col[k+1]=paint[1]; col[k+2]=paint[2]; }
   if(!geo){ geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(pos,3)); geo.setAttribute('color',new T.BufferAttribute(col,3)); geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(n*n*3),3)); geo.setIndex(new T.BufferAttribute(idxFor(seg),1)); geo.userData.seg=seg; }
   else { geo.attributes.position.needsUpdate=true; geo.attributes.color.needsUpdate=true; }
   writeNormals(geo.attributes.normal.array,ix,iz,seg); geo.attributes.normal.needsUpdate=true; geo.computeBoundingSphere();
@@ -225,8 +259,8 @@ function buildChunk(ix,iz,seg,near,seams,morphFrom,fadeIn){
   return rec; }
 function refreshChunk(c){ if(!c.land) return; const g=c.land.geometry, pos=g.attributes.position.array, col=g.attributes.color.array, n=c.seg+1, morphing=c.morph&&c.morphT<1;
   for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const v=j*n+i, k=v*3, x=c.ix*CH+pos[k], z=c.iz*CH+pos[k+2];
-    const edge=edgeFor(i,j,c.seg,c.seams), dd=TFD?TFD(x,z):0, h=edge?stitchHeight(x,z,edge.axis,edge.step):heightAt(x,z);
-    c.target[v]=h; if(!morphing) pos[k+1]=h; finishColor(col,k,c.bcol,dd,h); }
+    const edgeH=meshHeight(x,z,i,j,c.seg,c.seams), dd=TFD?TFD(x,z):0, h=edgeH;
+    c.target[v]=h; if(!morphing) pos[k+1]=h; const paint=vertexColor(x,z,h); c.bcol[k]=paint[0]; c.bcol[k+1]=paint[1]; c.bcol[k+2]=paint[2]; col[k]=paint[0]; col[k+1]=paint[1]; col[k+2]=paint[2]; }
   writeNormals(g.attributes.normal.array,c.ix,c.iz,c.seg);
   g.attributes.position.needsUpdate=true; g.attributes.color.needsUpdate=true; g.attributes.normal.needsUpdate=true; g.computeBoundingSphere();
   if(!morphing&&c.skirt) writeSkirt(c.skirt.geometry,pos,col,c.seg); if(c.tl) placeChunkTrees(c); }
@@ -449,7 +483,8 @@ function setFrame(id, guild){
   if(!guild&&F.stage>0) F.flats.push({x:F.L.x,z:F.L.z,r0:6,r1:20,h:rawH(F.L.x,F.L.z).h});
   if(water){ root.remove(water); water=null; }
   if(F.seaY!=null){ water=new T.Mesh(new T.PlaneGeometry(1600,1600),new T.MeshLambertMaterial({color:'#2a6db5',transparent:true,opacity:0.82})); water.rotation.x=-Math.PI/2; water.position.y=F.seaY; water.userData.sw=true; root.add(water); }
-  buildSite(); lastPC=null; }
+  try{ buildSite(); }catch(err){ F.siteError=String(err&&err.message||err); }
+  lastPC=null; }
 function landing(){ const L=F.L; return {x:L.x, z:L.z}; }
 
 /* ---------- globe ---------- */
@@ -554,7 +589,7 @@ window.SEEDWORLD={ CH, F, Q, stat, markDirty, baseHeightAt, roadDist, treeList, 
   biomeAt(x,z){ return cornerAt(Math.floor(x/CH),Math.floor(z/CH)).biome; },
   isVoidAt(x,z){ return chunkVoid(Math.floor(x/CH),Math.floor(z/CH)); }, setQuality(o){ Object.assign(Q,o); lastPC=null; },
   init(o){ opt=o; scene=o.scene; mats(); root=new T.Group(); root.userData.sw=true; scene.add(root); chunkRoot=new T.Group(); siteRoot=new T.Group(); root.add(chunkRoot); root.add(siteRoot); },
-  setFrame, heightAt, update, landing, clearChunks, get chunkCount(){ return chunks.size; }, toDir, regionAtLocal, study, seam, slopeGap, colorAt, treeChops, refreshTrees, setTreeGate,
+  setFrame, heightAt, update, landing, clearChunks, get chunkCount(){ return chunks.size; }, toDir, regionAtLocal, study, seam, slopeGap, colorAt, vertexColor, meshHeight, treeChops, refreshTrees, setTreeGate,
   animate(t){ const dt=lastAnim==null?0:Math.min(0.1,Math.max(0,t-lastAnim)); lastAnim=t; settle(dt); if(F.waystone) F.waystone.userData.rune.rotation.y=t*1.5; if(F.flag) F.flag.rotation.y=Math.sin(t*1.6)*0.25; },
   globe:{ G, build:buildGlobe, refresh:refreshGlobe, render:renderGlobe, pick, focus, hideLabels, select(id){ G.sel=id; selLines(); }, drag(dx,dy){ G.grp.rotation.y+=dx*0.005; G.grp.rotation.x=Math.max(-1.45,Math.min(1.45,G.grp.rotation.x+dy*0.005)); }, zoom(k){ G.dist=Math.max(1.55,Math.min(5,G.dist*k)); }, owners, relation } };
 })();

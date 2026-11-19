@@ -39,6 +39,7 @@ if(window.TROLLS) TROLLS.migrate(S);
 if(window.LEGEND) LEGEND.migrate(S);
 if(window.RECIPES) RECIPES.migrate(S);
 if(window.LEGEND&&window.STOCKPILE){ const prices=LEGEND.prices(); for(const id in prices) STOCKPILE.register(id, prices[id]); }
+if(window.EFFECTS){ if(!S.buffs) S.buffs={}; EFFECTS.scrub(S.buffs); if(S.inv){ S.inv.forEach(it=>EFFECTS.price(it)); EFFECTS.rings(S.inv); } }
 
 function save(){ S.player={x:player.pos.x,z:player.pos.z,yaw:camYaw}; S.jobs=jobs.map(j=>({kind:j.kind,what:j.what})); if(curJob&&!curJob.idle&&!(curJob.kind==='tf'&&curJob.plan)) S.jobs.unshift({kind:curJob.kind,what:curJob.what}); try{ TF.flush(); }catch(e){} store.set(SAVE_KEY,S); }
 
@@ -54,9 +55,11 @@ let ENG; try{ ENG=new MoriEngine({mode:'both'}); }catch(e){ ENG={talk:()=>"i'm h
 
 /* ---------- world scene ---------- */
 const scene=new T.Scene(); scene.fog=new T.Fog('#8ec5ff',IS_TOUCH?70:110,IS_TOUCH?240:360);
-const hemi=new T.HemisphereLight('#cfe8ff','#3a5a2a',1.0); scene.add(hemi);
-const sun=new T.DirectionalLight('#fff2d0',2.0); sun.castShadow=!IS_TOUCH; sun.shadow.mapSize.set(1024,1024);
-Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:120}); scene.add(sun); scene.add(sun.target);
+const hemi=new T.HemisphereLight('#c5d7f2','#3a4a28',0.9); scene.add(hemi);
+const fill=new T.AmbientLight('#d5e2f4',0.7); scene.add(fill);
+const sun=new T.DirectionalLight('#fff2d0',1.6); sun.castShadow=!IS_TOUCH; sun.shadow.mapSize.set(1024,1024);
+sun.shadow.radius=3; sun.shadow.bias=-0.0003; sun.shadow.normalBias=0.04;
+Object.assign(sun.shadow.camera,{left:-36,right:36,top:36,bottom:-36,near:1,far:140}); scene.add(sun); scene.add(sun.target);
 let skyMesh=null, scatterRoot=null;
 if(window.LOOK){ skyMesh=LOOK.makeSky(T); scene.add(skyMesh); }
 const colliders={segs:[],circles:[],boxes:[]};
@@ -80,9 +83,9 @@ W.height=(x,z)=>SW.heightAt(x,z);
 /* ---------- Phase 1 performance governor: frame-time budget steps quality down (and back up) ---------- */
 const QS=new URLSearchParams(location.search);
 if(window.POWER) POWER.boot(location.search);
-const QUAL=[{name:'low',   pr:1,    shadow:false,      smap:512,  R:3, near:0, treeR:60, flowerR:55, flowerCap:IS_TOUCH?300:450, fx:0.35, refreshCap:1, refreshMs:1.5},
-            {name:'medium',pr:1.25, shadow:!IS_TOUCH,  smap:512,  R:4, near:1, treeR:90, flowerR:85, flowerCap:IS_TOUCH?700:1100, fx:0.7,  refreshCap:IS_TOUCH?1:2, refreshMs:IS_TOUCH?1.5:2.5},
-            {name:'high',  pr:1.75, shadow:true,       smap:1024, R:5, near:1, treeR:130, flowerR:130, flowerCap:2400, fx:1,    refreshCap:2, refreshMs:3}];
+const QUAL=[{name:'low',   pr:1,    shadow:false, smap:512,  R:3, near:0, treeR:60, flowerR:55, flowerCap:IS_TOUCH?300:450, fx:0.35, refreshCap:1, refreshMs:1.5},
+            {name:'medium',pr:1.25, shadow:true,  smap:1024, R:4, near:1, treeR:90, flowerR:85, flowerCap:IS_TOUCH?700:1100, fx:0.7,  refreshCap:IS_TOUCH?1:2, refreshMs:IS_TOUCH?1.5:2.5},
+            {name:'high',  pr:1.75, shadow:true,  smap:1024, R:5, near:1, treeR:130, flowerR:130, flowerCap:2400, fx:1,    refreshCap:2, refreshMs:3}];
 let lookSaved=null; try{ lookSaved=localStorage.getItem('mori.look'); }catch(e){}
 const lookPick=window.LOOK?{low:0,medium:1,high:2}[LOOK.pick(IS_TOUCH, lookSaved)]:null;
 const PERF={q:lookPick!=null?lookPick:(IS_TOUCH?0:1), max:IS_TOUCH?1:2, budget:IS_TOUCH?33.3:20, ema:16, js:0, step:0, over:0, under:0, cool:2, auto:!lookSaved, changes:[], frames:0, overlay:QS.get('perf')==='1'};
@@ -149,7 +152,8 @@ const COMP_P=[
   Object.assign(HERO.params('elf'),{name:'Lyra', hair:'#d6c7ff', top:'#8b5cf6', armor:'#ff8af0', boots:'#2a1e36', hairStyle:'long', height:0.92}),
   Object.assign(HERO.params('halforc'),{name:'Juno', hair:'#1a1a1f', top:'#22d3ee', armor:'#1a1a1f', boots:'#121212', pauldron:true, bootStyle:'stomper', height:0.95}),
   Object.assign(HERO.params('halfling'),{name:'Kit', hair:'#ff4d6d', top:'#facc15', armor:'#6b4a2b', boots:'#3a2412', hairStyle:'wolfcut', corset:true})];
-const comps=COMP_P.map((p,i)=>({name:p.name, model:makeChar(p), pos:new T.Vector3(player.pos.x-1-i,0,player.pos.z+1+i), hp:20, max:20, slot:i}));
+const roles=['support','tank','ranged'];
+const comps=COMP_P.map((p,i)=>({name:p.name, role:roles[i], model:makeChar(p), pos:new T.Vector3(player.pos.x-1.6+i*1.6,0,player.pos.z+1.8), hp:20, max:20, slot:i, cd:0, healCd:0, buffCd:roles[i]==='support'?8:0, spellCd:0}));
 comps.forEach(c=>scene.add(c.model));
 (function markTrades(){
   if(!window.TRADES||!window.T) return;
@@ -166,7 +170,7 @@ comps.forEach(c=>scene.add(c.model));
 })();
 const trail=[]; // breadcrumb trail for follow-in-line
 const delroth={model:makeChar(HERO.PRESETS.delroth), line:0, t:0};
-{ const sw=tav.userData.stageWorld; delroth.model.position.set(sw[0],1.1,sw[1]); delroth.model.rotation.y=Math.PI/2; scene.add(delroth.model); }
+{ const sw=tav.userData.stageWorld; delroth.model.position.set(sw[0],1.1,sw[1]); delroth.model.rotation.y=Math.PI/2; scene.add(delroth.model); delroth.model.userData.npcAura=true; }
 const DELROTH_LINES=[
  "I am Delroth. Undead catfolk. Dread Necromancer of the sixtieth circle. And yes — the hat is load-bearing.",
  "Sixty levels. Do you know what sixty levels buys you? A permanent table at The Retired Bard and nobody asks why the rose is watching.",
@@ -205,7 +209,7 @@ function placeStructure(type, plot, seed, instant, crooked){
 S.structs.forEach(s=>{ if(PLOTS[s.plot]) placeStructure(s.type,s.plot,s.seed,true,s.crooked); });
 
 /* ---------- inventory helpers ---------- */
-function addItem(it){ it.id='i'+(S.nid++); S.inv.push(it); if(['weapon','armor','ring','shield'].includes(it.kind)){ const cur=S.inv.find(x=>x.equipped&&x.kind===it.kind); if(!cur||(itemScore(it)>itemScore(cur))){ if(cur) cur.equipped=false; it.equipped=true; } } else if(it.kind==='wondrous'||it.kind==='charm') it.equipped=true; return it; }
+function addItem(it){ if(window.EFFECTS) EFFECTS.price(it); it.id='i'+(S.nid++); S.inv.push(it); if(['weapon','armor','ring','shield'].includes(it.kind)){ const cur=S.inv.find(x=>x.equipped&&x.kind===it.kind&&x!==it); if(!cur||(itemScore(it)>itemScore(cur))){ if(cur) cur.equipped=false; it.equipped=true; } } else if(it.kind==='wondrous'||it.kind==='charm') it.equipped=true; return it; }
 /* SRD armor: base armor bonus and max Dex by type; shields by type. Masterwork adds no AC (it lowers the check penalty). */
 const ARMOR_SRD=[[/padded/i,'Padded',1,8],[/studded/i,'Studded Leather',3,5],[/leather/i,'Leather',2,6],[/chain ?shirt/i,'Chain Shirt',4,4],[/hide/i,'Hide',3,4],[/scale/i,'Scale Mail',4,3],[/chain ?mail/i,'Chainmail',5,2],[/breastplate/i,'Breastplate',5,3],[/splint/i,'Splint Mail',6,0],[/banded/i,'Banded Mail',6,1],[/half-?plate/i,'Half-Plate',7,0],[/full ?plate/i,'Full Plate',8,1]];
 const SHIELD_SRD=[[/buckler/i,'Buckler',1],[/tower/i,'Tower Shield',4],[/heavy/i,'Heavy Shield',2],[/light/i,'Light Shield',1]];
@@ -364,7 +368,10 @@ function updateMori(dt){
     else { j.phase='work'; j.t+=dt; if(j.target&&j.target.x!==undefined) m.face=Math.atan2(j.target.x-m.pos.x,j.target.z-m.pos.z);
       if(j.kind==='build'&&j.b){ const b=j.b, h=b.g.userData.h||3, base=W.height(b.g.position.x,b.g.position.z); b.g.position.y=base-h+h*Math.min(1,j.t/j.dur); m.face=Math.atan2(b.g.position.x-m.pos.x,b.g.position.z-m.pos.z); }
       if(j.kind==='forge'){ forge.userData.goblin.userData.arm.rotation.x=-Math.abs(Math.sin(j.t*8))*1.4; }
-      if(j.kind==='cleanse'){ const n=Math.floor(j.t/2.5); while(j.k<n){ j.k++; CLAN.cleanseStep(j.side,'mori'); CLAN.stats.mori++; } if(j.t>=j.dur) finishJob(j); } else if(j.kind==='tf'){ if(j.plan.region!==curRegion()){ TF.finishNow(j.plan); finishJob(j); } else if(TF.tick(j.plan,dt,player.pos)) finishJob(j); } else if(j.t>=j.dur) finishJob(j); } }
+      if(j.kind==='cleanse'){ const n=Math.floor(j.t/2.5); while(j.k<n){ j.k++; CLAN.cleanseStep(j.side,'mori'); CLAN.stats.mori++; } if(j.t>=j.dur) finishJob(j); }
+      else if(j.kind==='tf'){ if(j.plan.region!==curRegion()){ TF.finishNow(j.plan); finishJob(j); } else if(TF.tick(j.plan,dt,player.pos)) finishJob(j); }
+      else if(j.kind==='seed'&&window.RESEED&&RESEED.jobTimeout(j)){ log('That seed stage ran too long. The ground stays.'); curJob=null; try{ refreshFrameAt(); }catch(e2){} }
+      else if(j.t>=j.dur){ try{ finishJob(j); }catch(e){ log('A seed stage failed. The ground stays. '+(e&&e.message||e)); curJob=null; try{ refreshFrameAt(); }catch(e2){} } } } }
   m.pos.y=W.height(m.pos.x,m.pos.z); m.model.position.copy(m.pos); m.model.rotation.y=lerpAngle(m.model.rotation.y,m.face,Math.min(1,dt*8));
   HERO.animate(m.model, clockT, moving?1:(curJob&&curJob.phase==='work'?0.3:0));
   if(curJob&&curJob.phase==='work'&&curJob.kind!=='build') m.model.userData.hero.limbs.armR.rotation.x=-1.2+Math.sin(clockT*10)*0.5;
@@ -414,7 +421,7 @@ function rarity(it){ const b=it.bonus||0, sp=(it.spells||[]).length+(it.special?
   if(b>=1||sp>=1||/^(Potion|Ring|Wondrous Item|Magic|Robert)/.test(it.cat||'')||it.kind==='potion'||it.kind==='charm'||(it.fx&&Object.keys(it.fx).length&&it.cat!=='Equipment'&&!it.mw)) return RARITY[2];
   if(it.mw||/Masterwork/i.test(it.name||'')) return RARITY[1];
   return RARITY[0]; }
-function rName(it,tag){ const r=rarity(it); return '<b style="color:'+r.c+'" title="'+r.name+' · '+(it.cat||'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+'">'+it.name+'</b>'+(tag?' <span class="small" style="color:'+r.c+'">['+r.name+']</span>':''); }
+function rName(it,tag){ const r=rarity(it); return '<b style="color:'+r.c+'" class="bagName">'+it.name+'</b>'+(tag?' <span class="small" style="color:'+r.c+'">['+r.name+']</span>':''); }
 function charLevel(){ return 3+(S.clears||0)+Math.floor((S.qxp||0)/1000); } // v3.5: quest XP, guild pace 1,000 XP per level
 // green-and-up gear starts dropping around character level 4-5: below treasure level 4, magic gear rolls come out as masterwork
 function lootRoll(level){ const t=SRD.rollTreasure(level);
@@ -424,6 +431,7 @@ function lootRoll(level){ const t=SRD.rollTreasure(level);
 function takeTreasure(t){
   if(t.gold){ S.gold+=t.gold; return t.name+' (gold)'; }
   const it={name:t.name, cat:t.cat, kind:t.kind==='armor'&&/Shield|Buckler/i.test(t.name)?'shield':t.kind, bonus:t.bonus||0, special:t.special||'', value:t.value||0, fx:Object.assign({}, t.fx||ROBERT_FX[t.name]||{}), curse:t.curse||'', note:t.note||''};
+  if(window.EFFECTS) EFFECTS.price(it);
   if(t.name==='Template Stylus'){ const nt=TEMPLATES.find(x=>!S.templates.includes(x)); if(nt){ S.templates.push(nt); it.name+=' (taught '+nt+')'; } }
   addItem(it); return it.name; }
 function rollHtml(t){ const r=rarity(t); return '<div class="rollbox" style="border-color:'+r.c+'88"><div class="pct">d% '+t.rolls.map(r=>'<b>'+String(r).padStart(2,'0')+'</b>').join(' → ')+'</div><div><b>'+t.cat+'</b>: '+(t.gold?t.name:rName(t,true))+(t.gated?' <span class="small">(magic gear drops from character level 4+)</span>':'')+(t.value?' <span class="small">('+t.value.toLocaleString()+' gp)</span>':'')+'</div></div>'; }
@@ -447,9 +455,9 @@ function dollShop(){
        c.querySelector('#exAll').onclick=()=>{ const n=Math.floor(S.life/5); S.life-=n*5; S.larpy+=n; log('Traded '+n*5+' Life for '+n+' LARPy.'); dollShop(); };
        c.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{ const g=goods.find(x=>x[0]===b.dataset.buy); if(S.larpy<g[2]){ log('Mori Doll: "Not enough LARPy. Shoo."'); return; } S.larpy-=g[2];
          if(g[0]==='lt'){ S.lawnTokens=(S.lawnTokens||0)+5; log('Mori Doll: "Fine. Five lawn tokens. Stay off my lawn."'); LORE.unlock('npc_doll'); dollShop(); return; }
-         if(g[0]==='ko'||g[0]==='kc'||g[0]==='kr'||g[0]==='ks'){ S.follower=true; S.curses=(S.curses||0)+1; takeTreasure({name:g[1], cat:"Robert's World", kind:'cursed', value:0, curse:'You are now a loyal follower of Delroth', note:'cheap knockoff · curse'});
+         if(g[0]==='ko'||g[0]==='kc'||g[0]==='kr'||g[0]==='ks'){ S.follower=true; S.curses=(S.curses||0)+1; takeTreasure({name:g[1], cat:"Robert's World", kind:'cursed', value:1, curse:'You are now a loyal follower of Delroth', note:'cheap knockoff · curse'});
            modal('<h3>'+g[1]+'</h3><div class="quote">A voice from the tavern whispers:<br><b>"You are now a loyal follower of Delroth."</b></div><div class="small">Curse is cosmetic. Mostly. Mori Doll: "Stay off my lawn."</div>'); LORE.unlock('npc_doll'); return; }
-         takeTreasure({name:g[1], cat:"Robert's World", kind:g[0]==='zr'?'ring':g[0]==='fs'?'charm':'potion', value:0}); log('Bought '+g[1]+'. Mori Doll: "No refunds. Stay off my lawn."'); LORE.unlock('npc_doll'); dollShop(); }); });
+         takeTreasure({name:g[1], cat:"Robert's World", kind:g[0]==='zr'?'ring':g[0]==='fs'?'charm':'potion', value:g[0]==='zr'?8:2, fx:ROBERT_FX[g[1]]||{}}); log('Bought '+g[1]+'. Mori Doll: "No refunds. Stay off my lawn."'); LORE.unlock('npc_doll'); dollShop(); }); });
 }
 function outpostShop(){
   const goods=[['holoTape','Holo Tape +1 Reach',45,'+15 range on swings (and +1 to hit)'],['legionBoots','Legion Boots',60,'you and friends move faster'],['dye','Gothic Rose Dye',20,'unlock the dye for the Template Painter'],['synth','Synth: Hologram',35,'friends hum; shadows flee (unlocks instrument)'],['goldPick','Gold Pick (real value)',80,'Mori mines ore in one swing (+1 ore)']];
@@ -548,7 +556,7 @@ function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(
   h+='<div class="sec">Items ('+S.inv.length+')</div>';
   h+='<div class="q barRow" data-bar-spell="1"><span class="barDrag" title="Spell. Not in the world yet."><b>Spell</b> <span class="small">Placeholder. Drag onto the 1–9 bar.</span></span></div>';
   h+=(S.inv.length?S.inv.map(it=>{ const salve=it.kind==='salve'; const tip=salve?'Salve. Heals over time. No roll.':'Drag onto the action bar'; return '<div class="q barRow" data-bar-id="'+it.id+'"><span class="barDrag" title="'+tip+'">'+(it.equipped?'✅ ':'')+(salve&&!/salve/i.test(it.name)?'Salve: ':'')+rName(it)+' <span class="small">'+rarity(it).name+' · '+(it.cat||'')+(it.spells?' · '+it.spells.join(', ')+(it.meta&&it.meta.length?' ['+it.meta.join(', ')+']':'')+' · '+it.use+(it.craftNote?' · '+it.craftNote:''):'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+(it.durability!=null?' · dur '+it.durability+'/'+it.maxDur+' · life '+((it.lifetime||0)-(it.uses||0))+' left':'')+'</span></span>'+
-    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'<span class="small">quest item</span>':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+(it.value>1&&!it.equipped?'<button data-sell="'+it.id+'" title="SRD: items sell for half their market price">Sell '+Math.floor(it.value/2).toLocaleString()+'</button>':'')+(it.crafted&&!it.equipped?'<button data-treas="'+it.id+'">Treasury buys</button>':'')+'</div>'; }).join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
+    (it.kind==='tablet'?'<button data-tablet="1">Open</button>':it.kind==='potion'||it.kind==='scroll'||it.kind==='thrown'||it.kind==='bandage'||it.kind==='salve'?'<button data-use="'+it.id+'">'+(it.kind==='scroll'?'Read':it.kind==='thrown'?'Throw':it.kind==='bandage'?'Bind':it.kind==='salve'?'Apply':'Drink')+'</button>':it.kind==='quest'?'':'<button data-eq="'+it.id+'">'+(it.equipped?'Unequip':'Equip')+'</button>')+'<button data-sell="'+it.id+'">Sell '+Math.max(1, Math.floor((window.EFFECTS?EFFECTS.floor(it):it.value||2)/2))+'</button><button data-drop="'+it.id+'">Drop</button><button data-bin="'+it.id+'">Destroy</button></div>'; }).join(''):'<div class="small">Empty. Open chests in the Undercroft, roll at the Outpost or craft at the bench.</div>');
   h+=GATHERING.bagHTML();
   h+='<div class="sec">Template Painter — '+(ch.locked?'(locked preset: duplicate it in HeroLock to paint)':ch.name)+'</div>';
   h+='<div class="small">Templates owned: '+S.templates.join(', ')+'</div><div class="row">'+
@@ -559,10 +567,12 @@ function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(
   b.innerHTML=h;
   b.querySelectorAll('[data-tablet]').forEach(x=>x.onclick=()=>openTablet());
   b.querySelectorAll('[data-use]').forEach(x=>x.onclick=()=>{ drink(S.inv.find(i=>i.id===x.dataset.use)); renderBag(); });
-  b.querySelectorAll('[data-sell]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.sell); if(!it) return; const g=Math.floor(it.value/2); S.inv.splice(S.inv.indexOf(it),1); S.gold+=g; log('Sold '+it.name+' for '+g.toLocaleString()+' gold (half its '+it.value.toLocaleString()+' gp price). 1 gold = 1 gp.'); save(); renderBag(); });
+  b.querySelectorAll('[data-sell]').forEach(x=>x.onclick=()=>letGo(x.dataset.sell, 'sell'));
+  b.querySelectorAll('[data-drop]').forEach(x=>x.onclick=()=>letGo(x.dataset.drop, 'drop'));
+  b.querySelectorAll('[data-bin]').forEach(x=>x.onclick=()=>letGo(x.dataset.bin, 'bin'));
   b.querySelectorAll('[data-treas]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.treas); if(!it||!window.STATIONS) return; const r=STATIONS.treasuryBuyCrafted(it); if(!r.ok){ log('Treasury: '+ (r.why||'cannot buy')); return; } S.inv.splice(S.inv.indexOf(it),1); log('Guild treasury bought '+it.name+' for '+r.paid+' Mori Marks.'); save(); renderBag(); });
   b.querySelectorAll('[data-rsell]').forEach(x=>x.onclick=()=>{ const id=x.dataset.rsell, nm=GATHERING.R[id].name, n=S.reag[id]; const g=GATHERING.sell(id); log('Sold '+n+'× '+nm+' for '+g+' gold.'); noteCivic('trade', id); save(); renderBag(); });
-  b.querySelectorAll('[data-eq]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.eq); const was=it.equipped; if(!was&&['weapon','armor','ring','shield'].includes(it.kind)) S.inv.forEach(o=>{ if(o.kind===it.kind) o.equipped=false; }); it.equipped=!was; renderBag(); save(); });
+  b.querySelectorAll('[data-eq]').forEach(x=>x.onclick=()=>{ const it=S.inv.find(i=>i.id===x.dataset.eq); const was=it.equipped; if(!was&&['weapon','armor','ring','shield'].includes(it.kind)) S.inv.forEach(o=>{ if(o.kind===it.kind) o.equipped=false; }); it.equipped=!was; syncAura(); renderBag(); save(); });
   b.querySelectorAll('[data-tpl]').forEach(x=>x.onclick=()=>{ const [k,v]=x.dataset.tpl.split('|'); const val=v==='true'?true:v; ch[k]=ch[k]===val?(k==='hairStyle'?'short':k==='bootStyle'?'plain':false):val; saveChars(); rebuildPlayer(); renderBag(); });
   b.querySelectorAll('[data-dye]').forEach(x=>x.onclick=()=>{ ch[$('dyeSlot').value]=x.dataset.dye; saveChars(); rebuildPlayer(); renderBag(); });
 }
@@ -732,7 +742,7 @@ function npcApply(d,res){ if(!res) return; S.npcMem[d.id]=res.mem||S.npcMem[d.id
   });
   if($('questP').classList.contains('open')) renderQuests(); save(); return res; }
 function npcSay(text){ const d=NPCS.byId(chatNpc); if(!d) return null; const res=NPCS.npcReply(d,text,npcState(d)); if(res&&typeof res.then==='function'){ res.then(r=>npcApply(d,r)).catch(()=>addChat('npc','…',d)); return null; } return npcApply(d,res); }
-function openNpc(id){ const d=NPCS.byId(id); if(!d) return; if(chatNpc&&chatNpc!==id) endNpc(); const p=$('talkP'); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); p.classList.add('open'); if(chatNpc===id) return;
+function openNpc(id){ const d=NPCS.byId(id); if(!d) return; if(chatNpc&&chatNpc!==id) endNpc(); const p=$('talkP'); releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); p.classList.add('open'); if(chatNpc===id) return;
   chatNpc=id; const m=(S.npcMem||(S.npcMem={}))[id]||(S.npcMem[id]={}); m.met=(m.met||0)+1; m.talks=m.talks||0; npcChain=QUESTS.event('talk',id).map(q=>q.id); LORE.meet(id); MEMORY.onTalk(id); const ln=NPCS.liveOf(id); if(ln) ln.talking=true;
   $('talkTitle').textContent='💬 '+d.name; $('npcBar').style.display='flex'; $('npcWho').innerHTML='<b>'+d.role+'</b> · '+QUESTS.PLACE[d.home]+' · <span class="small">voiced by Mori</span>';
   const sh=$('npcShop'); const shops={brakka:['🛡 Shop & quest',()=>CLAN.brakkaUI&&CLAN.brakkaUI()], scribe:['📜 Scrolls',()=>CLAN.scribeUI&&CLAN.scribeUI()], forge:['⚒ Forge jobs',()=>togglePanel('jobsP')]}; const s=shops[d.shop];
@@ -783,9 +793,51 @@ $('bBlue').onclick=()=>{ S.blue?wakeMori():goBlue(); };
 
 /* ---------- panels ---------- */
 function sheetOpen(){ return !!document.querySelector('.panel.open'); }
-function closeSheets(){ document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); }
-function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const next=window.SHEETS?SHEETS.openOne(p.classList.contains('open')?id:null, id):(p.classList.contains('open')?null:id); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(next){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!next) endNpc(true); }
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
+function closeSheets(){ releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); }
+function syncAura(){
+  if(!player||!player.model) return;
+  const dread=(S.buffs&&S.buffs.dread>0)?S.buffs.dread:0;
+  player.model.userData.auraLeft=dread;
+  const bolts=player.model.userData.hero&&player.model.userData.hero.bolts;
+  if(bolts&&!player.model.userData.npcAura) bolts.visible=dread>0;
+}
+function clearStreaks(){
+  if(S.buffs) delete S.buffs.dread;
+  const models=[player&&player.model].concat((typeof comps!=='undefined'?comps:[]).map(c=>c.model));
+  models.forEach(m=>{
+    if(!m) return;
+    m.userData.auraLeft=0;
+    const bolts=m.userData.hero&&m.userData.hero.bolts;
+    if(bolts&&!m.userData.npcAura) bolts.visible=false;
+  });
+  if(typeof crewFx!=='undefined'){
+    for(let i=crewFx.length-1;i>=0;i--){ const f=crewFx[i]; if(f.sc&&f.m) f.sc.remove(f.m); if(f.m&&f.m.geometry) f.m.geometry.dispose(); if(f.m&&f.m.material) f.m.material.dispose(); crewFx.splice(i,1); }
+  }
+}
+function letGo(id, how){
+  const it=S.inv.find(i=>i.id===id);
+  if(!it||!window.EFFECTS) return;
+  const yes=how==='sell'||confirm((how==='bin'?'Destroy ':'Drop ')+it.name+'? This cannot be undone.');
+  const r=EFFECTS.dispose(S.inv, id, how==='bin'?'destroy':how, yes);
+  if(!r.ok) return;
+  if(r.gold) S.gold+=r.gold;
+  syncAura();
+  log(how==='sell'?('Sold '+r.item.name+' for '+r.gold+' gold.'):(how==='bin'?'Destroyed ':'Dropped ')+r.item.name+'.');
+  save(); renderBag();
+}
+function releaseBag(){
+  const nodes=[];
+  const ghost=$('barGhost');
+  if(ghost) nodes.push({ghost:true, shown:!ghost.hidden, title:ghost.textContent||'', el:ghost});
+  document.querySelectorAll('#bagBody .bagName, #bagBody .barDrag, #bagBody [title]').forEach(el=>nodes.push({bagTip:true, shown:!el.hidden, title:el.getAttribute('title')||'', el}));
+  if(window.TAGS) TAGS.release(nodes);
+  if(ghost){ ghost.hidden=true; ghost.textContent=''; if(ghost.removeAttribute) ghost.removeAttribute('title'); }
+  document.querySelectorAll('#bagBody [title]').forEach(el=>{ if(el.removeAttribute) el.removeAttribute('title'); });
+  document.querySelectorAll('#bagBody .barRow, #bagBody .bagName, #bagBody .barDrag').forEach(el=>el.remove());
+  barDrag=null;
+}
+function togglePanel(id){ if(id!=='seedP') closeGlobe(); const p=$(id); const next=window.SHEETS?SHEETS.openOne(p.classList.contains('open')?id:null, id):(p.classList.contains('open')?null:id); if(id!=='bagP'||!next) releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); if(next){ p.classList.add('open'); if(id==='jobsP') renderJobs(); if(id==='bagP') renderBag(); if(id==='beatP') renderBeat(); if(id==='talkP'){ updBrain(); if(!$('chatLog').children.length) addChat('mo',ENG.talk('')); } if(id==='questP') renderQuests(); if(id==='loreP') renderLore(); if(id==='memP') renderMemory(); if(id==='personaP') renderPersona(); } if(id==='talkP'&&!next) endNpc(true); }
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ if(b.dataset.close==='bagP') releaseBag(); $(b.dataset.close).classList.remove('open'); if(b.dataset.close==='talkP') endNpc(true); });
 $('bJobs').onclick=()=>togglePanel('jobsP'); $('bBag').onclick=()=>togglePanel('bagP'); $('bTalk').onclick=()=>{ if($('talkP').classList.contains('open')&&!chatNpc){ togglePanel('talkP'); return; } openMoriChat(); }; $('bQuests').onclick=()=>togglePanel('questP'); $('bLore').onclick=()=>togglePanel('loreP'); $('bMem').onclick=()=>togglePanel('memP'); $('bPersona').onclick=()=>togglePanel('personaP'); $('bBeat').onclick=()=>togglePanel('beatP');
 if($('bElder')) $('bElder').onclick=()=>openVillage('elderP');
 if($('bBoard')) $('bBoard').onclick=()=>openVillage('boardP');
@@ -807,8 +859,8 @@ function bindVillage(root){
   root.querySelectorAll('[data-distill]').forEach(b=>b.onclick=()=>{ if(!window.RECIPES) return; const app=(root.querySelector('#alembic')||{}).value||'distillery'; const r=RECIPES.distill(S.reag, app); log(r.ok?'Distilled '+r.qty+' '+r.name+'.':r.why); save(); renderVillage('elderP'); });
   root.querySelectorAll('[data-taste]').forEach(b=>b.onclick=()=>{ const r=RECIPES.taste(S, b.dataset.taste); log(r.ok?(r.learned?'You taste '+r.learned+'. ('+r.era+')':'You already know what this '+r.era.toLowerCase()+' can tell you.'):r.why); save(); renderVillage('elderP'); });
 }
-$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ store.del(SAVE_KEY); location.reload(); } };
-function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')) S.inv.push({id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:0, note:'A dark glassy tablet. The runes wait for a yes.'}); if(!S.tablet) S.tablet={approved:[]}; }
+$('bGlobe').onclick=()=>{ globeOpen?closeGlobe():openGlobe(); }; if($('bNewWorld')) $('bNewWorld').onclick=()=>{ document.body.classList.remove('menu'); const typed=$('seedIn')&&$('seedIn').value; newWorld(String(typed||S.seed||'').trim()); }; $('bHelp').onclick=help; if($('bTablet')) $('bTablet').onclick=()=>openTablet(); if($('bCull')) $('bCull').onclick=()=>{ if(window.OCCLUSION){ OCCLUSION.stats.debug=!OCCLUSION.stats.debug; log(OCCLUSION.stats.debug?'Cull counts on.':'Cull counts off.'); } }; $('bReset').onclick=()=>{ if(confirm('Reset the Guild? This erases your save (characters you made are kept).')){ window.__resetting=true; releaseBag(); store.del(SAVE_KEY); location.reload(); } };
+function ensureTablet(){ if(!S.inv.some(i=>i.kind==='tablet')){ const tab={id:'obsidian_tablet', name:'Obsidian Tablet', cat:'Relic', kind:'tablet', value:2, end:'store', note:'A dark glassy tablet. The runes wait for a yes.'}; if(window.EFFECTS) EFFECTS.price(tab); S.inv.push(tab); } if(!S.tablet) S.tablet={approved:[]}; }
 let tabletDraft=null, tabletResult=null;
 function tabletSlots(){ const h=hereCity(); return {ruler:h.ruler||'The Guild Charter (Seedkeeper Mori)', name:h.name||'Guildhold', motto:h.motto||'', gov:h.govName||'Guild Charter', race:h.race||'', region:h.region||'', arts:''}; }
 function moriDraft(){ return {note:'one vocab finger', fingers:[
@@ -832,7 +884,7 @@ function renderTablet(){ const el=$('tabletBody'); if(!el) return; const n=(S.ta
   $('tabYes').onclick=()=>{ if(!tabletResult||!tabletResult.pass||!tabletDraft) return; S.tablet.approved.push(tabletDraft); if(tabletDraft.note==='tinker persona') S.tablet.wear='tinker'; applyWorn(); save(); tabletDraft=null; tabletResult=null; log('The tablet keeps that finger.'); renderTablet(); };
   $('tabNo').onclick=()=>{ if(S.tablet&&S.tablet.approved.length){ const gone=S.tablet.approved.pop(); if(gone&&gone.note==='tinker persona') S.tablet.wear='mori'; } applyWorn(); save(); tabletResult=null; log('The last finger is gone.'); renderTablet(); };
 }
-function openTablet(){ ensureTablet(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
+function openTablet(){ ensureTablet(); releaseBag(); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('open')); $('tabletP').classList.add('open'); renderTablet(); }
 function help(){ modal('<h3>How to play</h3><ul class="help">'+
  '<li><b>Move</b>: WASD / arrows (phones: left-thumb joystick). <b>Look</b>: drag to orbit, wheel / pinch to zoom.</li>'+
  '<li><b>Loot rarity:</b> '+RARITY.map(r=>'<span style="color:'+r.c+'">■ '+r.name+'</span>').join(' · ')+'. Magic gear starts dropping around character level 4–5 (level = 3 + full dungeon clears). A full clear is the boss portal home. Clearing one room does not raise it.</li>'+
@@ -898,10 +950,16 @@ if($('turnGo')) $('turnGo').onclick=async()=>{ try{ if(document.documentElement.
 if(window.visualViewport) visualViewport.addEventListener('resize', ()=>{ if(typeof resize==='function') resize(); });
 function codexHTML(){ if(!S.codex) S.codex=CODEX.fresh(); const cats=Object.keys(CODEX.CATS); return '<div class="sec">Codex</div><div class="small">A page stays dark until the world has shown it to you. '+CODEX.hidden(S.codex)+' still hidden.</div>'+cats.map(id=>{ const rows=CODEX.list(S.codex, id); return '<div class="small"><b>'+CODEX.CATS[id].label+'</b> — '+(rows.length?rows.map(p=>p.name).join(', '):'nothing seen yet')+'</div>'; }).join(''); }
 function paintSheetTabs(){ const box=$('sheetTabs'); if(!box||!window.SHEETS) return; const phone=document.body.classList.contains('phone')&&document.body.classList.contains('menu'); box.hidden=!phone; if(!phone){ document.querySelectorAll('#bottom button').forEach(b=>{ b.style.display=''; }); return; }
-  const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ box.dataset.grp=b.dataset.grp; paintSheetTabs(); }); }
+  const cur=box.dataset.grp||SHEETS.GROUPS[0].id; box.dataset.grp=cur; box.innerHTML=SHEETS.GROUPS.map(g=>'<button type="button" data-grp="'+g.id+'"'+(g.id===cur?' class="on"':'')+'>'+g.label+'</button>').join(''); const show=SHEETS.showIds(cur); document.querySelectorAll('#bottom > button').forEach(b=>{ b.style.display=show.indexOf(b.id)>=0?'':'none'; }); box.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{ const next=b.dataset.grp; const ids=SHEETS.showIds(next); if(ids.indexOf('bBag')<0&&$('bagP')&&$('bagP').classList.contains('open')){ releaseBag(); $('bagP').classList.remove('open'); } box.dataset.grp=next; paintSheetTabs(); }); }
 if($('phoneMenu')) $('phoneMenu').onclick=()=>{ document.body.classList.toggle('menu'); paintSheetTabs(); };
-if(QS.get('menu')==='1'){ document.body.classList.add('menu'); paintSheetTabs(); }
+if(QS.get('menu')==='1'){ document.body.classList.add('menu'); const box=$('sheetTabs'); if(box&&QS.get('tab')) box.dataset.grp=QS.get('tab'); paintSheetTabs(); setTimeout(()=>{ const m=$('modal'); if(m) m.classList.remove('open'); }, 600); }
 if(QS.get('elder')==='1') setTimeout(()=>{ if(typeof openVillage==='function') openVillage('elderP'); }, 400);
+if(QS.get('fresh')) setTimeout(()=>{
+  const seed=QS.get('fresh')==='1'?'fresh-'+Math.floor(Math.random()*9999):QS.get('fresh');
+  if(window.NEWWORLD){ const r=NEWWORLD.apply(S, seed, {confirm:true}); if(r.ok) adoptWorld(r.save); }
+  const m=$('modal'); if(m) m.classList.remove('open');
+}, 0);
+if(QS.get('globe')==='1') setTimeout(()=>{ if(typeof openGlobe==='function') openGlobe(); const m=$('modal'); if(m) m.classList.remove('open'); }, 700);
 function showPiece(part){
   if(!window.SNAP) return;
   const at=SNAP.snap(part.x||0, part.z||0);
@@ -1038,20 +1096,88 @@ function updatePlayer(dt){
   // tavern floor/stage
   if(mode==='world'&&tav.userData.inside(player.pos.x,player.pos.z)) player.pos.y=Math.max(player.pos.y, tav.userData.floorY||0.15);
   player.model.position.copy(player.pos); if(player.sit) player.model.position.y-=0.42; player.model.rotation.y=lerpAngle(player.model.rotation.y,player.face,Math.min(1,dt*12));
+  syncAura();
   HERO.animate(player.model, clockT, moving?Math.min(1.4,len*(1+stats().speed)):0);
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
-  // breadcrumbs for the companions
-  const last=trail[0]; if(!last||Math.hypot(last.x-player.pos.x,last.z-player.pos.z)>0.35){ trail.unshift({x:player.pos.x,z:player.pos.z}); if(trail.length>60) trail.pop(); }
-  comps.forEach((c,i)=>{ let crumb=trail[Math.min(trail.length-1,(i+1)*5)]||player.pos;
-    if(window.CREW){ const pool=mode==='dungeon'?mobs:(window.GATHERING?GATHERING.crit:[]); const foes=(pool||[]).filter(m=>m.alive&&Math.hypot(m.x-player.pos.x,m.z-player.pos.z)<14).map(m=>({id:m.key||m.kind,x:m.x,z:m.z})); const ord=CREW.order(c,{foes, player:{x:player.pos.x,z:player.pos.z}, mode:c.guard?'guard':''}); if(ord.act!=='follow') crumb={x:ord.x,z:ord.z}; }
-    const ddx=crumb.x-c.pos.x, ddz=crumb.z-c.pos.z, d=Math.hypot(ddx,ddz); let mv=0;
-    if(d>0.15){ const s=Math.min(d, sp*1.05*dt*(d>3?1.6:1)); c.pos.x+=ddx/d*s; c.pos.z+=ddz/d*s; c.model.rotation.y=lerpAngle(c.model.rotation.y,Math.atan2(ddx,ddz),Math.min(1,dt*10)); mv=1; }
-    if(d>14){ c.pos.x=crumb.x; c.pos.z=crumb.z; }
-    c.pos.y=mode==='world'?groundY(c.pos.x,c.pos.z):0; c.model.position.copy(c.pos); HERO.animate(c.model, clockT+i, mv);
-    if(c.atkT>0){ c.atkT-=dt; c.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(c.atkT/0.35*Math.PI); } });
+  // companions walk their own slots and swing on their own timers
+  const crewPack=comps.map(c=>({name:c.name, role:c.role, x:c.pos.x, z:c.pos.z, hp:c.hp, max:c.max, cd:c.cd||0, healCd:c.healCd||0, buffCd:c.buffCd||0, spellCd:c.spellCd||0, bless:c.bless||0, target:c.target||null}));
+  const you={id:'you', x:player.pos.x, z:player.pos.z, hp:S.hp, max:stats().maxHp};
+  let crewEvents=[];
+  if(window.CREW){
+    const pool=mode==='dungeon'?mobs:(window.GATHERING?GATHERING.crit:[]);
+    const foes=[];
+    (pool||[]).forEach(m=>{
+      if(!m.alive||!m.m||m.m.hp<=0) return;
+      if(!m._cid) m._cid=m.key||('mob'+(m.idx!=null?m.idx:m.kind)+':'+Math.round(m.x)+':'+Math.round(m.z));
+      foes.push({id:m._cid, x:m.x, z:m.z, hp:m.m.hp, max:m.m.max||m.m.hp, threat:m.threat||0, ref:m});
+    });
+    const blockers=[];
+    if(mode==='world'&&SW.F&&SW.F.colliders){
+      (SW.F.colliders.circles||[]).forEach(b=>{ if(Math.hypot(b.x-player.pos.x,b.z-player.pos.z)<22) blockers.push({x:b.x,z:b.z,r:b.r||1}); });
+      (SW.F.colliders.boxes||[]).forEach(b=>{ if(Math.hypot(b.x-player.pos.x,b.z-player.pos.z)<22) blockers.push({x:b.x,z:b.z,hw:b.hw!=null?b.hw:b.w/2,hd:b.hd!=null?b.hd:b.d/2}); });
+    }
+    const sim=CREW.tick(crewPack, {dt, stance:S.crewStance||'aggressive', player:you, foes, allies:[you].concat(crewPack), blockers});
+    crewEvents=sim.events||[];
+    if(you.hp!==S.hp) S.hp=Math.max(0, Math.min(stats().maxHp, you.hp));
+    foes.forEach(f=>{
+      if(!f.ref||!f.ref.alive) return;
+      if(f.hp<f.ref.m.hp){ f.ref.m.hp=f.hp; f.ref.threat=f.threat||0; f.ref.hit=0.25; if(f.ref.m.hp<=0) killMob(f.ref, mode==='dungeon'); }
+    });
+  }
+  crewPack.forEach((p,i)=>{
+    const c=comps[i];
+    const dx=p.x-c.pos.x, dz=p.z-c.pos.z, d=Math.hypot(dx,dz);
+    c.pos.x=p.x; c.pos.z=p.z; c.hp=p.hp; c.max=p.max; c.cd=p.cd; c.healCd=p.healCd; c.buffCd=p.buffCd; c.spellCd=p.spellCd; c.bless=p.bless; c.target=p.target;
+    if(mode==='dungeon'&&dun&&dun.walk&&!dun.walk(c.pos.x, c.pos.z)){ c.pos.x-=dx; c.pos.z-=dz; }
+    c.pos.y=mode==='world'?groundY(c.pos.x,c.pos.z):0;
+    c.model.position.copy(c.pos);
+    if(d>0.02) c.model.rotation.y=lerpAngle(c.model.rotation.y, Math.atan2(dx,dz), Math.min(1,dt*10));
+    HERO.animate(c.model, clockT+i, d>0.02?1:0);
+    if(c.atkT>0){ c.atkT-=dt; const arm=c.model.userData.hero&&c.model.userData.hero.limbs&&c.model.userData.hero.limbs.armR; if(arm) arm.rotation.x=-2.2*Math.sin(c.atkT/0.35*Math.PI); }
+  });
+  crewEvents.forEach(ev=>{
+    if(ev.type==='hit'){ const who=comps.find(c=>c.name===ev.mate); if(who) who.atkT=0.35; crewMark(ev); }
+    else if(ev.type==='heal'){ crewMark(ev); if(ev.who!=='you'){ const a=comps.find(c=>c.name===ev.who); if(a) a.hp=Math.max(a.hp, (crewPack.find(p=>p.name===ev.who)||a).hp); } }
+    else if(ev.type==='bless'){ S.buffs.bless=Math.max(S.buffs.bless||0, 6); crewMark(ev); }
+  });
 }
 
-/* ---------- dungeon ---------- */
+const crewFx=[];
+function crewMark(ev){
+  const sc=mode==='dungeon'&&dun?dun.scene:scene;
+  if(!sc||!window.T) return;
+  if(ev.kind==='shot'||ev.kind==='missile'){
+    const bolt=new T.Mesh(new T.SphereGeometry(ev.kind==='missile'?0.14:0.08, 6, 6), new T.MeshBasicMaterial({color:ev.kind==='missile'?'#9ecbff':'#f0e2b0'}));
+    bolt.position.set(ev.from.x, 1.2, ev.from.z); sc.add(bolt);
+    crewFx.push({kind:'bolt', m:bolt, sc, from:ev.from, to:ev.to, t:0, life:0.32});
+  }
+  if(ev.type==='hit'||ev.type==='heal'||ev.type==='bless'){
+    const c=document.createElement('canvas'); c.width=160; c.height=64; const g=c.getContext('2d');
+    g.font='bold 40px sans-serif'; g.fillStyle=ev.type==='heal'?'#8dff9a':ev.type==='bless'?'#ffe08a':'#ffd0a0';
+    g.fillText(ev.type==='heal'?'+'+ev.n:ev.type==='bless'?'Bless':String(ev.dmg), 8, 46);
+    const tex=new T.CanvasTexture(c); const s=new T.Sprite(new T.SpriteMaterial({map:tex, transparent:true, depthWrite:false}));
+    const at=ev.at||ev.to||{x:player.pos.x,z:player.pos.z};
+    s.position.set(at.x, 1.9, at.z); s.scale.set(1.2, 0.5, 1); sc.add(s);
+    crewFx.push({kind:'num', m:s, sc, t:0, life:0.7});
+  }
+}
+function crewFxTick(dt){
+  for(let i=crewFx.length-1;i>=0;i--){
+    const f=crewFx[i]; f.t+=dt;
+    if(f.kind==='bolt'){ const k=Math.min(1, f.t/f.life); f.m.position.set(f.from.x+(f.to.x-f.from.x)*k, 1.2, f.from.z+(f.to.z-f.from.z)*k); }
+    else f.m.position.y+=dt*0.7;
+    if(f.t>=f.life){ f.sc.remove(f.m); if(f.m.geometry) f.m.geometry.dispose(); if(f.m.material){ if(f.m.material.map) f.m.material.map.dispose(); f.m.material.dispose(); } crewFx.splice(i,1); }
+  }
+}
+function paintStance(){
+  const box=$('crewStance'); if(!box) return;
+  const cur=S.crewStance||'aggressive';
+  box.querySelectorAll('[data-stance]').forEach(b=>b.classList.toggle('on', b.dataset.stance===cur));
+}
+function setStance(name){
+  if(!window.CREW||CREW.STANCES.indexOf(name)<0) return;
+  S.crewStance=name; paintStance(); save();
+}
 let dun=null, mobs=[], chests=[], dunLvl=1;
 let dunRet=null, dunName='The Undercroft';
 function enterDungeon(o){ o=o&&o.ret?o:null;
@@ -1102,15 +1228,15 @@ function castSpellFx(target){ if(!(window.MT&&MT.on)) return; const w=S.inv.find
   const to=target?new T.Vector3(target.x,(target.g?target.g.position.y:0)+0.9,target.z):new T.Vector3(player.pos.x+f*7,player.pos.y+1.1,player.pos.z+c*7); MT.cast(sc,from,to,MT.kindFor(w.spells)); }
 function attack(){ if(crOpen||atkCd>0) return;
   if(window.SHEETS&&SHEETS.onAttack(sheetOpen()).close) closeSheets();
-  atkCd=0.55; player.atkT=0.35; comps.forEach((c,i)=>setTimeout(()=>{ c.atkT=0.35; },80+i*90));
+  atkCd=0.55; player.atkT=0.35;
   const st=stats(); let best=null, bd=1e9; (mode==='dungeon'?mobs:GATHERING.crit).forEach(m=>{ if(!m.alive) return; const d=Math.hypot(m.x-player.pos.x,m.z-player.pos.z)-m.m.size*0.5; if(d<st.reach&&d<bd){ bd=d; best=m; } });
   if(!best){ castSpellFx(null); return; } player.face=Math.atan2(best.x-player.pos.x,best.z-player.pos.z); castSpellFx(best);
-  const fl=comps.length?2:0, r=SRD.d20(), tot=r+st.atk+fl; const hit=r===20||(r!==1&&tot>=best.m.ac); const ab=st.atk+(fl?'+2 flank':'');
-  if(!hit){ showRoll(r,'d20 '+r+' + '+ab+' = '+tot+' vs AC '+best.m.ac+' — <b>miss</b>'+(r===1?' (natural 1)':''),'miss'); return; }
-  let dmg=SRD.dice('1d8')+st.dmg; if(r===20) dmg*=2; const friends=comps.length; dmg+=friends;
-  best.m.hp-=dmg; best.hit=0.25;
+  const r=SRD.d20(), tot=r+st.atk; const hit=r===20||(r!==1&&tot>=best.m.ac);
+  if(!hit){ showRoll(r,'d20 '+r+' + '+st.atk+' = '+tot+' vs AC '+best.m.ac+' — <b>miss</b>'+(r===1?' (natural 1)':''),'miss'); return; }
+  let dmg=SRD.dice('1d8')+st.dmg; if(r===20) dmg*=2;
+  best.m.hp-=dmg; best.hit=0.25; best.threat=(best.threat||0)+1;
   if(window.STATIONS){ const w=S.inv.find(i=>i.equipped&&i.kind==='weapon'); if(w) STATIONS.wearItem(w,1); }
-  showRoll(r,'d20 '+r+' + '+ab+' = '+tot+' vs AC '+best.m.ac+' — <b>'+(r===20?'CRITICAL! ':'hit')+'</b> '+dmg+' dmg (Lyra, Juno & Kit copy: +'+friends+')',r===20?'crit':'');
+  showRoll(r,'d20 '+r+' + '+st.atk+' = '+tot+' vs AC '+best.m.ac+' — <b>'+(r===20?'CRITICAL! ':'hit')+'</b> '+dmg+' dmg',r===20?'crit':'');
   if(best.m.hp<=0) killMob(best, mode==='dungeon');
 }
 function killMob(best, inDun){ best.alive=false; GATHERING.addCarcass(best, inDun); const g=SRD.rnd(6)*best.m.xp; S.gold+=g;
@@ -1240,19 +1366,35 @@ function renderCreator(){ const w=innerWidth,h=innerHeight; renderer.setScissorT
 /* ---------- labels (speech bubbles) ---------- */
 function label(id){ let e=$(id); if(!e){ e=document.createElement('div'); e.id=id; e.className='label3d'; document.body.appendChild(e); } return e; }
 const lblD=label('lblDelroth'), lblM=label('lblMori'), lblDoll=label('lblDoll'), lblT=label('lblTarget');
+const _itemTag=window.TAGS?TAGS.fresh():{shown:false,text:''};
 { const t=document.createElement('div'); t.id='crThumbLab'; t.className='small'; t.innerHTML='<div style="display:flex;justify-content:space-around">'+VIEWS.map(v=>'<span>'+v[0]+'</span>').join('')+'</div><div style="text-align:center">identity lock · 5 angles</div>'; $('creator').appendChild(t); }
 function project(obj3, yOff, el, html){ tmpV.copy(obj3).setY(obj3.y+yOff).project(camera); if(tmpV.z>1||Math.abs(tmpV.x)>1.1||Math.abs(tmpV.y)>1.1){ el.style.display='none'; return; }
   el.style.display='block'; el.style.left=((tmpV.x+1)/2*innerWidth)+'px'; el.style.top=((1-tmpV.y)/2*innerHeight)+'px'; if(el._h!==html){ el.innerHTML=html; el._h=html; } }
 
 /* ---------- day / night ---------- */
-const DAY=240; const cDay=new T.Color('#8ec5ff'), cDusk=new T.Color('#ff9a6a'), cNight=new T.Color('#0b0a22'), skyC=new T.Color();
-function updateSky(dt){ const before=S.clock; S.clock=(S.clock+dt)%DAY; if(before>200&&S.clock<before&&window.VILLAGE) VILLAGE.onDay(S, atGuild()?'guild':String(curRegion()), atGuild()); const ph=S.clock/DAY, el=Math.sin(ph*Math.PI*2); // el>0 day
-  const day=Math.max(0,Math.min(1,el*2.5+0.3)); skyC.copy(cNight).lerp(cDay,day); if(Math.abs(el)<0.3) skyC.lerp(cDusk,(0.3-Math.abs(el))/0.3*0.55);
-  scene.background=skyC; scene.fog.color.copy(skyC); if(skyMesh){ skyMesh.position.set(player.pos.x,0,player.pos.z); if(skyMesh.material&&skyMesh.material.color) skyMesh.material.color.copy(skyC); } hemi.intensity=0.25+0.85*day; sun.intensity=2.2*day+0.05;
-  sun.position.set(player.pos.x+Math.cos(ph*Math.PI*2)*40, Math.max(6,el*50), player.pos.z+12); sun.target.position.set(player.pos.x,0,player.pos.z);
-  stars.material.opacity=1-day; stars.position.set(player.pos.x,0,player.pos.z);
+const DAY=240; const skyC=new T.Color(); let bright=1; try{ const bv=parseFloat(localStorage.getItem('mori.bright')); if(bv>=0.7&&bv<=1.5) bright=bv; }catch(e){}
+if($('bright')){ $('bright').value=Math.round(bright*100); $('bright').oninput=e=>{ bright=Math.max(0.7, Math.min(1.5, (+e.target.value)/100)); try{ localStorage.setItem('mori.bright', String(bright)); }catch(err){} updateSky(0); }; }
+function updateSky(dt){ const before=S.clock;
+  const sky=window.RESEED?RESEED.sky(S.clock, dt):{clock:(Number.isFinite(S.clock)?S.clock:40)+(dt||0), day:1, light:1, sun:2};
+  S.clock=sky.clock;
+  if(before>200&&S.clock<before&&window.VILLAGE) VILLAGE.onDay(S, atGuild()?'guild':String(curRegion()), atGuild()); const ph=S.clock/240, el=Math.sin(ph*Math.PI*2);
+  const day=sky.day;
+  const g=window.LOOK?LOOK.grade(day, el, bright):{horizon:[0.7,0.85,0.98],zenith:[0.4,0.62,0.95],fog:[0.7,0.85,0.98],fill:0.7,hemi:0.9,sun:1.4,sunColor:[1,0.95,0.8],skyColor:[0.8,0.9,1],groundColor:[0.22,0.26,0.16],exposure:1.15};
+  skyC.setRGB(g.horizon[0], g.horizon[1], g.horizon[2]);
+  scene.background=skyC; scene.fog.color.copy(skyC);
+  if(skyMesh&&window.LOOK) LOOK.paintSky(skyMesh, g.horizon, g.zenith);
+  if(skyMesh) skyMesh.position.set(player.pos.x,0,player.pos.z);
+  hemi.color.setRGB(g.skyColor[0], g.skyColor[1], g.skyColor[2]);
+  hemi.groundColor.setRGB(g.groundColor[0], g.groundColor[1], g.groundColor[2]);
+  hemi.intensity=g.hemi; fill.intensity=g.fill; sun.intensity=g.sun;
+  sun.color.setRGB(g.sunColor[0], g.sunColor[1], g.sunColor[2]);
+  if(renderer.toneMappingExposure!=null) renderer.toneMappingExposure=g.exposure;
+  const moon=day<0.22;
+  sun.position.set(player.pos.x+(moon?-18:Math.cos(ph*Math.PI*2)*40), moon?42:Math.max(10, el*46+12), player.pos.z+(moon?14:12));
+  sun.target.position.set(player.pos.x,0,player.pos.z);
+  stars.material.opacity=Math.max(0, 1-day*1.4); stars.position.set(player.pos.x,0,player.pos.z);
   built.forEach(b=>{ if(b.g.userData.halo) b.g.userData.halo.material.opacity=0.15+0.6*(1-day); });
-  $('sClock').textContent=(day>0.5?'☀ Day':el>-0.2&&el<0.2?'🌆 Dusk':'🌙 Night')+' '+String(Math.floor(ph*24)).padStart(2,'0')+':00';
+  $('sClock').textContent=(day>0.55?'☀ Day':Math.abs(el)<0.22?'🌆 Dusk':'🌙 Night')+' '+String(Math.floor(ph*24)).padStart(2,'0')+':00';
   return day; }
 
 /* ---------- HUD ---------- */
@@ -1260,11 +1402,12 @@ function hud(){ const st=stats(); $('sHp').textContent=S.hp+'/'+st.maxHp; $('hpb
   $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=(S.ore||0)+(window.GATHERING?GATHERING.stand('ore'):0); $('sTimber').textContent=S.timber;
   { const id=curRegion(), inf=PL.regionInfo(id), stg=stageOf(id); $('sRegion').textContent=mode==='dungeon'&&dun?'🕳 '+dunName+' · '+(dunRoomName()||'passage')+' · rooms '+(S.roomClears||0)+' · full clears '+(S.clears||0)+' · under '+inf.name:'🌍 '+(atGuild()?'The Guild · ':'')+inf.name+' · '+(stg?PL.BIOMES[inf.biome].name:'void')+' · '+STAGES[stg];
   if($('sWorld')&&window.IDLEBUILD) $('sWorld').textContent=IDLEBUILD.progressChip(); }
-  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none'; }
+  const ri=rankInfo(); $('sRank').textContent='🔨 '+ri.name+' '+ri.p+'%'; renderHotbar(); $('bAttack').style.display=(document.body.classList.contains('phone')||mode==='dungeon')?'':'none';
+  const brow=$('buffRow'); if(brow){ const keys=Object.keys(S.buffs||{}); brow.innerHTML=keys.map(k=>'<button type="button" data-buff="'+k+'">'+k+' '+Math.ceil(S.buffs[k])+'s</button>').join(''); brow.querySelectorAll('[data-buff]').forEach(b=>b.onclick=()=>{ if(window.EFFECTS) EFFECTS.dismiss(S.buffs, b.dataset.buff); if(player.model) player.model.userData.auraLeft=0; hud(); }); } }
 
 /* ---------- World Seed: travel, globe map, seed panel (v3) ---------- */
-function setTownVisible(v){ const skip=new Set([hemi,sun,sun.target,stars,player.model].concat(comps.map(c=>c.model)));
-  scene.children.forEach(o=>{ if(skip.has(o)||o.isLight||o.userData.sw) return; o.visible=v; }); }
+function setTownVisible(v){ const skip=new Set([hemi,sun,sun.target,stars,skyMesh,player.model].concat(comps.map(c=>c.model)));
+  scene.children.forEach(o=>{ if(!o||skip.has(o)||o.isLight||o.userData.sw) return; o.visible=v; }); }
 function tfFinishCur(){ if(curJob&&curJob.kind==='tf'&&curJob.plan){ TF.finishNow(curJob.plan); finishJob(curJob); } }
 function travelTo(id, quiet){ if(mode==='dungeon'||crOpen) return; id=+id; tfFinishCur(); S.at=id===guildId?null:id; refreshFrameAt();
   if(id===guildId) LORE.unlockFlag('visit_guild'); else if(window.CLAN&&CLAN.site){ if(CLAN.site.kind==='clan') LORE.unlockFlag('visit_clan'); if(CLAN.site.kind==='haven'){ LORE.unlockFlag('visit_haven'); if(CLAN.pct&&CLAN.pct()>0) LORE.unlockFlag('see_blight'); } }
@@ -1303,7 +1446,8 @@ function noteCivic(via, hint){ if(!window.GROUNDED||via==='level') return null; 
 function cityModal(id){ if(!SW.globe.G.mesh) SW.globe.build(); else if(globeDirty){ SW.globe.refresh(); globeDirty=false; } const cs=PL.cityState(id,guildId); const rels=cityRels(id);
   modal('<h3>⚑ '+cs.name+'</h3><div class="row"><span class="chip" style="background:'+cs.banner[0]+';color:'+cs.banner[1]+'">banner</span><b>'+cs.govName+'</b></div><div>Ruled by <b>'+cs.ruler+'</b></div><div class="quote">“'+cs.motto+'”</div><div class="small">Power '+cs.power+'/10 · '+PL.regionInfo(id).name+'</div>'+civicHTML(id)+'<div class="sec">Relations</div>'+(rels.length?rels.map(r=>'<div>'+r.w+' <b>'+r.name+'</b></div>').join(''):'<div class="small">No neighbours close enough to care yet.</div>')+CLAN.cityHTML(id)); }
 function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.globe.G; const sel=G.sel; const n=programmedCount(); const cities=(G.cities||[]); const ex=Object.keys(WD().exp).length;
-  let h='<div class="sec">World Seed</div><div class="row"><input id="seedIn" type="text" value="'+String(S.seed).replace(/"/g,'')+'" style="flex:1;min-width:0"><button id="seedApply">Apply</button><button id="seedRand">🎲 Randomize</button></div>';
+  let h='<div class="sec">World Seed</div><div class="row"><button id="seedNew" class="pri">New World</button><button id="seedRevert">Revert world</button></div>';
+  h+='<div class="row"><input id="seedIn" type="text" value="'+String(S.seed).replace(/"/g,'')+'" style="flex:1;min-width:0"><button id="seedApply">Apply</button><button id="seedRand">🎲 Randomize</button></div>';
   h+='<div class="small">Same seed → same planet, every time. Radius <b>3,185 km</b> (¼ of Earth\'s surface area). '+PL.COUNT+' regions of ~'+Math.round(PL.RADIUS_KM*Math.PI/2/PL.N)+' km. Only the seed and Mori\'s progress are saved; terrain, biomes and names are recomputed.</div>';
   h+='<div class="row small"><span class="chip">🌱 '+n+'/'+PL.COUNT+' programmed ('+(n/PL.COUNT*100).toFixed(1)+'%)</span><span class="chip">▦ '+(PL.COUNT-n)+' void</span><span class="chip">⚑ '+cities.length+' city-states</span><span class="chip">👣 '+ex+' explored</span></div>';
   if(sel>=0){ const inf=PL.regionInfo(sel), st=stageOf(sel); const own=G.own&&G.own.get(sel);
@@ -1316,7 +1460,6 @@ function renderSeedPanel(){ const b=$('seedBody'); if(!b) return; const G=SW.glo
   if(window.IDLEBUILD) h+=IDLEBUILD.settingsHTML();
   if(window.POWER) h+=POWER.settingsHTML();
   if(window.PHONE) h+=PHONE.settingsHTML(document.body.classList.contains('phone'));
-  h+='<div class="row"><button id="seedNew">New World</button><button id="seedRevert">Revert world</button></div>';
   h+='<div class="row"><button id="seedHome">🏛 Return to the Guild</button><button id="seedClose">✕ Close globe</button></div>';
   b.innerHTML=h;
   if(window.IDLEBUILD) IDLEBUILD.bindSettings(b);
@@ -1334,8 +1477,13 @@ function applySeed(v){ v=String(v||'').trim().slice(0,40); if(!v||v===S.seed) re
   TF.reset(); S.seed=v; PL.setSeed(v); guildId=PL.startRegion(); WD(); S.at=null; SW.globe.G.sel=guildId; SW.globe.build(); globeDirty=false;
   log('🌍 New World Seed "'+v+'". The Guild now stands in '+PL.regionInfo(guildId).name+'.'); const wasOpen=globeOpen; travelTo(guildId,true); if(wasOpen) openGlobe(); }
 function adoptWorld(next){ if(!window.NEWWORLD) return; NEWWORLD.install(S, next); tfFinishCur(); jobs=[]; if(curJob){ curJob=null; mori.path=[]; } if(window.TF) TF.reset();
-  PL.setSeed(S.seed||'mori'); guildId=PL.startRegion(); if(!S.worlds) S.worlds={}; WD(); S.at=null; SW.globe.G.sel=guildId; SW.globe.build(); globeDirty=false;
-  if(S.greet) addChat('mo', S.greet); log(S.greet||'The world is set.'); travelTo(guildId, true); if(globeOpen) renderSeedPanel(); }
+  if(!Number.isFinite(S.clock)) S.clock=40;
+  if(window.EFFECTS){ EFFECTS.scrub(S.buffs||(S.buffs={})); EFFECTS.rings(S.inv||[]); }
+  clearStreaks();
+  if(window.TAGS) TAGS.clear(_itemTag);
+  releaseBag();
+  PL.setSeed(S.seed||'mori'); guildId=PL.startRegion(); if(!S.worlds) S.worlds={}; WD(); S.at=null; SW.globe.G.sel=guildId; try{ SW.globe.build(); }catch(e){} globeDirty=false;
+  if(S.greet) addChat('mo', S.greet); log(S.greet||'The world is set.'); travelTo(guildId, true); try{ refreshFrameAt(); }catch(e){ log('The ground layer stumbled. A lit floor stays under you.'); } if(globeOpen) renderSeedPanel(); }
 function newWorld(v){ if(!window.NEWWORLD) return; v=String(v||'').trim(); if(!v){ log('Type a seed name first.'); return; }
   if(!confirm('New World "'+v+'"? Your pack, skills, and gold stay. This world is backed up and can be reverted. Nothing is wiped unless you confirm.')) return;
   const r=NEWWORLD.apply(S, v, {confirm:true}); if(!r.ok){ log(r.why||'The new world was not made.'); return; } adoptWorld(r.save); }
@@ -1385,8 +1533,9 @@ function tickMarch(){
 }
 let phaseN=0;
 function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phaseN):{world:true,audio:true,build:true,chunk:4,bgMs:1.5}}; if(window.TWOSPEED&&heavy.plan.bgMs!=null) TWOSPEED.budget=heavy.plan.bgMs;
+  crewFxTick(dt);
   mtClock+=dt; if(window.MT&&MT.on) MT.update(mtClock); // flame frames stay on the render clock; new audio buffers do not
-  clockT+=dt; updateCrafting(dt); for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
+  clockT+=dt; updateCrafting(dt); if(window.EFFECTS) EFFECTS.tick(S.buffs, dt); else { for(const k in S.buffs){ S.buffs[k]-=dt; if(S.buffs[k]<=0) delete S.buffs[k]; } } if(window.HERBAL) HERBAL.tickHots(dt); /* auto-apply salve (no roll) when HP < 40% and a salve is on the hotbar */ if(window.HERBAL&&S.hotbar&&S.hotbar.salve!==false){ const st=stats(); if(S.hp<st.maxHp*0.4&&S.hp>0&&!(S.hots&&S.hots.length)){ const sv=HERBAL.pickHotbar('salve'); if(sv) HERBAL.useHealItem(sv); } } atkCd=Math.max(0,atkCd-dt);
   if(logT>0){ logT-=dt; if(logT<=0) $('log').style.opacity=0.35; } if(rollT>0){ rollT-=dt; if(rollT<=0) $('roll').className=''; }
   // world simulation keeps running in the dungeon (Mori keeps building)
   if(mode==='world'&&window.IDLEBUILD&&heavy.plan.build) IDLEBUILD.update(dt);
@@ -1395,6 +1544,7 @@ function step(dt){ phaseN++; const heavy={plan:window.POWER?POWER.framePlan(phas
   if(!held) tickMarch();
   updateMori(dt);
   nodes.forEach(n=>{ if(!n.ready&&!n.claimed&&n.regrow>0){ n.regrow-=dt; if(n.regrow<=0){ n.ready=true; n.crown.visible=true; n.stump.visible=false; if(n.label) n.label.visible=true; } } });
+  nodes.forEach(n=>{ if(!n.label) return; const far=Math.hypot(n.x-player.pos.x, n.z-player.pos.z)>18; const menu=document.body.classList.contains('menu'); n.label.visible=!!(n.ready&&!far&&!menu); });
   weedT-=dt; if(weedT<=0){ weedT=4; if(weeds.length<26) spawnWeed(); }
   built.forEach(b=>{ if(b.g.userData.crystal) b.g.userData.crystal.rotation.y+=dt; });
   if(crOpen) return;
@@ -1439,7 +1589,13 @@ function render(day){ IMPOSTORS.setLight(0.32+0.68*day);
     const dl=W.STATIONS.doll; if(Math.hypot(dl.x-player.pos.x,dl.z-player.pos.z)<7) project(new T.Vector3(dl.x,0,dl.z),2.2,lblDoll,'🪆 “'+DOLL_LINES[Math.floor(clockT/6)%DOLL_LINES.length]+'”'); else lblDoll.style.display='none';
     renderWorld(scene);
   } else { [lblD,lblM,lblDoll].forEach(e=>e.style.display='none'); renderWorld(dun.scene); }
-  if(curTarget){ project(new T.Vector3(curTarget.x,mode==='world'?W.height(curTarget.x,curTarget.z):0,curTarget.z),1.0,lblT,curTarget.label); } else lblT.style.display='none';
+  if(curTarget){
+    const far=Math.hypot(curTarget.x-player.pos.x, curTarget.z-player.pos.z);
+    const menu=document.body.classList.contains('menu')||!!document.querySelector('.panel.open');
+    const tag=window.TAGS?TAGS.show(_itemTag, {id:curTarget.kind||curTarget.label, text:curTarget.label, dist:far, max:curTarget.r||6, gone:!!(curTarget.gone||curTarget.spent), menu}):{shown:!menu, text:curTarget.label};
+    if(tag.shown) project(new T.Vector3(curTarget.x,mode==='world'?W.height(curTarget.x,curTarget.z):0,curTarget.z),1.0,lblT,tag.text);
+    else lblT.style.display='none';
+  } else { if(window.TAGS) TAGS.clear(_itemTag); lblT.style.display='none'; }
 }
 function obeliskAnim(){ const u=obelisk.userData; u.orb.rotation.y=clockT*0.4; u.core.rotation.y=-clockT*0.3; u.ring.position.y=2.6+Math.sin(clockT*1.5)*0.6; const f=Math.min(1,programmedCount()/40); u.core.scale.setScalar(0.6+f*0.75); }
 let dayNow=1;
@@ -1457,6 +1613,15 @@ HERBAL.init({ S:()=>S, save, log, showRoll, stats });
 STATIONS.init({ S:()=>S, save, log });
 DREADLORD.init({ scene, delroth, log, showRoll });
 LORE.unlockFlag('visit_guild', true); LORE.unlock('npc_mori', true);
+if($('crewStance')) $('crewStance').querySelectorAll('[data-stance]').forEach(b=>b.onclick=()=>setStance(b.dataset.stance));
+paintStance();
+if(QS.get('fight')==='1'&&window.GATHERING&&GATHERING.spawnHostile){
+  S.crewStance='aggressive'; paintStance();
+  const w=GATHERING.spawnHostile('wolf', (S.player.x||0)+1.4, (S.player.z||8)-5.5);
+  if(w&&w.m){ w.m.hp=80; w.m.max=80; }
+  const shut=()=>{ const m=$('modal'); if(m) m.classList.remove('open'); };
+  setTimeout(shut, 400); setTimeout(shut, 1200);
+}
 TREASURY.init({ S:()=>S, log, mode:()=>mode });
 IDLEBUILD.init({
   S:()=>S, save, log, modal, addChat, player, PL, WD:()=>WD(), STAGES, PERF,
@@ -1474,7 +1639,7 @@ if(S.blue){ $('bBlue').textContent='☀ Wake Mori'; }
 setTownVisible(atGuild()); SW.update(player.pos.x,player.pos.z,999);
 (S.jobs||[]).forEach(j=>{ if(j&&j.kind&&j.what) jobs.push({kind:j.kind,what:j.what,id:S.nid++}); });
 if(!store.get(SAVE_KEY)) setTimeout(help,400);
-addEventListener('beforeunload',()=>{ tfFinishCur(); save(); }); document.addEventListener('visibilitychange',()=>{ if(document.hidden){ tfFinishCur(); if(window.IDLEBUILD) IDLEBUILD.stampSeen(); save(); } else { if(window.IDLEBUILD) IDLEBUILD.stampSeen(); } });
+addEventListener('beforeunload',()=>{ if(window.__resetting) return; tfFinishCur(); save(); }); document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(window.__resetting) return; tfFinishCur(); if(window.IDLEBUILD) IDLEBUILD.stampSeen(); save(); } else { if(window.IDLEBUILD) IDLEBUILD.stampSeen(); } });
 requestAnimationFrame(frame);
 
 /* test hook */

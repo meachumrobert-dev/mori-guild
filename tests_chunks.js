@@ -46,7 +46,7 @@ function edgeMatch(a,b,label){
 function crack(fine, coarse){
   const axis=Math.abs(fine[fine.length-1].x-fine[0].x)>Math.abs(fine[fine.length-1].z-fine[0].z)?'x':'z';
   const cs=coarse.slice().sort((p,q)=>p[axis]-q[axis]);
-  let gap=0, shareH=0, shareN=0;
+  let gap=0, shareH=0, shareN=0, shareC=0;
   fine.forEach(p=>{
     let a=cs[0], b=cs[cs.length-1];
     for(let i=0;i<cs.length-1;i++) if(cs[i][axis]<=p[axis]+1e-3 && cs[i+1][axis]+1e-3>=p[axis]){ a=cs[i]; b=cs[i+1]; break; }
@@ -58,8 +58,9 @@ function crack(fine, coarse){
     fine.forEach(f=>{ const d=Math.hypot(f.x-p.x, f.z-p.z); if(d<bd){ bd=d; best=f; } });
     shareH=Math.max(shareH, Math.abs(best.h-p.h));
     shareN=Math.max(shareN, Math.hypot(best.nx-p.nx, best.ny-p.ny, best.nz-p.nz));
+    shareC=Math.max(shareC, Math.abs((best.r||0)-(p.r||0)), Math.abs((best.g||0)-(p.g||0)), Math.abs((best.b||0)-(p.b||0)));
   });
-  return {gap, shareH, shareN};
+  return {gap, shareH, shareN, shareC};
 }
 
 [[16,'fine'],[8,'mid'],[4,'far']].forEach(([seg,name])=>{
@@ -75,6 +76,7 @@ function crack(fine, coarse){
   ok(ns.gap<0.002, 'south LOD '+fineSeg+'/'+coarseSeg+' crack '+ns.gap.toExponential(2)+' m');
   ok(ew.shareH<1e-4 && ns.shareH<1e-4, 'shared LOD vertices keep the same height');
   ok(ew.shareN<1e-4 && ns.shareN<1e-4, 'shared LOD vertices keep the same normal');
+  ok(ew.shareC<1e-4 && ns.shareC<1e-4, 'shared LOD vertices keep the same color');
 });
 
 let maxBorder=0, maxInner=0, at='';
@@ -125,6 +127,33 @@ const SLOPE_LIMIT=0.4;
 ok(maxBorder<SLOPE_LIMIT, 'chunk border slope gap '+maxBorder.toFixed(3)+' at '+at+' (limit '+SLOPE_LIMIT+')');
 ok(maxRegion<SLOPE_LIMIT, 'region border slope gap '+maxRegion.toFixed(3)+' (limit '+SLOPE_LIMIT+')');
 ok(maxBorder<=maxInner+0.35, 'chunk borders are no creasier than the ground inside a tile ('+maxBorder.toFixed(3)+' vs '+maxInner.toFixed(3)+')');
+
+function colorGap(a,b){
+  let dc=0;
+  for(let i=0;i<a.length;i++) dc=Math.max(dc, Math.abs(a[i].r-b[i].r), Math.abs(a[i].g-b[i].g), Math.abs(a[i].b-b[i].b));
+  return dc;
+}
+if(border){
+  let jump=0;
+  for(let z=-40; z<=40; z+=8){
+    const h1=SW.heightAt(border.x-4, z), h2=SW.heightAt(border.x+4, z);
+    const c1=SW.vertexColor(border.x-4, z, h1), c2=SW.vertexColor(border.x+4, z, h2);
+    jump=Math.max(jump, Math.abs(c1[0]-c2[0]), Math.abs(c1[1]-c2[1]), Math.abs(c1[2]-c2[2]));
+  }
+  ok(jump<0.22, 'region biome colors blend across the border ('+jump.toFixed(3)+')');
+}
+['mori','alpha','north','oak','river'].forEach(seed=>{
+  P.setSeed(seed);
+  const gid=P.startRegion();
+  SW.study(gid, ()=>1);
+  [[0,0,1,0,'e','w'],[0,0,0,1,'s','n'],[-1,1,-1,2,'s','n']].forEach(([ix,iz,jx,jz,sa,sb])=>{
+    [16,8,4].forEach(seg=>{
+      const A=SW.seam(ix,iz,seg,sa,seg), B=SW.seam(jx,jz,seg,sb,seg);
+      const dh=maxAbs(A,B,'h'), dn=Math.max(maxAbs(A,B,'nx'), maxAbs(A,B,'ny'), maxAbs(A,B,'nz')), dc=colorGap(A,B);
+      ok(dh<1e-4 && dn<1e-4 && dc<1e-5, seed+' chunk '+ix+','+iz+' '+sa+' seg '+seg+' matches the neighbour');
+    });
+  });
+});
 
 console.log('slope gap: chunk border '+maxBorder.toFixed(3)+', interior '+maxInner.toFixed(3)+', region border '+maxRegion.toFixed(3)+', void border '+maxVoid.toFixed(3)+', void meet '+meet.toFixed(2)+' m');
 console.log('tests_chunks: '+n+' checks passed');
