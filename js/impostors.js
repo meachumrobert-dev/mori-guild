@@ -43,8 +43,9 @@ function mkMesh(cap,name){ const q=new T.PlaneGeometry(1,1); q.translate(0,0.5,0
 const TREE_TINT={taiga:'#2f4f3a',jungle:'#2f7d2a',savanna:'#7d8a3a',swamp:'#3d5230',mountain:'#4a5e48',_:'#3b6b2c'};
 const tc=new T.Color();
 function chunkList(ix,iz){ const key=frameKey+':'+ix+','+iz; let c=chunkCards.get(key); if(c) return c; const SW=X.SW; const tl=SW.treeList(ix,iz); const out=[];
-  tc.set(TREE_TINT[tl.biome]||TREE_TINT._); const taiga=tl.biome==='taiga';
-  tl.list.forEach(([x,z,s],i)=>{ const h=SW.heightAt(x,z); if(X.blocked&&X.blocked(x,z,h)) return; const k=1+((i*3)%5-2)*0.06; out.push(x,h-0.3,z,3.4*s,6.6*s*(taiga?1.35:1),0,tc.r*k,tc.g*k,tc.b*k,0); });
+  tc.set(TREE_TINT[tl.biome]||TREE_TINT._); const taiga=tl.biome==='taiga'||tl.biome==='snow'||tl.biome==='tundra'||tl.biome==='mountain';
+  const cell=taiga?0:(tl.biome==='beach'||tl.biome==='desert'?2:1);
+  tl.list.forEach(([x,z,s],i)=>{ const h=SW.heightAt(x,z); if(X.blocked&&X.blocked(x,z,h)) return; const k=1+((i*3)%5-2)*0.06; out.push(x,h-0.3,z,3.4*s,6.6*s*(taiga?1.35:1),cell,tc.r*k,tc.g*k,tc.b*k,0); });
   c=new Float32Array(out); chunkCards.set(key,c); ST.chunkJobs++; if(chunkCards.size>700) chunkCards.delete(chunkCards.keys().next().value); return c; }
 function siteCards(out){ const SW=X.SW; const r=SW.siteRoot; if(!r) return; r.children.forEach(o=>{ const cd=o.userData.card; if(!cd) return; tc.set(cd.tint||'#ffffff');
   out.push(o.position.x,o.position.y,o.position.z,cd.w,cd.h,cd.cell,tc.r,tc.g,tc.b,cd.big?ST.midB*1.6:ST.midB); }); }

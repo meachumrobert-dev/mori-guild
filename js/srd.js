@@ -71,5 +71,16 @@ function rollTreasure(level){
   else { const it=ROBERT[rnd(ROBERT.length)-1]; Object.assign(out,{cat:"Robert's World", name:it[0], kind:it[1], value:500}); }
   return out;
 }
-window.SRD={dice, d20, dPct, rnd, MONSTERS, TEMPLATES, makeMonster, rollTreasure, ROBERT, mix};
+window.SRD={dice, d20, dPct, rnd, MONSTERS, TEMPLATES, makeMonster, scaleMonster, rollTreasure, ROBERT, mix};
+function scaleMonster(mon, depth){
+  const extra=Math.max(0, (depth|0)-1);
+  if(!mon||!extra) return mon;
+  mon.hp=Math.max(1, (mon.max||mon.hp)+extra*4);
+  mon.max=mon.hp;
+  mon.ac=(mon.ac||10)+Math.min(8, extra);
+  mon.atk=(mon.atk||0)+Math.min(8, extra);
+  mon.dmgBonus=(mon.dmgBonus||0)+Math.floor(extra/2);
+  mon.depth=depth|0;
+  return mon;
+}
 })();

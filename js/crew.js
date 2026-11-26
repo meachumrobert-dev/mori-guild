@@ -10,6 +10,9 @@ const ROLES={
 };
 const AGGRO={aggressive:14, defensive:6, passive:0};
 const STANCES=['aggressive','defensive','passive'];
+const BLESS_RANGE=12;
+const CATCH=20;
+const STUCK=3;
 function roleOf(mate){
   const n=String(mate.role||mate.name||'').toLowerCase();
   if(n==='tank'||n==='juno') return ROLES.tank;
@@ -44,6 +47,47 @@ function walk(mate, tx, tz, dt, blockers, speed){
     }
   }
   return {x:nx, z:nz, slid};
+}
+function pace(base, behind){
+  const d=behind||0;
+  if(d>8) return Math.max(base, 5.8);
+  if(d>4) return Math.max(base, 5.3);
+  return base;
+}
+function route(canWalk, x, z, tx, tz){
+  if(typeof canWalk!=='function') return null;
+  const tile=2;
+  const cell=(px,pz)=>[Math.floor(px/tile), Math.floor(pz/tile)];
+  const key=(a,b)=>a+','+b;
+  const [sx,sz]=cell(x,z), [gx,gz]=cell(tx,tz);
+  if(sx===gx&&sz===gz) return {x:tx, z:tz};
+  const q=[[sx,sz]], prev=new Map();
+  prev.set(key(sx,sz), null);
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  let found=null, guard=0;
+  while(q.length&&guard++<500){
+    const cur=q.shift();
+    if(cur[0]===gx&&cur[1]===gz){ found=cur; break; }
+    for(let i=0;i<dirs.length;i++){
+      const nx=cur[0]+dirs[i][0], nz=cur[1]+dirs[i][1], k=key(nx,nz);
+      if(prev.has(k)) continue;
+      const wx=(nx+0.5)*tile, wz=(nz+0.5)*tile;
+      if(!canWalk(wx, wz)) continue;
+      prev.set(k, cur);
+      q.push([nx,nz]);
+    }
+  }
+  if(!found) return null;
+  let step=found;
+  while(prev.get(key(step[0],step[1]))){
+    const p=prev.get(key(step[0],step[1]));
+    if(p[0]===sx&&p[1]===sz) break;
+    step=p;
+  }
+  return {x:(step[0]+0.5)*tile, z:(step[1]+0.5)*tile};
+}
+function shouldRegroup(dist, stuck){
+  return dist>CATCH||(stuck||0)>STUCK;
 }
 function followSlot(player, i){
   const p=player||{x:0,z:0};
@@ -103,7 +147,8 @@ function tick(mates, ctx){
   const events=[];
   (mates||[]).forEach((mate,i)=>{
     const role=roleOf(mate);
-    const speed=role.speed;
+    const behind=ctx.player?Math.hypot((ctx.player.x||0)-(mate.x||0), (ctx.player.z||0)-(mate.z||0)):0;
+    const speed=pace(role.speed, behind);
     mate.cd=Math.max(0,(mate.cd||0)-dt);
     mate.healCd=Math.max(0,(mate.healCd||0)-dt);
     mate.buffCd=Math.max(0,(mate.buffCd||0)-dt);
@@ -130,14 +175,29 @@ function tick(mates, ctx){
     }
     if(role.heal){
       const low=lowest(ctx.allies, mate.name);
-      if(low&&Math.hypot((low.x||0)-beforeX,(low.z||0)-beforeZ)>2.2) goal={x:(low.x||0)+0.9, z:(low.z||0)+0.9};
+      if(low&&Math.hypot((low.x||0)-beforeX,(low.z||0)-beforeZ)>2.2&&Math.hypot((low.x||0)-beforeX,(low.z||0)-beforeZ)<=BLESS_RANGE) goal={x:(low.x||0)+0.9, z:(low.z||0)+0.9};
     }
+    if(ctx.walk){ const wp=route(ctx.walk, beforeX, beforeZ, goal.x, goal.z); if(wp) goal=wp; }
     const step=walk(mate, goal.x, goal.z, dt, ctx.blockers, speed);
     if(step.slid&&act!=='retreat'&&act!=='follow') act='reposition';
     mate.x=step.x; mate.z=step.z;
+    if(ctx.walk&&!ctx.walk(mate.x, mate.z)){
+      const ax=beforeX+(step.x-beforeX), az=beforeZ;
+      const bx=beforeX, bz=beforeZ+(step.z-beforeZ);
+      if(ctx.walk(ax, az)){ mate.x=ax; mate.z=az; }
+      else if(ctx.walk(bx, bz)){ mate.x=bx; mate.z=bz; }
+      else { mate.x=beforeX; mate.z=beforeZ; }
+    }
+    const movedNow=Math.hypot(mate.x-beforeX, mate.z-beforeZ);
+    mate.stuck=movedNow<0.02?(mate.stuck||0)+dt:0;
+    if(ctx.player&&shouldRegroup(Math.hypot(mate.x-ctx.player.x, mate.z-ctx.player.z), mate.stuck)){
+      const off=[[-1.2,1.4],[0.2,1.8],[1.2,1.4]][i%3];
+      mate.x=ctx.player.x+off[0]; mate.z=ctx.player.z+off[1]; mate.stuck=0; mate.regrouped=true;
+      events.push({type:'regroup', mate:mate.name, x:mate.x, z:mate.z});
+    } else mate.regrouped=false;
     const moved=Math.hypot(mate.x-beforeX, mate.z-beforeZ);
     const cap=speed*dt+1e-4;
-    if(moved>cap){
+    if(!mate.regrouped&&moved>cap){
       const k=cap/moved;
       mate.x=beforeX+(mate.x-beforeX)*k;
       mate.z=beforeZ+(mate.z-beforeZ)*k;
@@ -158,8 +218,13 @@ function tick(mates, ctx){
       }
       if(mate.buffCd<=0){
         mate.buffCd=role.buffCd;
-        (ctx.allies||[]).forEach(a=>{ if(a) a.bless=1; });
-        events.push({type:'bless', mate:mate.name});
+        let any=false;
+        (ctx.allies||[]).forEach(a=>{
+          if(!a) return;
+          if(Math.hypot((a.x||0)-mate.x,(a.z||0)-mate.z)>BLESS_RANGE) return;
+          a.bless=1; any=true;
+        });
+        if(any) events.push({type:'bless', mate:mate.name});
       }
       const spellTarget=foe||foes.find(f=>inAggro(f, mate, ctx.player, stance)&&!isAlly(f.id, ctx.allies));
       if(spellTarget&&mate.spellCd<=0&&Math.hypot(spellTarget.x-mate.x, spellTarget.z-mate.z)<=role.range){
@@ -189,6 +254,6 @@ function order(mate, ctx){
   const side=(mate.slot||0)%2?1:-1;
   return {act:'flank', foe:best.id, x:best.x+side*1.4, z:best.z+side*0.4};
 }
-root.CREW={ROLES, STANCES, AGGRO, roleOf, walk, tick, order, star:['roleplay']};
+root.CREW={ROLES, STANCES, AGGRO, BLESS_RANGE, CATCH, STUCK, roleOf, walk, pace, route, shouldRegroup, tick, order, star:['roleplay']};
 if(typeof module!=='undefined'&&module.exports) module.exports=root.CREW;
 })(typeof window!=='undefined'?window:globalThis);

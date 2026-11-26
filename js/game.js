@@ -209,7 +209,7 @@ function placeStructure(type, plot, seed, instant, crooked){
 S.structs.forEach(s=>{ if(PLOTS[s.plot]) placeStructure(s.type,s.plot,s.seed,true,s.crooked); });
 
 /* ---------- inventory helpers ---------- */
-function addItem(it){ if(window.EFFECTS) EFFECTS.price(it); it.id='i'+(S.nid++); S.inv.push(it); if(['weapon','armor','ring','shield'].includes(it.kind)){ const cur=S.inv.find(x=>x.equipped&&x.kind===it.kind&&x!==it); if(!cur||(itemScore(it)>itemScore(cur))){ if(cur) cur.equipped=false; it.equipped=true; } } else if(it.kind==='wondrous'||it.kind==='charm') it.equipped=true; return it; }
+function addItem(it){ if(window.EFFECTS) EFFECTS.price(it); it.id='i'+(S.nid++); S.inv.push(it); if(['weapon','armor','shield'].includes(it.kind)){ const cur=S.inv.find(x=>x.equipped&&x.kind===it.kind&&x!==it); if(!cur||(itemScore(it)>itemScore(cur))){ if(cur) cur.equipped=false; it.equipped=true; } } else if(it.kind==='ring'){ const rings=S.inv.filter(x=>x!==it&&x.equipped&&x.kind==='ring'); if(rings.length<2) it.equipped=true; else { rings.sort((a,b)=>(a.value||0)-(b.value||0)); rings[0].equipped=false; it.equipped=true; } } else if(it.kind==='wondrous'||it.kind==='charm') it.equipped=true; return it; }
 /* SRD armor: base armor bonus and max Dex by type; shields by type. Masterwork adds no AC (it lowers the check penalty). */
 const ARMOR_SRD=[[/padded/i,'Padded',1,8],[/studded/i,'Studded Leather',3,5],[/leather/i,'Leather',2,6],[/chain ?shirt/i,'Chain Shirt',4,4],[/hide/i,'Hide',3,4],[/scale/i,'Scale Mail',4,3],[/chain ?mail/i,'Chainmail',5,2],[/breastplate/i,'Breastplate',5,3],[/splint/i,'Splint Mail',6,0],[/banded/i,'Banded Mail',6,1],[/half-?plate/i,'Half-Plate',7,0],[/full ?plate/i,'Full Plate',8,1]];
 const SHIELD_SRD=[[/buckler/i,'Buckler',1],[/tower/i,'Tower Shield',4],[/heavy/i,'Heavy Shield',2],[/light/i,'Light Shield',1]];
@@ -218,16 +218,16 @@ function armorInfo(it){ const n=(it.armorType||'')+' '+(it.name||''); for(const 
 function shieldInfo(it){ const n=(it.armorType||'')+' '+(it.name||''); for(const a of SHIELD_SRD) if(a[0].test(n)) return {type:a[1],ac:a[2]}; return {type:'Light Shield',ac:1}; }
 function itemScore(it){ const f=it.fx||{}; let base=0; if(it.kind==='armor'){ const a=armorInfo(it); base=a.ac+Math.min(DEX_MOD,a.md); } else if(it.kind==='shield') base=shieldInfo(it).ac;
   return base+(it.bonus||0)*(it.kind==='weapon'?2:1)+(it.mw&&!it.bonus&&it.kind==='weapon'?1:0)+(it.special?1:0)+(f.ac||0)+(f.atk||0)+(f.dmg||0)+(f.speed||0)*3; }
-function stats(){ let ac=10, atk=3, dmg=1, speed=0, arm=0, md=99, shd=0, other=0, aT=''; S.inv.filter(i=>i.equipped).forEach(i=>{ const f=i.fx||{}; if(i.kind==='weapon'){ atk+=i.bonus||(i.mw?1:0); dmg+=i.bonus||0; } if(i.kind==='armor'){ const a=armorInfo(i); arm=a.ac+(i.bonus||0); md=a.md; aT=a.type; } if(i.kind==='shield') shd=shieldInfo(i).ac+(i.bonus||0); other+=f.ac||0; atk+=f.atk||0; dmg+=f.dmg||0; speed+=f.speed||0; });
+function stats(){ let ac=10, atk=3, dmg=1, speed=0, arm=0, md=99, shd=0, defl=0, nat=0, other=0, aT='', die='1d8', threat=20; S.inv.filter(i=>i.equipped).forEach(i=>{ const f=i.fx||{}; const kind=window.GEAR?GEAR.bonusKind(i):'magic'; if(i.kind==='weapon'){ atk+=i.bonus||(i.mw?1:0); dmg+=i.bonus||0; if(window.GEAR){ const w=GEAR.weaponOf(i.name,'medium'); die=w.die; threat=w.threat; } } if(i.kind==='armor'){ const a=armorInfo(i); arm=a.ac+(i.bonus||0); md=a.md; aT=a.type; } if(i.kind==='shield') shd=Math.max(shd, shieldInfo(i).ac+(i.bonus||0)); if(f.ac){ if(kind==='shield') shd=Math.max(shd, f.ac); else if(kind==='natural') nat+=f.ac; else if(kind==='deflection') defl+=f.ac; else other+=f.ac; } atk+=f.atk||0; dmg+=f.dmg||0; speed+=f.speed||0; });
   if(S.outpost.holoTape){ atk+=1; } if(S.outpost.legionBoots) speed+=0.1; if(S.buffs.atk>0){ atk+=2; } if(S.buffs.ac>0) ac+=2;
-  const lv=charLevel(); atk+=Math.floor((lv-3)/2); // levels: +5 max HP each, +1 attack every 2 (wizard-ish BAB)
-  const dx=Math.min(DEX_MOD,md); ac+=dx+arm+shd+other;
-  const acNote='10 + Dex '+dx+(arm?' + '+aT+' '+arm:'')+(shd?' + shield '+shd:'')+(other?' + magic '+other:'')+(S.buffs.ac>0?' + barkskin 2':'');
-  return {ac, acNote, atk, dmg, speed:Math.min(0.8,speed), reach:2.1+(S.outpost.holoTape?0.8:0), maxHp:20+5*(lv-3)}; }
+  const lv=charLevel(); atk+=Math.floor((lv-3)/2);
+  const dx=Math.min(DEX_MOD,md); ac+=dx+arm+shd+defl+nat+other;
+  const acNote='10 + Dex '+dx+(arm?' + '+aT+' '+arm:'')+(shd?' + shield '+shd:'')+(defl?' + deflection '+defl:'')+(nat?' + natural '+nat:'')+(other?' + other '+other:'')+(S.buffs.ac>0?' + barkskin 2':'');
+  return {ac, acNote, atk, dmg, die, threat, speed:Math.min(0.8,speed), reach:2.1+(S.outpost.holoTape?0.8:0), maxHp:20+5*(lv-3)}; }
 const potions=()=>S.inv.filter(i=>i.kind==='potion');
 
 /* ---------- UI helpers ---------- */
-let logT=0; function log(msg){ const l=$('log'); l.textContent=msg; l.style.opacity=1; logT=5; }
+let logT=0; const heldLogs=[]; function log(msg){ if(mode==='dungeon'&&/^Mori\b/.test(String(msg||''))){ heldLogs.push(msg); return; } const l=$('log'); l.textContent=msg; l.style.opacity=1; logT=5; }
 let rollT=0; function showRoll(die, text, cls){ const r=$('roll'); $('rollDie').textContent=die; $('rollText').innerHTML=text; r.className='show '+(cls||''); r.dataset.where=mode; rollT=2.2; }
 function dismissRoll(){ rollT=0; const r=$('roll'); if(r){ r.className=''; r.dataset.where=''; } }
 function speak(t,v){ if(!$('ttsOn').checked||!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(t); u.pitch=v?v.pitch:1.4; u.rate=v?v.rate:1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){} }
@@ -334,7 +334,7 @@ function finishJob(j){
 const TF_DONE={grove:'i planted a grove! the little trees will get big.', hill:'a hill! you can climb it.', mountain:'a whole mountain. snow on top. i am tired.', lake:'i dug a lake. the water came by itself.', river:'a river bed! it runs down to the low ground.', flatten:'flat now. a village could go there one day.', meadow:'flowers! i made them out of little triangles. zinnias and marigolds and the dark gloomroses.'};
 function tfSuggestion(){ const rid=curRegion(); if(stageOf(rid)<1||!PL.regionInfo(rid).isLand||mode!=='world') return null; if(jobs.some(j=>j.kind==='tf')||(curJob&&curJob.kind==='tf')) return null;
   const sm=TF.summary()||{counts:{}}; const c=sm.counts, n=Object.values(c).reduce((a,b)=>a+b,0); if(n>=6) return null; const nm=PL.regionInfo(rid).name;
-  const pick=!c.grove?['grove','this land needs shade and birds']:!c.meadow?['meadow','bees need flowers here']:!c.lake?['lake','there is no still water here']:!c.hill?['hill','a lookout hill would be nice']:!c.river?['river','rain needs somewhere to run']:(stageOf(rid)>=2&&!c.flatten)?['flatten','level ground for a future village']:!c.mountain?['mountain','every region deserves one mountain']:['grove','more trees'];
+  const pick=!c.grove?['grove','this land needs shade and birds']:!c.meadow?['meadow','bees need flowers here']:!c.hill?['hill','a lookout hill would be nice']:!c.river?['river','rain needs somewhere to run']:(stageOf(rid)>=2&&!c.flatten)?['flatten','level ground for a future village']:!c.mountain?['mountain','every region deserves one mountain']:['grove','more trees'];
   return {kind:'tf', what:pick[0]+'|'+rid, why:pick[1]+' in '+nm}; }
 function queueCleanse(side,chat){ const rid=CLAN.pick().sister; const j=queueJob('cleanse',(side==='clan'?'clan':'kin')+'|'+rid); log('Queued for Mori: '+jobLabel(j));
   return 'ok! '+(side==='clan'?'i ride with a clan raid, from the edges in':'i cleanse with the moonfang kin, from the middle out')+'. '+(curRegion()===rid?'starting now!':'it starts when we are in havenwall ('+PL.regionInfo(rid).name+').'); }
@@ -422,6 +422,7 @@ function rarity(it){ const b=it.bonus||0, sp=(it.spells||[]).length+(it.special?
   if(it.mw||/Masterwork/i.test(it.name||'')) return RARITY[1];
   return RARITY[0]; }
 function rName(it,tag){ const r=rarity(it); return '<b style="color:'+r.c+'" class="bagName">'+it.name+'</b>'+(tag?' <span class="small" style="color:'+r.c+'">['+r.name+']</span>':''); }
+function treasureLevel(){ return window.GEAR?GEAR.treasureLevel(S.clears||0):1+(S.clears||0); }
 function charLevel(){ return 3+(S.clears||0)+Math.floor((S.qxp||0)/1000); } // v3.5: quest XP, guild pace 1,000 XP per level
 // green-and-up gear starts dropping around character level 4-5: below treasure level 4, magic gear rolls come out as masterwork
 function lootRoll(level){ const t=SRD.rollTreasure(level);
@@ -429,7 +430,7 @@ function lootRoll(level){ const t=SRD.rollTreasure(level);
   else if(level<4&&/^(Ring|Wondrous Item)$/.test(t.cat)){ Object.assign(t,{cat:'Potion', name:'Potion of Cure Light Wounds', kind:'potion', value:50, fx:{heal:'1d8+1'}, gated:true}); }
   return t; }
 function takeTreasure(t){
-  if(t.gold){ S.gold+=t.gold; return t.name+' (gold)'; }
+  if(t.gold){ S.gold+=t.gold; log('+'+t.gold+' gold.'); return t.name+' (gold)'; }
   const it={name:t.name, cat:t.cat, kind:t.kind==='armor'&&/Shield|Buckler/i.test(t.name)?'shield':t.kind, bonus:t.bonus||0, special:t.special||'', value:t.value||0, fx:Object.assign({}, t.fx||ROBERT_FX[t.name]||{}), curse:t.curse||'', note:t.note||''};
   if(window.EFFECTS) EFFECTS.price(it);
   if(t.name==='Template Stylus'){ const nt=TEMPLATES.find(x=>!S.templates.includes(x)); if(nt){ S.templates.push(nt); it.name+=' (taught '+nt+')'; } }
@@ -552,7 +553,7 @@ function updateCrafting(dt){ const c=(S.crafting||[])[0]; if(!c) return; c.remai
 
 /* ---------- Bag & Template Painter ---------- */
 function renderBag(){ const b=$('bagBody'); const st=stats(); const ch=charById(CH.sel);
-  let h='<div class="small">AC '+st.ac+' <span title="SRD: '+st.acNote+'">('+st.acNote+')</span> · Attack +'+st.atk+' · Damage 1d8+'+st.dmg+' · Speed +'+Math.round(st.speed*100)+'%'+(S.follower?' · <i>loyal follower of Delroth</i>':'')+'</div>';
+  let h='<div class="small">AC '+st.ac+' <span title="SRD: '+st.acNote+'">('+st.acNote+')</span> · Attack +'+st.atk+' · Damage '+(st.die||'1d8')+'+'+st.dmg+' · Speed +'+Math.round(st.speed*100)+'%'+(S.follower?' · <i>loyal follower of Delroth</i>':'')+'</div>';
   h+='<div class="sec">Items ('+S.inv.length+')</div>';
   h+='<div class="q barRow" data-bar-spell="1"><span class="barDrag" title="Spell. Not in the world yet."><b>Spell</b> <span class="small">Placeholder. Drag onto the 1–9 bar.</span></span></div>';
   h+=(S.inv.length?S.inv.map(it=>{ const salve=it.kind==='salve'; const tip=salve?'Salve. Heals over time. No roll.':'Drag onto the action bar'; return '<div class="q barRow" data-bar-id="'+it.id+'"><span class="barDrag" title="'+tip+'">'+(it.equipped?'✅ ':'')+(salve&&!/salve/i.test(it.name)?'Salve: ':'')+rName(it)+' <span class="small">'+rarity(it).name+' · '+(it.cat||'')+(it.spells?' · '+it.spells.join(', ')+(it.meta&&it.meta.length?' ['+it.meta.join(', ')+']':'')+' · '+it.use+(it.craftNote?' · '+it.craftNote:''):'')+(it.value?' · '+it.value.toLocaleString()+' gp':'')+(it.durability!=null?' · dur '+it.durability+'/'+it.maxDur+' · life '+((it.lifetime||0)-(it.uses||0))+' left':'')+'</span></span>'+
@@ -655,7 +656,12 @@ function chatRegen(id){ const rec=chatHist.find(x=>x.id===id); if(!rec||(rec.who
 function chatPin(id){ const rec=chatHist.find(x=>x.id===id); if(!rec) return; const npcId=chatNpc||'mori'; MEMORY.onPinChat(npcId, rec.text); if(npcId!=='mori') MEMORY.addXP(npcId,1); addChat('sys','📌 pinned'); if($('memP')&&$('memP').classList.contains('open')) renderMemory(); save(); }
 function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); if(!v) return; if(raw==null) $('chatIn').value=''; addChat('me',v);
   if(chatNpc){ const mm=/^(mori)[,:!]\s*(.*)$/i.exec(v); if(/^(mori|back to mori|talk to mori)$/i.test(v)){ endNpc(); openMoriChat(); return; } if(mm&&mm[2]) v=mm[2]; else { npcSay(v); return; } }
+  v=window.ASK?ASK.stripName(v):v.replace(/^\s*mori\b[,:!]\s*/i,'');
+  const asking=window.ASK&&ASK.question(v);
   moriN++; const s=v.toLowerCase();
+  if(asking){ const known=ASK.answer(v); if(known){ addChat('mo', known); return; }
+    if(/\bwhere\b/.test(s)&&window.NPCS){ const who=NPCS.DEFS.find(d=>s.indexOf(String(d.short||'').toLowerCase())>=0); if(who){ addChat('mo', (who.short||who.name)+' is the '+who.role+'. look in '+(window.QUESTS&&QUESTS.PLACE[who.home]||who.home)+'.'); return; } }
+  }
   if(S.blue&&!/wake/.test(s)){ addChat('mo','zzz… (blue room. press Wake Mori.)'); return; }
   if(/wake/.test(s)){ wakeMori(); return; }
   let m;
@@ -674,14 +680,15 @@ function sendChat(raw){ let v=(raw!=null?String(raw):$('chatIn').value).trim(); 
     let k=/\b(flowers?|meadow|blossoms?|wildflowers?|blooms?)\b/.test(s)?'meadow':/\b(trees?|grove|forest|woods|orchard)\b/.test(s)?'grove':/\bmountains?\b/.test(s)?'mountain':/\bhills?\b|\b(raise|lift)\b.*\b(earth|ground|land)\b/.test(s)?'hill':/\b(lake|pond)\b/.test(s)?'lake':/\b(river|riverbed|stream|creek)\b/.test(s)?'river':/\b(flatten|level|smooth)\b/.test(s)?'flatten':/\b(lower|sink)\b.*\b(earth|ground|land)\b/.test(s)?'lake':null;
     if(!k&&/\bterraform/.test(s)){ const t=tfSuggestion(); k=t?t.what.split('|')[0]:'grove'; }
     if(k&&verb){ const j=queueTF(k); if(j) addChat('mo','ok! '+TF.KINDS[k].label.toLowerCase()+' here in '+PL.regionInfo(curRegion()).name+'. watch the land!'); else addChat('mo','i can\'t shape this place yet.'); return; } }
-  for(const k in W.STRUCTS){ if(s.includes('build')&&(s.includes(k)||s.includes(W.STRUCTS[k].label.toLowerCase()))){ queueJob('build',k); addChat('mo','ok i build a '+W.STRUCTS[k].label.toLowerCase()+'! added to my jobs.'); return; } }
-  for(const k of ['timber','ore','herbs','weeds']) if(s.includes(k)&&/(get|gather|mine|pick|pull|chop)/.test(s)){ queueJob('gather',k); addChat('mo','going to get '+k+'!'); return; }
-  for(const k in BREWS) if(s.includes(k)||(k==='clw'&&/heal/.test(s))){ queueJob('brew',k); addChat('mo','brewing '+BREWS[k].label.toLowerCase()+'.'); return; }
-  for(const k in FORGES) if(s.includes(k)){ queueJob('forge',k); addChat('mo','grizzik! we forge a '+FORGES[k].label.toLowerCase()+'.'); return; }
+  for(const k in W.STRUCTS){ if(!asking&&s.includes('build')&&(s.includes(k)||s.includes(W.STRUCTS[k].label.toLowerCase()))){ queueJob('build',k); addChat('mo','ok i build a '+W.STRUCTS[k].label.toLowerCase()+'! added to my jobs.'); return; } }
+  for(const k of ['timber','ore','herbs','weeds']) if(!asking&&s.includes(k)&&/(get|gather|mine|pick|pull|chop)/.test(s)){ queueJob('gather',k); addChat('mo','going to get '+k+'!'); return; }
+  for(const k in BREWS) if(!asking&&(s.includes(k)||(k==='clw'&&/heal/.test(s)))){ queueJob('brew',k); addChat('mo','brewing '+BREWS[k].label.toLowerCase()+'.'); return; }
+  if(!asking&&/\b(forge|smelt)\b/.test(s)&&window.GEAR){ if(/\bbronze\b/.test(s)){ const r=GEAR.smelt(S.reag||(S.reag={}), 'bronze'); addChat('mo', r.ok?'bronze bar is in the bag. copper and tin, done.':r.why); return; } if(/\bbrass\b/.test(s)){ const r=GEAR.smelt(S.reag||(S.reag={}), 'brass'); addChat('mo', r.ok?'brass bar is in the bag.':'need copper bars and a zinc bar.'); return; } }
+  for(const k in FORGES) if(!asking&&/\b(forge|make|craft)\b/.test(s)&&new RegExp('\\b'+k+'\\b').test(s)){ queueJob('forge',k); addChat('mo','grizzik! we forge a '+FORGES[k].label.toLowerCase()+'.'); return; }
   if(/\bseed|program/.test(s)){ const id=seedCandidate(); if(id<0){ addChat('mo','nothing to seed right now. the edge is all done!'); return; } queueJob('seed',id); addChat('mo','ok! i seed '+jobLabel({kind:'seed',what:id}).replace(/^\S+ Seed /,'').replace(' · ',' in ')+'. the world gets more real.'); return; }
   if(/\b(who|what) are you\b|\bdelroth\b/.test(s)&&/delroth/.test(s)){ addChat('mo','delroth is on the tavern stage. he is level sixty and his hat is +5. he is nice to me.'); return; }
   { const c=moriCtx(), r=MORICHAT.reply(v,c); if(r){ addChat('mo',r); save(); return; } }
-  if(/\b(daw|beats?|nle|cut|yellow|226|blue room|build|proud)\b/.test(s)){ const r=ENG.talk(v); addChat('mo',r); return; }
+  if(!asking&&/\b(daw|beats?|nle|cut|yellow|226|blue room|proud)\b/.test(s)){ const r=ENG.talk(v); addChat('mo',r); return; }
   if(window.ROLE){
     const law=atGuild()?'public':'wild';
     const act=ROLE.read(v, {law:law});
@@ -961,13 +968,15 @@ if(QS.get('fresh')) setTimeout(()=>{
 }, 0);
 if(QS.get('globe')==='1') setTimeout(()=>{ if(typeof openGlobe==='function') openGlobe(); const m=$('modal'); if(m) m.classList.remove('open'); }, 700);
 function showPiece(part){
-  if(!window.SNAP) return;
+  if(!window.SNAP||!part) return;
   const at=SNAP.snap(part.x||0, part.z||0);
   const pit=new T.Mesh(new T.BoxGeometry(1, 0.08, 1), new T.MeshStandardMaterial({color:'#5a4632'}));
   pit.position.set(at.x, 0.04, at.z); scene.add(pit);
   const wall=new T.Mesh(new T.BoxGeometry(1, 1.7, 0.28), new T.MeshStandardMaterial({color:part.by==='mori'?'#7d6bb5':'#c4b08a'}));
   wall.position.set(at.x, 0.9, at.z); wall.name='snap-'+(part.by||'you'); scene.add(wall);
 }
+if(Array.isArray(S.pieces)) S.pieces.forEach(showPiece);
+setTimeout(()=>{ if(!window.DICT||!window.ASK) return; const words=['mori','oswin','bronze','brass','codex','wolf','skeleton','zombie','ooze','scimitar','treadwheel','shipyard','boat','guildhold','delroth','lyra','juno','kit','undercroft','chamomile','orichalcum','mithril','adamantine','nickel','zinc']; if(window.SRD) Object.keys(SRD.MONSTERS).forEach(k=>words.push(SRD.MONSTERS[k].name)); if(window.NPCS) NPCS.DEFS.forEach(d=>words.push(d.name, d.short)); DICT.addPack(ASK.words(words)); }, 1200);
 if(QS.get('build')==='1'&&window.SNAP) setTimeout(()=>{
   S.pieces=SNAP.coBuild(SNAP.place([], {kind:'wall', x:3.2, z:-4}, 'you'));
   S.pieces.forEach(showPiece);
@@ -1036,7 +1045,7 @@ function sitOn(t){ if(!t.sit){ log((t.verb||'Use')+': '+t.name+'. '+(t.flavor||'
 function worldTargets(){ const furn=(window.FURNITURE&&atGuild())?FURNITURE.targets('guild').map(t=>Object.assign({},t,{act:()=>sitOn(t)})):[]; return GATHERING.targets().concat(resourceTargets(),NPCS.targets(),CLAN.targets(),furn,baseWorldTargets()); }
 function resourceTargets(){ return nodes.filter(n=>n.ready&&n.rid&&window.ORES&&ORES.kind(n.rid)).map(n=>({x:n.x,z:n.z,r:2.6,label:ORES.prompt(n.rid),tip:ORES.tip(n.rid),act:()=>gatherNode(n)})); }
 function gatherNode(n){ if(!n||!n.ready) return; const q=YIELD()+(n.type==='ore'&&S.outpost.goldPick?1:0); n.ready=false; n.depleted=true; n.crown.visible=false; n.stump.visible=true; if(n.label) n.label.visible=false; n.regrow=40; curTarget=null;
-  if(n.rid&&window.ORES&&ORES.kind(n.rid)){ if(!S.reag) S.reag={}; S.reag[n.rid]=(S.reag[n.rid]||0)+q; if(window.SKILLS) SKILLS.use(S,'gathering','mining',1); log(ORES.gatherLine(n.rid, q, n.place)); return; }
+  if(n.rid&&window.ORES&&ORES.kind(n.rid)){ if(!S.reag) S.reag={}; S.reag[n.rid]=(S.reag[n.rid]||0)+q; if(window.SKILLS) SKILLS.use(S,'gathering','mining',1); log(ORES.gatherLine(n.rid, q, n.place, 'You')); return; }
   S[n.type]+=q; log('+'+q+' '+n.type); }
 function baseWorldTargets(){ if(!atGuild()) return regionTargets(); const st=W.STATIONS, sw=tav.userData.stageWorld; return regionTargets().concat([
   {x:st.seed.x+1.5,z:st.seed.z+1.5,r:3.4,label:'🌱 World Seed Obelisk (globe & seed)',act:()=>openGlobe()},
@@ -1100,7 +1109,7 @@ function updatePlayer(dt){
   HERO.animate(player.model, clockT, moving?Math.min(1.4,len*(1+stats().speed)):0);
   if(player.atkT>0){ player.atkT-=dt; const k=player.atkT/0.35; player.model.userData.hero.limbs.armR.rotation.x=-2.2*Math.sin(k*Math.PI); }
   // companions walk their own slots and swing on their own timers
-  const crewPack=comps.map(c=>({name:c.name, role:c.role, x:c.pos.x, z:c.pos.z, hp:c.hp, max:c.max, cd:c.cd||0, healCd:c.healCd||0, buffCd:c.buffCd||0, spellCd:c.spellCd||0, bless:c.bless||0, target:c.target||null}));
+  const crewPack=comps.map(c=>({name:c.name, role:c.role, x:c.pos.x, z:c.pos.z, hp:c.hp, max:c.max, cd:c.cd||0, healCd:c.healCd||0, buffCd:c.buffCd||0, spellCd:c.spellCd||0, bless:c.bless||0, target:c.target||null, stuck:c.stuck||0}));
   const you={id:'you', x:player.pos.x, z:player.pos.z, hp:S.hp, max:stats().maxHp};
   let crewEvents=[];
   if(window.CREW){
@@ -1116,7 +1125,7 @@ function updatePlayer(dt){
       (SW.F.colliders.circles||[]).forEach(b=>{ if(Math.hypot(b.x-player.pos.x,b.z-player.pos.z)<22) blockers.push({x:b.x,z:b.z,r:b.r||1}); });
       (SW.F.colliders.boxes||[]).forEach(b=>{ if(Math.hypot(b.x-player.pos.x,b.z-player.pos.z)<22) blockers.push({x:b.x,z:b.z,hw:b.hw!=null?b.hw:b.w/2,hd:b.hd!=null?b.hd:b.d/2}); });
     }
-    const sim=CREW.tick(crewPack, {dt, stance:S.crewStance||'aggressive', player:you, foes, allies:[you].concat(crewPack), blockers});
+    const sim=CREW.tick(crewPack, {dt, stance:S.crewStance||'aggressive', player:you, foes, allies:[you].concat(crewPack), blockers, walk:mode==='dungeon'&&dun&&dun.walk?dun.walk:null});
     crewEvents=sim.events||[];
     if(you.hp!==S.hp) S.hp=Math.max(0, Math.min(stats().maxHp, you.hp));
     foes.forEach(f=>{
@@ -1127,8 +1136,7 @@ function updatePlayer(dt){
   crewPack.forEach((p,i)=>{
     const c=comps[i];
     const dx=p.x-c.pos.x, dz=p.z-c.pos.z, d=Math.hypot(dx,dz);
-    c.pos.x=p.x; c.pos.z=p.z; c.hp=p.hp; c.max=p.max; c.cd=p.cd; c.healCd=p.healCd; c.buffCd=p.buffCd; c.spellCd=p.spellCd; c.bless=p.bless; c.target=p.target;
-    if(mode==='dungeon'&&dun&&dun.walk&&!dun.walk(c.pos.x, c.pos.z)){ c.pos.x-=dx; c.pos.z-=dz; }
+    c.pos.x=p.x; c.pos.z=p.z; c.hp=p.hp; c.max=p.max; c.cd=p.cd; c.healCd=p.healCd; c.buffCd=p.buffCd; c.spellCd=p.spellCd; c.bless=p.bless; c.target=p.target; c.stuck=p.stuck||0;
     c.pos.y=mode==='world'?groundY(c.pos.x,c.pos.z):0;
     c.model.position.copy(c.pos);
     if(d>0.02) c.model.rotation.y=lerpAngle(c.model.rotation.y, Math.atan2(dx,dz), Math.min(1,dt*10));
@@ -1138,7 +1146,7 @@ function updatePlayer(dt){
   crewEvents.forEach(ev=>{
     if(ev.type==='hit'){ const who=comps.find(c=>c.name===ev.mate); if(who) who.atkT=0.35; crewMark(ev); }
     else if(ev.type==='heal'){ crewMark(ev); if(ev.who!=='you'){ const a=comps.find(c=>c.name===ev.who); if(a) a.hp=Math.max(a.hp, (crewPack.find(p=>p.name===ev.who)||a).hp); } }
-    else if(ev.type==='bless'){ S.buffs.bless=Math.max(S.buffs.bless||0, 6); crewMark(ev); }
+    else if(ev.type==='bless'){ const lyra=comps.find(c=>c.name===ev.mate); const near=lyra&&Math.hypot(player.pos.x-lyra.pos.x, player.pos.z-lyra.pos.z)<=(CREW.BLESS_RANGE||12); if(near){ S.buffs.bless=Math.max(S.buffs.bless||0, 6); crewMark(ev); } }
   });
 }
 
@@ -1188,7 +1196,7 @@ function enterDungeon(o){ o=o&&o.ret?o:null;
     const opts=k==='direrat'?['fiendish','celestial','halffiend','zombie']:['fiendish','undead','halffiend','celestial']; return opts[SRD.rnd(opts.length)-1]; };
   // v3.2: progress is kept on retreat — slain foes stay slain, opened chests stay open, until the dungeon is cleared through the portal
   let DS=S.dun[dunName]; const resume=!!DS; if(!DS) DS=S.dun[dunName]={tm:[], dead:[], open:[], rested:false, lvl:dunLvl}; else dunLvl=Math.max(dunLvl,DS.lvl||dunLvl);
-  let mi=0; plan.forEach(([ri,list])=>{ const r=dun.rooms[ri]; list.forEach((k,i)=>{ const idx=mi++; if(DS.tm[idx]==null) DS.tm[idx]=tmplFor(k); const m=SRD.makeMonster(k,DS.tm[idx]); const g=W.creatureMesh(m);
+  let mi=0; plan.forEach(([ri,list])=>{ const r=dun.rooms[ri]; list.forEach((k,i)=>{ const idx=mi++; if(DS.tm[idx]==null) DS.tm[idx]=tmplFor(k); const made=SRD.makeMonster(k,DS.tm[idx]); const m=SRD.scaleMonster?SRD.scaleMonster(made, dunLvl):made; const g=W.creatureMesh(m);
     const a=dun.tw(r.x0+1+SRD.rnd(r.x1-r.x0-2), r.y0+1+SRD.rnd(r.y1-r.y0-2)); if(ri===3){ a[0]=dun.center(r)[0]; a[1]=dun.center(r)[1]; }
     const dead=DS.dead.includes(idx); g.position.set(a[0],0,a[1]); g.visible=!dead; dun.scene.add(g); mobs.push({m, g, x:a[0], z:a[1], cd:1+Math.random(), alive:!dead, room:ri, hit:0, idx, ag:false}); }); });
   [[1,false],[2,false],[3,true]].forEach(([ri,big],ci)=>{ const r=dun.rooms[ri]; const a=dun.tw(r.x1-1, r.y0+1); const g=W.chestMesh(big); g.position.set(a[0],0,a[1]); dun.scene.add(g); const open=DS.open.includes(ci); if(open&&g.userData.lid) g.userData.lid.rotation.x=-1.9; chests.push({g,x:a[0],z:a[1],big,open,room:ri,ci}); });
@@ -1207,20 +1215,20 @@ function leaveDungeon(msg){ if(mode!=='dungeon') return; dunSaveState(); if(S.du
   const card=$('modalCard'); if(card&&/Loot chest|Boss chest/.test(card.textContent||'')) closeModal();
   dun.scene.remove(player.model); scene.add(player.model); comps.forEach((c,i)=>{ dun.scene.remove(c.model); scene.add(c.model); });
   const st=dunRet||{x:W.STATIONS.dungeon.x,z:W.STATIONS.dungeon.z+4}; player.pos.set(st.x,0,st.z); comps.forEach((c,i)=>c.pos.set(st.x-1+i,0,st.z+1.5)); camYaw=Math.PI; trail.length=0; dunRet=null;
-  dun.scene.traverse(o=>{ if(o.geometry&&o.geometry.dispose) o.geometry.dispose(); }); dun=null; mobs=[]; chests=[]; if(msg) log(msg); save(); }
+  dun.scene.traverse(o=>{ if(o.geometry&&o.geometry.dispose) o.geometry.dispose(); }); dun=null; mobs=[]; chests=[]; heldLogs.splice(0).forEach(m=>log(m)); if(msg) log(msg); save(); }
 function zeroReturn(){ const keep=S.inv.some(i=>i.equipped&&i.fx&&i.fx.zeroKeep); const lost=keep?0:Math.floor(S.gold*0.1); S.gold-=lost; S.hp=stats().maxHp;
   if(mode==='dungeon'){ leaveDungeon(); } if(!atGuild()) travelTo(guildId,true); const h=W.STATIONS.hall; player.pos.set(h.x,0,h.z+7); comps.forEach((c,i)=>c.pos.set(h.x-1+i,0,h.z+8.5));
   modal('<h3>⭕ Zero-Return</h3><div class="quote">Your HP hit zero. The Guild calls you home to re-center.</div><div>'+(keep?'Your Zero-Return Band glows — you keep all your gold.':'You dropped '+lost+' gold on the way back.')+'</div>'); save(); }
 function dungeonTargets(){ const t=GATHERING.targets(); chests.forEach(c=>{ if(!c.open) t.push({x:c.x,z:c.z,r:2.2,label:(c.big?'💎 Boss chest':'📦 Loot chest')+' — roll d%',act:()=>openChest(c)}); });
   if(dun.camp) t.push({x:dun.camp.x,z:dun.camp.z,r:2.6,label:(S.dun[dunName]||{}).rested?'🔥 Campfire (used this visit)':'🔥 Rest at the campfire (full heal, once this visit)',act:restAtCamp});
   t.push({x:dun.exitAt[0],z:dun.exitAt[1],r:2.6,label:dunRet?'🪜 Climb back out':'🪜 Climb back to the Guild',act:()=>leaveDungeon('You climb out of the Undercroft.')});
-  if(!mobs.some(m=>m.alive&&m.m.boss)) t.push({x:dun.portalAt[0],z:dun.portalAt[1],r:2.4,label:'🌀 Portal home (cleared!)',act:()=>{ S.clears++; delete S.dun[dunName]; S.hp=stats().maxHp; leaveDungeon(dunName+' cleared! Level up: you are now level '+charLevel()+' ('+S.hp+' HP). Dungeons feel deeper next time (treasure level '+(S.clears+1)+').'); }});
+  if(!mobs.some(m=>m.alive&&m.m.boss)) t.push({x:dun.portalAt[0],z:dun.portalAt[1],r:2.4,label:'🌀 Portal home (cleared!)',act:()=>{ S.clears++; delete S.dun[dunName]; S.hp=stats().maxHp; leaveDungeon(dunName+' cleared! Level up: you are now level '+charLevel()+' ('+S.hp+' HP). Dungeons feel deeper next time (treasure level '+treasureLevel()+').'); }});
   return t; }
 function openChest(c){ if(c.room===3&&mobs.some(m=>m.alive&&m.m.boss)){ log('The ooze guards the boss chest. Defeat it first!'); return; }
   if(c.room<3&&mobs.some(m=>m.alive&&m.room===c.room)){ log('Clear the room before looting!'); return; }
-  c.open=true; c.g.userData.lid.rotation.x=-1.9; dunSaveState(); const n=c.big?3:1; const res=[]; for(let i=0;i<n;i++) res.push(lootRoll(charLevel()+(c.big?1:0)));
+  c.open=true; c.g.userData.lid.rotation.x=-1.9; dunSaveState(); const n=c.big?3:1; const res=[]; for(let i=0;i<n;i++) res.push(lootRoll(treasureLevel()+(c.big?1:0)));
   const got=res.map(t=>takeTreasure(t)); const bonus=walkUnlock(); showRoll(res[0].roll,'d% '+res[0].rolls.join(' → ')+' · '+res[0].name,'crit');
-  modal('<h3>'+(c.big?'💎 Boss chest':'📦 Loot chest')+'</h3><div class="small">Random treasure, SRD-style d% tables (character level '+charLevel()+', treasure level '+(charLevel()+(c.big?1:0))+')</div>'+res.map(rollHtml).join('')+'<div class="small">Also found: '+bonus+'</div><div class="small">Added to bag: '+got.join(', ')+'</div>'); save(); }
+  modal('<h3>'+(c.big?'💎 Boss chest':'📦 Loot chest')+'</h3><div class="small">Random treasure, SRD-style d% tables (character level '+charLevel()+', treasure level '+treasureLevel()+(c.big?' · boss roll '+(treasureLevel()+1):'')+')</div>'+res.map(rollHtml).join('')+'<div class="small">Also found: '+bonus+'</div><div class="small">Added to bag: '+got.join(', ')+'</div>'); save(); }
 let atkCd=0;
 /* Mori Templates: a weapon carrying SRD spells throws a flame / bolt stream at the target (cosmetic only; the d20 roll is unchanged) */
 function castSpellFx(target){ if(!(window.MT&&MT.on)) return; const w=S.inv.find(i=>i.equipped&&i.kind==='weapon'&&i.spells&&i.spells.length); if(!w) return;
@@ -1233,7 +1241,7 @@ function attack(){ if(crOpen||atkCd>0) return;
   if(!best){ castSpellFx(null); return; } player.face=Math.atan2(best.x-player.pos.x,best.z-player.pos.z); castSpellFx(best);
   const r=SRD.d20(), tot=r+st.atk; const hit=r===20||(r!==1&&tot>=best.m.ac);
   if(!hit){ showRoll(r,'d20 '+r+' + '+st.atk+' = '+tot+' vs AC '+best.m.ac+' — <b>miss</b>'+(r===1?' (natural 1)':''),'miss'); return; }
-  let dmg=SRD.dice('1d8')+st.dmg; if(r===20) dmg*=2;
+  let dmg=SRD.dice(st.die||'1d8')+st.dmg; if(window.GEAR?GEAR.crits(r, st.threat):r===20) dmg*=2;
   best.m.hp-=dmg; best.hit=0.25; best.threat=(best.threat||0)+1;
   if(window.STATIONS){ const w=S.inv.find(i=>i.equipped&&i.kind==='weapon'); if(w) STATIONS.wearItem(w,1); }
   showRoll(r,'d20 '+r+' + '+st.atk+' = '+tot+' vs AC '+best.m.ac+' — <b>'+(r===20?'CRITICAL! ':'hit')+'</b> '+dmg+' dmg',r===20?'crit':'');
@@ -1398,7 +1406,7 @@ function updateSky(dt){ const before=S.clock;
   return day; }
 
 /* ---------- HUD ---------- */
-function hud(){ const st=stats(); $('sHp').textContent=S.hp+'/'+st.maxHp; $('hpbar').firstElementChild.style.width=(S.hp/st.maxHp*100)+'%';
+function hud(){ const st=stats(); const hp=window.GEAR?GEAR.roundHp(S.hp):Math.round(S.hp); $('sHp').textContent=hp+'/'+st.maxHp; $('hpbar').firstElementChild.style.width=(S.hp/st.maxHp*100)+'%';
   $('sLife').textContent=S.life; $('sLarpy').textContent=S.larpy; $('sGold').textContent=S.gold; $('sHerbs').textContent=S.herbs; $('sOre').textContent=(S.ore||0)+(window.GATHERING?GATHERING.stand('ore'):0); $('sTimber').textContent=S.timber;
   { const id=curRegion(), inf=PL.regionInfo(id), stg=stageOf(id); $('sRegion').textContent=mode==='dungeon'&&dun?'🕳 '+dunName+' · '+(dunRoomName()||'passage')+' · rooms '+(S.roomClears||0)+' · full clears '+(S.clears||0)+' · under '+inf.name:'🌍 '+(atGuild()?'The Guild · ':'')+inf.name+' · '+(stg?PL.BIOMES[inf.biome].name:'void')+' · '+STAGES[stg];
   if($('sWorld')&&window.IDLEBUILD) $('sWorld').textContent=IDLEBUILD.progressChip(); }

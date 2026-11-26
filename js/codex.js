@@ -17,7 +17,12 @@ const PAGES={
   guild_hall:{cat:'jobs', sub:'buildings', name:'Guild hall', text:'Where the town keeps its name and its rest.', level:0},
   bloomery:{cat:'stations', sub:'craft', name:'Bloomery', text:'Ore and charcoal become a bloom.', level:1},
   human:{cat:'races', sub:'peoples', name:'Human', text:'Short lives, quick towns, restless trade.', level:0},
-  prestidigitation:{cat:'spells', sub:'transmutation', name:'Prestidigitation', text:'A cantrip of small shows. Flavor, not a fireball.', school:'transmutation', level:0}
+  prestidigitation:{cat:'spells', sub:'transmutation', name:'Prestidigitation', text:'A cantrip of small shows. Flavor, not a fireball.', school:'transmutation', level:0},
+  skeleton:{cat:'bestiary', sub:'beasts', name:'Human skeleton', text:'Bones with a sword. It does not breathe.', level:1},
+  zombie:{cat:'bestiary', sub:'beasts', name:'Human zombie', text:'Slow undead. It keeps coming.', level:1},
+  grayooze:{cat:'bestiary', sub:'beasts', name:'Gray ooze', text:'The Undercroft boss. Acid, and no armor to speak of.', level:3},
+  monitor:{cat:'bestiary', sub:'beasts', name:'Monitor lizard', text:'A big reptile of warm coasts and swamps.', level:2},
+  firebeetle:{cat:'bestiary', sub:'beasts', name:'Giant fire beetle', text:'A glowing vermin. The glands burn.', level:1}
 };
 function fresh(){ return {seen:{}}; }
 function discover(book, id){

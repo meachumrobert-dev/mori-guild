@@ -138,10 +138,11 @@ body.phone #ctx #bInteract{display:flex;opacity:.45}
 body.phone #ctx #bInteract.hot{opacity:1}
 #roadFade{position:fixed;inset:0;background:#0e0b16;opacity:0;pointer-events:none;transition:opacity .35s;z-index:40}
 #roadFade.on{opacity:1}
-#crewStance{position:fixed;z-index:7;right:8px;bottom:78px;display:flex;gap:4px}
+#crewStance{position:fixed;z-index:4;left:8px;right:auto;top:132px;bottom:auto;display:flex;flex-direction:column;gap:4px}
 #crewStance button{min-height:36px;padding:4px 8px;font-size:12px;opacity:.72}
 #crewStance button.on{opacity:1;outline:2px solid #a3ff12}
-body.phone #crewStance{right:max(8px,env(safe-area-inset-right));bottom:calc(var(--chrome-bottom, 212px) + 8px)}
+body:has(.panel.open) #crewStance,body.menu #crewStance{display:none}
+body.phone #crewStance{left:max(8px,env(safe-area-inset-left));right:auto;top:calc(var(--hud-top, 96px) + 56px);bottom:auto}
 body.phone #crewStance button{min-width:48px;min-height:40px}
 #phoneMenu{display:none}
 body.phone #phoneMenu{display:flex;position:fixed;z-index:8;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:48px;min-height:48px;width:48px;height:48px;padding:0;align-items:center;justify-content:center;font-size:22px}
@@ -322,6 +323,9 @@ body.phone #turnHint button{min-height:48px;min-width:48px}
 <script src="js/sheets.js"></script>
 <script src="js/raidmarch.js"></script>
 <script src="js/crew.js"></script>
+<script src="js/gear.js"></script>
+<script src="js/ask.js"></script>
+<script src="js/realm.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/newworld.js"></script>
 <script src="js/reseed.js"></script>

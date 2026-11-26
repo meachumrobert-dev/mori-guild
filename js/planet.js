@@ -118,7 +118,7 @@ function cityState(id, guildId){ const k='c'+id; if(cache.has(k)) return cache.g
     if(gk==='lord') ruler+=' '+word(r).replace(/(mont|dale|reach|gard|holm|wick|stead|mere|ford|crest|haven|spire|march|fall|vale|moor|keep|port)$/,'')+' of '+nm;
     if(gk==='theocracy') ruler+=' of '+FAITHS[Math.floor(r()*FAITHS.length)];
     const b1=BANNERS[Math.floor(r()*BANNERS.length)]; let b2=BANNERS[Math.floor(r()*BANNERS.length)]; if(b2===b1) b2=b1==='#111318'?'#ecf0f1':'#111318';
-    cs={id, name:nm, gov:gk, govName:G.name, ruler, banner:[b1,b2], motto:MOTTOS[Math.floor(r()*MOTTOS.length)], power:1+Math.floor(r()*10)}; }
+    cs={id, name:nm, gov:gk, govName:G.name, ruler, banner:[b1,b2], motto:MOTTOS[id%MOTTOS.length]+' — '+nm, power:1+Math.floor(r()*10)}; }
   cs.biome=inf.biome; cache.set(k,cs); return cs; }
 function relation(a,b){ const lo=Math.min(a,b), hi=Math.max(a,b); const h=hashInt(SEED,'rel',lo,hi)%100; const A=cityState(a), B=cityState(b);
   if(h<32) return {type:'ally'}; if(h<62) return {type:'rival'};

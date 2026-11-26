@@ -476,7 +476,9 @@ function setFrame(id, guild){
   F.id=id; F.guild=!!guild; F.info=P.regionInfo(id); F.stage=stageOf(id); F.roads=[]; F.curve=[]; F.bridges=[]; F.gradeLines=[]; F.flats=[]; F.targets=[]; F.colliders={segs:[],circles:[],boxes:[]}; F.city=null; F.barrow=null; F.flag=null; F.waystone=null; F.keep=null; F.clan=null; F.settlement=null;
   const O=P.regionCenter(id); F.O=O; let E=P.cross([0,1,0],O); if(Math.hypot(...E)<1e-3) E=[1,0,0]; E=P.norm(E); F.E=E; F.Nn=P.cross(O,E);
   F.e0=F.stage>0?P.elevation(O[0],O[1],O[2]):0; F.d0=0; F.d0=F.stage>0?(rawH(0,0).h):0;
-  const inf=F.info; F.seaY=(F.stage>0&&F.e0<400)?-F.e0:null;
+  const inf=F.info; const coastal=!guild&&F.stage>0&&(inf.biome==='beach'||/coast/i.test(inf.name||''));
+  F.seaY=(F.stage>0&&F.e0<400)?-F.e0:null;
+  if(coastal){ const shore=rawH(30,0).h; F.seaY=shore+0.4; }
   TFD=(opt.tf&&F.stage>0)?opt.tf.bind(id):(opt.tf&&opt.tf.bind(-1),null);
   F.A=guild?{x:170,z:140}:{x:0,z:0}; F.L=guild?{x:0,z:8}:{x:0,z:F.stage>=4?55:F.stage>=3?50:26};
   if(F.stage>0&&inf.isLand&&F.stage>=3) F.flats.push({x:F.A.x,z:F.A.z,r0:F.stage>=4?20:10,r1:F.stage>=4?36:18,h:rawH(F.A.x,F.A.z).h});
@@ -484,6 +486,7 @@ function setFrame(id, guild){
   if(water){ root.remove(water); water=null; }
   if(F.seaY!=null){ water=new T.Mesh(new T.PlaneGeometry(1600,1600),new T.MeshLambertMaterial({color:'#2a6db5',transparent:true,opacity:0.82})); water.rotation.x=-Math.PI/2; water.position.y=F.seaY; water.userData.sw=true; root.add(water); }
   try{ buildSite(); }catch(err){ F.siteError=String(err&&err.message||err); }
+  if(F.seaY!=null&&!F.guild){ F.targets.push({x:22,z:8,r:4,label:'⚓ Dock',kind:'dock'}); F.targets.push({x:28,z:12,r:4,label:'🚢 Shipyard',kind:'yard'}); }
   lastPC=null; }
 function landing(){ const L=F.L; return {x:L.x, z:L.z}; }
 

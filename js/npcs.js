@@ -18,7 +18,7 @@ const EVENING=[[1.5,'sleep'],[8.5,'eat'],[10,'work']];
 const L={ human:{scale:1}, halfling:{scale:0.68}, gnome:{scale:0.66}, dwarf:{scale:0.8,wide:1.18}, halforc:{scale:1.08,wide:1.1}, halfelf:{scale:0.98,ears:true}, wolf:{scale:1.08,wolf:true} };
 const DEFS=[
  {id:'oswin', name:'Warden Oswin Hale', short:'Oswin', role:'Guild Hall steward', home:'guild', race:'human', look:{skin:'#e0b48c',hair:'#8a8a8a',shirt:'#2f4a7a',pants:'#3a3028',beard:'#8a8a8a'}, voice:{pitch:0.85,rate:0.95},
-  sched:DAYWORK, spots:{work:[[0,-6.5],[3,-6]],eat:[-10.2,13.4],sleep:[2.4,-9.6]},
+  sched:DAYWORK, spots:{work:[[0,-6.5],[3,-6]],eat:[-10.2,13.4],sleep:[0.4,-11.2]}, bed:true,
   P:{traits:'formal, dutiful, dry humor', greet:['Well met. I am Oswin Hale, warden of this Guild Hall. I keep the ledgers and the peace.'], again:['Ah, {name}. Back again — visit {visits} by my ledger.','{name}. The hall is in order. How can I help?'],
    bye:['Mind the fence on your way.','Go well, {name}.'], self:['Warden of the Guild Hall. I keep the ledger of every job, every visitor and every coin. Mori keeps the town; I keep count.'],
    work:['Ledgers, mostly. Mori builds, I write it down, and the Guild remembers.'], place:['This is the Guild — the planet\'s starting point. Hall, forge, bench, the Retired Bard, and the Undercroft below.'],
@@ -248,11 +248,11 @@ function hour(){ return (X.S().clock||0)/X.DAY*24; }
 function spawn(d, g, A, F, root, existing){ const n={d, g, spots:resolve(d,A,F), x:0, z:0, yaw:0, act:'work', walking:false, existing:!!existing, F};
   const h=hour(), a=phaseAt(d,h), sp=target(n,a,h); n.x=sp.x; n.z=sp.z; n.act=a; place(n,0); if(root&&!existing) root.add(g); live.push(n); return n; }
 function target(n,a,h){ if(a==='work'){ const w=n.spots.work; return w[Math.floor(h/1.5)%w.length]; } return n.spots[a]||n.spots.work[0]; }
-function place(n,t){ const y=X.hAt(n.x,n.z), g=n.g; if(!g) return; const lie=n.act==='sleep'&&!n.walking&&n.d.id!=='grizzik', sit=n.act==='eat'&&!n.walking;
-  g.position.set(n.x, y+(n.walking?Math.abs(Math.sin(t*7))*0.05:0)+(lie?0.18:0)-(sit?0.12:0), n.z); g.rotation.set(lie?-Math.PI/2:0, n.yaw, 0, 'YXZ');
+function place(n,t){ const y=X.hAt(n.x,n.z), g=n.g; if(!g) return; const bunk=n.act==='sleep'&&!n.walking&&n.d.id!=='grizzik'; const sit=n.act==='eat'&&!n.walking;
+  g.position.set(n.x, y+(n.walking?Math.abs(Math.sin(t*7))*0.05:0)+(bunk?0.42:0)-(sit?0.12:0), n.z); g.rotation.set(0, n.yaw, 0);
   if(g.userData.label){ const p=X.player.pos; g.userData.label.visible=Math.hypot(p.x-n.x,p.z-n.z)<16; } }
 function buildGuild(){ guildGrp=new T.Group(); guildGrp.name='npcs_guild'; X.scene.add(guildGrp); const st=X.STATIONS; const A={A:{x:0,z:0}};
-  DEFS.filter(d=>d.home==='guild'||d.home==='bard').forEach(d=>{ if(d.existing==='grizzik'){ spawn(d,null,{A:{x:0,z:0}},null,null,true); return; } spawn(d, makeBody(d), A, null, guildGrp); }); }
+  DEFS.filter(d=>d.home==='guild'||d.home==='bard').forEach(d=>{ if(d.existing==='grizzik'){ spawn(d,null,{A:{x:0,z:0}},null,null,true); return; } spawn(d, makeBody(d), A, null, guildGrp); if(d.bed){ const s=d.spots.sleep; const bed=new T.Mesh(new T.BoxGeometry(1.4,0.28,0.7), new T.MeshLambertMaterial({color:'#6a4428'})); bed.position.set(s[0], 0.2, s[1]); bed.name='bunk-'+d.id; guildGrp.add(bed); } }); }
 function siteHook(F,K){ for(let i=live.length-1;i>=0;i--) if(live[i].d.home==='clan'||live[i].d.home==='haven') live.splice(i,1); anvilG=null; tents=null;
   const site=window.CLAN&&CLAN.site; if(!site||!X) return; const A={A:F.A}; ['hold','stall','gate','forge'].forEach(k=>{ if(site[k]) A[k]=site[k]; }); if(site.brakka) A.brakka0={x:site.brakka.x,z:site.brakka.z};
   const home=site.kind; if(home==='clan'){ const a=spotXY({a:'A',dx:-4,dz:14.8},A); anvilG=new T.Mesh(new T.BoxGeometry(0.9,0.6,0.45),new T.MeshLambertMaterial({color:'#3a3a3a'})); anvilG.position.set(a.x,K.heightAt(a.x,a.z)+0.3,a.z); K.root.add(anvilG); }
