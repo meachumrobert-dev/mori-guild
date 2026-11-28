@@ -57,7 +57,7 @@ function nameOf(id){ const k=KINDS[id]; return k?k.name:null; }
 function worldLabel(id){ return nameOf(id)||'Ore'; }
 function prompt(id){ const n=nameOf(id); return n?'⛏ Mine '+n:'⛏ Mine ore'; }
 function tip(id){ const k=KINDS[id]; return k?k.tip:('Ore. Yields '+(nameOf(id)||'ore')+'.'); }
-function gatherLine(id, n, place){ const name=nameOf(id)||'Ore'; const qty=(n==null?1:n); return 'Mori: +'+qty+' '+name+(place?' from the '+place:'')+'.'; }
+function gatherLine(id, n, place, who){ const name=nameOf(id)||'Ore'; const qty=(n==null?1:n); return (who||'Mori')+': +'+qty+' '+name+(place?' from the '+place:'')+'.'; }
 function reagents(){
   return Object.keys(KINDS).map(id=>{ const k=KINDS[id]; return {id, name:k.name, fam:'ore', tier:k.tier, gp:k.gp, wt:k.wt, stack:k.stack, col:k.col}; });
 }

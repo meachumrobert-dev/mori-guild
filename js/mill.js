@@ -18,10 +18,14 @@ function shaft(source, opt){
 }
 function walk(state, steps){
   state=state||{endurance:0};
-  const next=shaft('tread', {steps:steps||0, endurance:state.endurance||0});
-  state.endurance=next.endurance;
-  state.power=next.power;
-  state.loads=next.loads;
+  const add=Math.max(0, steps||0);
+  state.steps=Math.min(80, (state.steps||0)+add);
+  state.endurance=Math.round(((state.endurance||0)+add*0.05)*100)/100;
+  state.power=Math.round(Math.min(1, state.steps/40)*100)/100;
+  const loads=LOADS.slice();
+  const share=loads.length?state.power/loads.length:0;
+  state.loads={};
+  loads.forEach(id=>{ state.loads[id]=Math.round(share*100)/100; });
   return state;
 }
 root.MILL={LOADS, shaft, walk, star:['mundane']};
